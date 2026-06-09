@@ -131,6 +131,10 @@ dist
 # Turborepo
 .turbo/
 
+# Prisma generated client
+**/prisma/generated/
+**/src/generated/
+
 # Python
 __pycache__/
 *.pyc
