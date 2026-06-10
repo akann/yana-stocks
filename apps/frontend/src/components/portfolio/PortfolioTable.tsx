@@ -10,7 +10,8 @@ export function PortfolioTable({ portfolio }: { portfolio: Portfolio }) {
         <h3 className="font-medium text-white">{portfolio.name}</h3>
         {portfolio.totalValue != null && (
           <span className="text-sm text-gray-400">
-            Total: <span className="text-white font-medium">${portfolio.totalValue.toFixed(2)}</span>
+            Total:{' '}
+            <span className="text-white font-medium">${portfolio.totalValue.toFixed(2)}</span>
           </span>
         )}
       </div>
@@ -33,14 +34,24 @@ export function PortfolioTable({ portfolio }: { portfolio: Portfolio }) {
                   : null;
               const positive = pnl == null || pnl >= 0;
               return (
-                <tr key={stock.symbol} className="border-b border-gray-800 last:border-0 hover:bg-gray-800/50">
+                <tr
+                  key={stock.symbol}
+                  className="border-b border-gray-800 last:border-0 hover:bg-gray-800/50"
+                >
                   <td className="px-4 py-3 font-medium text-white">{stock.symbol}</td>
                   <td className="px-4 py-3 text-right text-gray-300">{stock.shares}</td>
-                  <td className="px-4 py-3 text-right text-gray-300">${stock.avgCostBasis.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-right text-gray-300">
+                    ${stock.avgCostBasis.toFixed(2)}
+                  </td>
                   <td className="px-4 py-3 text-right text-gray-300">
                     {stock.currentValue != null ? `$${stock.currentValue.toFixed(2)}` : '—'}
                   </td>
-                  <td className={clsx('px-4 py-3 text-right font-medium', positive ? 'text-green-400' : 'text-red-400')}>
+                  <td
+                    className={clsx(
+                      'px-4 py-3 text-right font-medium',
+                      positive ? 'text-green-400' : 'text-red-400',
+                    )}
+                  >
                     {pnl != null ? `${positive ? '+' : ''}$${pnl.toFixed(2)}` : '—'}
                   </td>
                 </tr>

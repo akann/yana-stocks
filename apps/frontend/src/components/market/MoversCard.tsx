@@ -22,7 +22,8 @@ function MoverRow({ entry, rank }: { entry: MoverEntry; rank: number }) {
       <div className="text-right">
         <div className="text-sm font-medium text-white">${entry.price.toFixed(2)}</div>
         <div className={clsx('text-xs font-medium', positive ? 'text-green-400' : 'text-red-400')}>
-          {positive ? '+' : ''}{entry.changePercent.toFixed(2)}%
+          {positive ? '+' : ''}
+          {entry.changePercent.toFixed(2)}%
         </div>
       </div>
     </Link>
@@ -50,7 +51,9 @@ export function MoversCard() {
           {(data?.gainers ?? []).map((entry, i) => (
             <MoverRow key={entry.symbol} entry={entry} rank={i + 1} />
           ))}
-          {!data?.gainers?.length && <p className="text-gray-500 text-sm py-4 text-center">No data</p>}
+          {!data?.gainers?.length && (
+            <p className="text-gray-500 text-sm py-4 text-center">No data</p>
+          )}
         </div>
       </div>
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
@@ -61,7 +64,9 @@ export function MoversCard() {
           {(data?.losers ?? []).map((entry, i) => (
             <MoverRow key={entry.symbol} entry={entry} rank={i + 1} />
           ))}
-          {!data?.losers?.length && <p className="text-gray-500 text-sm py-4 text-center">No data</p>}
+          {!data?.losers?.length && (
+            <p className="text-gray-500 text-sm py-4 text-center">No data</p>
+          )}
         </div>
       </div>
     </div>

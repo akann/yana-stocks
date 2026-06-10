@@ -1,4 +1,12 @@
-import { Controller, DefaultValuePipe, Get, Param, ParseIntPipe, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  DefaultValuePipe,
+  Get,
+  Param,
+  ParseIntPipe,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { OHLCV } from '@yana-stocks/shared-types';
 import { UserFromTokenGuard } from '../common/current-user.decorator';

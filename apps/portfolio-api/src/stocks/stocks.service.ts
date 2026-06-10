@@ -4,7 +4,12 @@ import { ConfigService } from '@nestjs/config';
 import type { OHLCV, PredictionSignal, SentimentSignal } from '@yana-stocks/shared-types';
 import { firstValueFrom } from 'rxjs';
 import { RedisService } from '../redis/redis.service';
-import type { AggregateStockResponse, MarketMovers, MoverEntry, PriceCacheEntry } from './price-cache.types';
+import type {
+  AggregateStockResponse,
+  MarketMovers,
+  MoverEntry,
+  PriceCacheEntry,
+} from './price-cache.types';
 
 @Injectable()
 export class StocksService {
@@ -70,7 +75,15 @@ export class StocksService {
       if (!raw) return [];
       const entry = JSON.parse(raw) as PriceCacheEntry;
       const symbol = key.replace('papi:price:', '');
-      return [{ symbol, price: entry.price, change: entry.change, changePercent: entry.changePercent, volume: entry.volume }];
+      return [
+        {
+          symbol,
+          price: entry.price,
+          change: entry.change,
+          changePercent: entry.changePercent,
+          volume: entry.volume,
+        },
+      ];
     });
 
     entries.sort((a, b) => b.changePercent - a.changePercent);

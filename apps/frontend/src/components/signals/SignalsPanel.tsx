@@ -43,7 +43,9 @@ export function SignalsPanel({ symbol }: { symbol: string }) {
     <div className="space-y-4">
       {/* Sentiment */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Sentiment</h3>
+        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          Sentiment
+        </h3>
         {sentiment ? (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -68,7 +70,9 @@ export function SignalsPanel({ symbol }: { symbol: string }) {
 
       {/* Predictions */}
       <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Predictions</h3>
+        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+          Predictions
+        </h3>
         {predList.length > 0 ? (
           <div className="grid grid-cols-2 gap-2">
             {predList.map((p) => {
@@ -78,11 +82,21 @@ export function SignalsPanel({ symbol }: { symbol: string }) {
               return (
                 <div key={p.horizon} className="bg-gray-800 rounded-lg p-3">
                   <div className="text-xs text-gray-400 mb-1">{HORIZON_LABELS[p.horizon]}</div>
-                  <div className="text-base font-semibold text-white">${p.predictedPrice.toFixed(2)}</div>
-                  <div className={clsx('text-xs font-medium', positive ? 'text-green-400' : 'text-red-400')}>
-                    {positive ? '+' : ''}{pct.toFixed(2)}%
+                  <div className="text-base font-semibold text-white">
+                    ${p.predictedPrice.toFixed(2)}
                   </div>
-                  <div className="text-xs text-gray-500 mt-1">conf: {(p.confidence * 100).toFixed(0)}%</div>
+                  <div
+                    className={clsx(
+                      'text-xs font-medium',
+                      positive ? 'text-green-400' : 'text-red-400',
+                    )}
+                  >
+                    {positive ? '+' : ''}
+                    {pct.toFixed(2)}%
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    conf: {(p.confidence * 100).toFixed(0)}%
+                  </div>
                 </div>
               );
             })}

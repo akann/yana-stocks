@@ -1,7 +1,11 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { KAFKA_GROUP_IDS, KAFKA_TOPICS } from '@yana-stocks/kafka-client';
-import type { ProcessedPriceMessage, PredictionSignal, SentimentSignal } from '@yana-stocks/shared-types';
+import type {
+  ProcessedPriceMessage,
+  PredictionSignal,
+  SentimentSignal,
+} from '@yana-stocks/shared-types';
 import { Consumer, Kafka } from 'kafkajs';
 import { RedisService } from '../redis/redis.service';
 import type { PriceCacheEntry } from '../stocks/price-cache.types';
@@ -23,7 +27,11 @@ export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit(): Promise<void> {
     await this.consumer.connect();
     await this.consumer.subscribe({
-      topics: [KAFKA_TOPICS.PRICES_PROCESSED, KAFKA_TOPICS.SIGNALS_SENTIMENT, KAFKA_TOPICS.SIGNALS_PREDICTION],
+      topics: [
+        KAFKA_TOPICS.PRICES_PROCESSED,
+        KAFKA_TOPICS.SIGNALS_SENTIMENT,
+        KAFKA_TOPICS.SIGNALS_PREDICTION,
+      ],
       fromBeginning: false,
     });
 
@@ -49,9 +57,7 @@ export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
 
   private async handlePrice(msg: ProcessedPriceMessage): Promise<void> {
     const existing = await this.redis.get(`papi:price:${msg.symbol}`);
-    const prevPrice = existing
-      ? (JSON.parse(existing) as PriceCacheEntry).price
-      : msg.price;
+    const prevPrice = existing ? (JSON.parse(existing) as PriceCacheEntry).price : msg.price;
 
     const change = msg.price - prevPrice;
     const changePercent = prevPrice !== 0 ? (change / prevPrice) * 100 : 0;

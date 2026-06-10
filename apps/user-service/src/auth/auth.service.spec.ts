@@ -136,5 +136,4 @@ describe('AuthService', () => {
       expect(redis.del).toHaveBeenCalledWith('refresh:some-refresh-token');
     });
   });
-
 });

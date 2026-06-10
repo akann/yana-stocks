@@ -84,7 +84,16 @@ describe('StocksService', () => {
   describe('getHistory', () => {
     it('returns cached OHLCV data from Redis', async () => {
       const mockBars: OHLCV[] = [
-        { symbol: 'AAPL', timestamp: new Date(), open: 170, high: 182, low: 169, close: 180, volume: 500000, interval: '1m' },
+        {
+          symbol: 'AAPL',
+          timestamp: new Date(),
+          open: 170,
+          high: 182,
+          low: 169,
+          close: 180,
+          volume: 500000,
+          interval: '1m',
+        },
       ];
       redis.get.mockResolvedValue(JSON.stringify(mockBars));
 
@@ -96,21 +105,24 @@ describe('StocksService', () => {
 
     it('fetches from price-processor when cache is cold and caches the result', async () => {
       const mockBars: OHLCV[] = [
-        { symbol: 'AAPL', timestamp: new Date(), open: 170, high: 182, low: 169, close: 180, volume: 500000, interval: '1m' },
+        {
+          symbol: 'AAPL',
+          timestamp: new Date(),
+          open: 170,
+          high: 182,
+          low: 169,
+          close: 180,
+          volume: 500000,
+          interval: '1m',
+        },
       ];
       redis.get.mockResolvedValue(null);
-      httpService.get.mockReturnValue(
-        of({ data: mockBars } as AxiosResponse<OHLCV[]>),
-      );
+      httpService.get.mockReturnValue(of({ data: mockBars } as AxiosResponse<OHLCV[]>));
 
       const result = await service.getHistory('AAPL');
 
       expect(result).toHaveLength(1);
-      expect(redis.set).toHaveBeenCalledWith(
-        'papi:history:AAPL:100',
-        expect.any(String),
-        30,
-      );
+      expect(redis.set).toHaveBeenCalledWith('papi:history:AAPL:100', expect.any(String), 30);
     });
   });
 
@@ -126,7 +138,10 @@ describe('StocksService', () => {
     });
 
     it('returns cached movers when available', async () => {
-      const cachedMovers = { gainers: [{ symbol: 'AAPL', price: 180, change: 5, changePercent: 2.8, volume: 1000000 }], losers: [] };
+      const cachedMovers = {
+        gainers: [{ symbol: 'AAPL', price: 180, change: 5, changePercent: 2.8, volume: 1000000 }],
+        losers: [],
+      };
       redis.get.mockResolvedValue(JSON.stringify(cachedMovers));
 
       const result = await service.getMovers();

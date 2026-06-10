@@ -27,12 +27,20 @@ export function Navbar() {
             yana<span className="text-blue-400">stocks</span>
           </Link>
           <div className="hidden md:flex items-center gap-4 text-sm text-gray-400">
-            <Link href="/" className="hover:text-white transition-colors">Market</Link>
+            <Link href="/" className="hover:text-white transition-colors">
+              Market
+            </Link>
             {isAuthenticated && (
               <>
-                <Link href="/dashboard" className="hover:text-white transition-colors">Dashboard</Link>
-                <Link href="/portfolio" className="hover:text-white transition-colors">Portfolio</Link>
-                <Link href="/watchlist" className="hover:text-white transition-colors">Watchlist</Link>
+                <Link href="/dashboard" className="hover:text-white transition-colors">
+                  Dashboard
+                </Link>
+                <Link href="/portfolio" className="hover:text-white transition-colors">
+                  Portfolio
+                </Link>
+                <Link href="/watchlist" className="hover:text-white transition-colors">
+                  Watchlist
+                </Link>
               </>
             )}
           </div>
@@ -47,7 +55,9 @@ export function Navbar() {
             </button>
           ) : (
             <>
-              <Link href="/login" className="text-gray-400 hover:text-white transition-colors">Sign in</Link>
+              <Link href="/login" className="text-gray-400 hover:text-white transition-colors">
+                Sign in
+              </Link>
               <Link
                 href="/register"
                 className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md transition-colors"

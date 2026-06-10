@@ -61,9 +61,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <h3 className="font-medium text-white">{p.name}</h3>
                 {p.totalValue != null && (
-                  <span className="text-sm text-gray-400">
-                    ${p.totalValue.toFixed(2)}
-                  </span>
+                  <span className="text-sm text-gray-400">${p.totalValue.toFixed(2)}</span>
                 )}
               </div>
               <p className="text-sm text-gray-500 mt-1">{p.stocks.length} holdings</p>

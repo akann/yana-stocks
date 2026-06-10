@@ -1,9 +1,11 @@
 # yana-stocks — Claude Code Instructions
 
 ## Project Overview
+
 `yana-stocks` is a production-grade microservices application for real-time stock market data, portfolio management, sentiment analysis, and ML-based price prediction. It runs on a self-hosted Kubernetes cluster managed via ArgoCD GitOps.
 
 ## Monorepo Structure
+
 Turborepo + pnpm workspaces.
 
 ```
@@ -36,6 +38,7 @@ yana-stocks/
 ## Tech Stack
 
 ### NestJS Services
+
 - Framework: NestJS (latest)
 - PostgreSQL ORM: Prisma (`user-service` only)
 - MongoDB ORM: Mongoose via `@nestjs/mongoose`
@@ -47,6 +50,7 @@ yana-stocks/
 - Config: `@nestjs/config`
 
 ### Frontend
+
 - Next.js 14 (App Router)
 - TailwindCSS
 - Recharts (charts)
@@ -54,6 +58,7 @@ yana-stocks/
 - No Vite — Next.js uses Turbopack
 
 ### Python Services
+
 - Python 3.12
 - FastAPI (HTTP endpoints where needed)
 - HuggingFace `transformers` + FinBERT (sentiment-analyzer)
@@ -62,6 +67,7 @@ yana-stocks/
 - PyMongo (MongoDB)
 
 ### Testing
+
 - Jest (unit + integration) for NestJS
 - pytest for Python
 - Playwright (E2E) in `apps/e2e/`
@@ -70,6 +76,7 @@ yana-stocks/
 ## Services
 
 ### 1. price-ingestor (Python)
+
 - **Purpose:** Poll Alpaca API for real-time stock prices, publish to Kafka
 - **Kafka producer:** `stocks.prices.raw`
 - **Data source:** Alpaca Markets free tier (paper trading API)
@@ -77,6 +84,7 @@ yana-stocks/
 - **No DB** — pure producer
 
 ### 2. price-processor (NestJS)
+
 - **Purpose:** Consume raw prices, store OHLCV history, cache latest price
 - **Kafka consumer:** `stocks.prices.raw`
 - **Kafka producer:** `stocks.prices.processed`
@@ -84,6 +92,7 @@ yana-stocks/
 - **Redis:** Latest price cache (TTL 5s)
 
 ### 3. sentiment-analyzer (Python)
+
 - **Purpose:** Consume news feed, run FinBERT NLP, publish sentiment signals
 - **Kafka producer:** `stocks.signals.sentiment`
 - **MongoDB:** Store articles + sentiment scores
@@ -91,6 +100,7 @@ yana-stocks/
 - **Model:** `ProsusAI/finbert` from HuggingFace
 
 ### 4. ml-predictor (Python)
+
 - **Purpose:** Price prediction using LSTM/Prophet, serve via REST + Kafka
 - **Kafka producer:** `stocks.signals.prediction`
 - **MongoDB:** Store predictions
@@ -99,6 +109,7 @@ yana-stocks/
 - **REST:** `/api/predict/:symbol`
 
 ### 5. user-service (NestJS)
+
 - **Purpose:** User registration, login, JWT auth, refresh tokens
 - **PostgreSQL (CNPG):** Users, refresh token store
 - **Redis:** Refresh token blacklist
@@ -112,6 +123,7 @@ yana-stocks/
   - `GET /auth/me`
 
 ### 6. portfolio-service (NestJS)
+
 - **Purpose:** Portfolio and watchlist management, trade history
 - **MongoDB:** Portfolios, watchlists, trades
 - **Kafka consumer:** `stocks.prices.processed` (for portfolio valuation)
@@ -124,6 +136,7 @@ yana-stocks/
   - `GET /trades`
 
 ### 7. portfolio-api (NestJS)
+
 - **Purpose:** REST aggregator — combines prices, signals, predictions
 - **Redis:** Cache aggregated responses (TTL 10s)
 - **Endpoints:**
@@ -133,6 +146,7 @@ yana-stocks/
   - `GET /market/movers` — top gainers/losers
 
 ### 8. frontend (Next.js 14)
+
 - **Purpose:** Dashboard UI
 - **Routes:**
   - `/` — market overview, top movers
@@ -144,6 +158,7 @@ yana-stocks/
 - **URL:** `https://stocks.yanatech.co.uk`
 
 ### 9. e2e (Playwright)
+
 - **Purpose:** End-to-end tests
 - **Coverage:** Auth flows, portfolio CRUD, stock data display
 - **Config:** Chromium + iPhone 14 (mobile)
@@ -151,17 +166,18 @@ yana-stocks/
 
 ## Kafka Topics
 
-| Topic | API version | Partitions | Retention | Producer | Consumer(s) |
-|---|---|---|---|---|---|
-| `stocks.prices.raw` | kafka.strimzi.io/v1 | 3 | 24h | price-ingestor | price-processor |
-| `stocks.prices.processed` | kafka.strimzi.io/v1 | 3 | 7d | price-processor | ml-predictor, portfolio-api |
-| `stocks.signals.sentiment` | kafka.strimzi.io/v1 | 3 | 7d | sentiment-analyzer | portfolio-api |
-| `stocks.signals.prediction` | kafka.strimzi.io/v1 | 3 | 7d | ml-predictor | portfolio-api |
-| `stocks.portfolio.events` | kafka.strimzi.io/v1 | 3 | 30d | portfolio-service | price-processor |
+| Topic                       | API version         | Partitions | Retention | Producer           | Consumer(s)                 |
+| --------------------------- | ------------------- | ---------- | --------- | ------------------ | --------------------------- |
+| `stocks.prices.raw`         | kafka.strimzi.io/v1 | 3          | 24h       | price-ingestor     | price-processor             |
+| `stocks.prices.processed`   | kafka.strimzi.io/v1 | 3          | 7d        | price-processor    | ml-predictor, portfolio-api |
+| `stocks.signals.sentiment`  | kafka.strimzi.io/v1 | 3          | 7d        | sentiment-analyzer | portfolio-api               |
+| `stocks.signals.prediction` | kafka.strimzi.io/v1 | 3          | 7d        | ml-predictor       | portfolio-api               |
+| `stocks.portfolio.events`   | kafka.strimzi.io/v1 | 3          | 30d       | portfolio-service  | price-processor             |
 
 **Kafka broker:** `kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092`
 
 ## Auth Flow
+
 ```
 POST /auth/login
   → user-service validates credentials
@@ -180,6 +196,7 @@ Kong JWT plugin validates accessToken on all /api/* except /auth/*
 ```
 
 ## Kong Routes (k8s-apps repo)
+
 ```
 /api/auth/*      → user-service:3000        (no JWT)
 /api/stocks/*    → portfolio-api:3000       (JWT required)
@@ -191,19 +208,23 @@ Kong JWT plugin validates accessToken on all /api/* except /auth/*
 ## Shared Packages
 
 ### packages/shared-types
+
 TypeScript interfaces used across all services and frontend:
+
 ```typescript
-Stock, OHLCV, Portfolio, Trade, Watchlist, User,
-SentimentSignal, PredictionSignal, KafkaMessage
+(Stock, OHLCV, Portfolio, Trade, Watchlist, User, SentimentSignal, PredictionSignal, KafkaMessage);
 ```
 
 ### packages/shared-dto
+
 Validation DTOs shared between services:
+
 ```typescript
-CreatePortfolioDto, AddStockDto, RegisterDto, LoginDto
+(CreatePortfolioDto, AddStockDto, RegisterDto, LoginDto);
 ```
 
 ### packages/kafka-client
+
 ```typescript
 KAFKA_TOPICS = {
   PRICES_RAW: 'stocks.prices.raw',
@@ -211,10 +232,11 @@ KAFKA_TOPICS = {
   SIGNALS_SENTIMENT: 'stocks.signals.sentiment',
   SIGNALS_PREDICTION: 'stocks.signals.prediction',
   PORTFOLIO_EVENTS: 'stocks.portfolio.events',
-}
+};
 ```
 
 ### packages/typescript-config
+
 - `base.json` — common settings
 - `nestjs.json` — extends base, NestJS-specific decorators
 - `nextjs.json` — extends base, Next.js-specific
@@ -224,6 +246,7 @@ KAFKA_TOPICS = {
 **k8s-apps repo:** `github.com/akann/k8s-apps` (local at `~/repo/k8s-apps` on k8s-cp-1)
 
 New resources needed in k8s-apps:
+
 ```
 apps/yana-stocks/
 ├── namespace.yaml
@@ -248,16 +271,18 @@ apps/yana-stocks/
 ```
 
 ## Local Dev Infrastructure (docker-compose.yml)
+
 ```yaml
 services:
-  kafka:         # Redpanda (lightweight Kafka)
-  mongodb:       # MongoDB 8
-  redis:         # Redis 8
-  postgres:      # PostgreSQL 16
-  minio:         # MinIO
+  kafka: # Redpanda (lightweight Kafka)
+  mongodb: # MongoDB 8
+  redis: # Redis 8
+  postgres: # PostgreSQL 16
+  minio: # MinIO
 ```
 
 ## Production Infrastructure
+
 - **Kafka:** `kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092`
 - **MongoDB:** `mongodb-headless.mongodb.svc.cluster.local:27017` (replicaSet=rs0)
 - **Redis:** `redis-master.redis.svc.cluster.local:6379`
@@ -266,6 +291,7 @@ services:
 - **Alpaca API:** `https://data.alpaca.markets` (free tier, paper trading)
 
 ## Kubernetes Patterns
+
 - **KEDA:** `price-ingestor`, `sentiment-analyzer` — scale on Kafka consumer lag
 - **Argo Rollouts:** `ml-predictor` — canary 10%→50%→100%
 - **Standard Deployment:** all other services
@@ -273,6 +299,7 @@ services:
 - **Secrets:** ESO from Infisical project `k8s-homelab` (ID `69b39965-b778-47a7-ba52-2cd66a7aad0a`)
 
 ## CI/CD
+
 - GitHub Actions in `yana-stocks` repo
 - Turborepo `--filter=[HEAD^1]` — only build changed services
 - Per-service Docker image → Harbor
@@ -280,6 +307,7 @@ services:
 - E2E: Playwright runs against staging before prod deploy
 
 ## Build Order (implement in this order)
+
 1. Monorepo scaffold (turbo.json, pnpm-workspace.yaml, docker-compose)
 2. Shared packages (shared-types, kafka-client, typescript-config)
 3. `user-service` — auth foundation
@@ -293,6 +321,7 @@ services:
 11. `e2e` — Playwright tests
 
 ## Code Style
+
 - TypeScript strict mode everywhere
 - ESLint + Prettier enforced
 - No `any` types
@@ -302,9 +331,11 @@ services:
 - Logging: NestJS built-in logger, structured JSON in production
 
 ## Environment Variables per Service
+
 Each service reads from `.env` locally and from Kubernetes secrets in production (via ESO from Infisical).
 
 ### user-service
+
 ```
 DATABASE_URL=postgresql://...   # Prisma
 REDIS_URL=redis://...
@@ -316,6 +347,7 @@ KAFKA_BROKERS=...
 ```
 
 ### price-processor
+
 ```
 MONGODB_URI=mongodb://...
 REDIS_URL=redis://...
@@ -323,12 +355,14 @@ KAFKA_BROKERS=...
 ```
 
 ### portfolio-service
+
 ```
 MONGODB_URI=mongodb://...
 KAFKA_BROKERS=...
 ```
 
 ### portfolio-api
+
 ```
 REDIS_URL=redis://...
 KAFKA_BROKERS=...
@@ -339,6 +373,7 @@ ML_PREDICTOR_URL=http://ml-predictor:8000
 ```
 
 ### price-ingestor (Python)
+
 ```
 ALPACA_API_KEY=...
 ALPACA_API_SECRET=...
@@ -348,6 +383,7 @@ SYMBOLS=AAPL,GOOGL,MSFT,AMZN,TSLA,NVDA,META,JPM,V,JNJ
 ```
 
 ### sentiment-analyzer (Python)
+
 ```
 KAFKA_BROKERS=...
 MONGODB_URI=mongodb://...
@@ -356,6 +392,7 @@ HUGGINGFACE_MODEL=ProsusAI/finbert
 ```
 
 ### ml-predictor (Python)
+
 ```
 KAFKA_BROKERS=...
 MONGODB_URI=mongodb://...
@@ -366,6 +403,7 @@ MINIO_BUCKET=yana-stocks-models
 ```
 
 ### frontend
+
 ```
 NEXT_PUBLIC_API_URL=https://api-gateway.yanatech.co.uk/api
 NEXT_PUBLIC_WS_URL=wss://api-gateway.yanatech.co.uk
@@ -378,6 +416,7 @@ NEXT_PUBLIC_WS_URL=wss://api-gateway.yanatech.co.uk
 Use these prompts in order when building with Claude Code in VS Code.
 
 ### Prompt 1 — Monorepo scaffold
+
 ```
 Following CLAUDE.md, scaffold the Turborepo monorepo. Create:
 
@@ -395,6 +434,7 @@ Following CLAUDE.md, scaffold the Turborepo monorepo. Create:
 ```
 
 ### Prompt 2 — user-service
+
 ```
 Following CLAUDE.md, scaffold apps/user-service as a NestJS app with:
 - Prisma for PostgreSQL (User model, RefreshToken model)
@@ -408,6 +448,7 @@ Following CLAUDE.md, scaffold apps/user-service as a NestJS app with:
 ```
 
 ### Prompt 3 — price-ingestor
+
 ```
 Following CLAUDE.md, scaffold services/price-ingestor as a Python service with:
 - Alpaca Markets SDK (alpaca-trade-api or alpaca-py)
@@ -421,6 +462,7 @@ Following CLAUDE.md, scaffold services/price-ingestor as a Python service with:
 ```
 
 ### Prompt 4 — price-processor
+
 ```
 Following CLAUDE.md, scaffold apps/price-processor as a NestJS app with:
 - Kafka consumer for stocks.prices.raw via @nestjs/microservices
@@ -432,6 +474,7 @@ Following CLAUDE.md, scaffold apps/price-processor as a NestJS app with:
 ```
 
 ### Prompt 5 — portfolio-service
+
 ```
 Following CLAUDE.md, scaffold apps/portfolio-service as a NestJS app with:
 - Mongoose for MongoDB (Portfolio, Watchlist, Trade schemas)
@@ -445,6 +488,7 @@ Following CLAUDE.md, scaffold apps/portfolio-service as a NestJS app with:
 ```
 
 ### Prompt 6 — portfolio-api
+
 ```
 Following CLAUDE.md, scaffold apps/portfolio-api as a NestJS aggregator with:
 - ioredis for response caching (TTL 10s)
@@ -457,6 +501,7 @@ Following CLAUDE.md, scaffold apps/portfolio-api as a NestJS aggregator with:
 ```
 
 ### Prompt 7 — sentiment-analyzer
+
 ```
 Following CLAUDE.md, scaffold services/sentiment-analyzer as a Python service with:
 - NewsAPI.org client for news fetching
@@ -470,6 +515,7 @@ Following CLAUDE.md, scaffold services/sentiment-analyzer as a Python service wi
 ```
 
 ### Prompt 8 — ml-predictor
+
 ```
 Following CLAUDE.md, scaffold services/ml-predictor as a Python service with:
 - FastAPI HTTP server on port 8000
@@ -484,6 +530,7 @@ Following CLAUDE.md, scaffold services/ml-predictor as a Python service with:
 ```
 
 ### Prompt 9 — frontend
+
 ```
 Following CLAUDE.md, scaffold apps/frontend as a Next.js 14 App Router app with:
 - TailwindCSS
@@ -497,6 +544,7 @@ Following CLAUDE.md, scaffold apps/frontend as a Next.js 14 App Router app with:
 ```
 
 ### Prompt 10 — e2e tests
+
 ```
 Following CLAUDE.md, scaffold apps/e2e as a Playwright test suite with:
 - Page Object Model pattern
@@ -507,6 +555,7 @@ Following CLAUDE.md, scaffold apps/e2e as a Playwright test suite with:
 ```
 
 ### Prompt 11 — Kubernetes manifests
+
 ```
 Following CLAUDE.md, create k8s/ manifests for all services:
 - namespace.yaml (yana-stocks)
@@ -523,22 +572,26 @@ Following CLAUDE.md, create k8s/ manifests for all services:
 ---
 
 ## Harbor Registry
+
 - **URL:** `harbor.yanatech.co.uk`
 - **Project:** `yana-stocks`
 - **Image format:** `harbor.yanatech.co.uk/yana-stocks/<service>:<tag>`
 - **CI pushes:** SHA tag + `latest` tag on every main branch build
 
 ## GitHub Actions
+
 - **Workflow:** `.github/workflows/ci.yml`
 - **Runner:** `runners-yana-stocks` (self-hosted ARC runner on k8s cluster)
 - **Secrets:** `HARBOR_USERNAME`, `HARBOR_PASSWORD`, `GH_PAT`
 - **On push to main:** lint → type-check → test → docker build → push to Harbor → update image tag in k8s-apps
 
 ## Alpaca API
+
 - **Free tier:** Real-time US stock data (15min delayed), paper trading
 - **Base URL:** `https://data.alpaca.markets`
 - **Symbols to track:** AAPL, GOOGL, MSFT, AMZN, TSLA, NVDA, META, JPM, V, JNJ
 
 ## NewsAPI
+
 - **Free tier:** 100 requests/day, headlines only
 - **Use for:** sentiment-analyzer news feed

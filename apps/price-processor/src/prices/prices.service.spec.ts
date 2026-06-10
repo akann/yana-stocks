@@ -45,11 +45,15 @@ describe('PricesService', () => {
         { provide: getModelToken(PriceBar.name), useValue: mockModel },
         {
           provide: RedisService,
-          useValue: { setex: jest.fn().mockResolvedValue(undefined) } satisfies Partial<RedisService>,
+          useValue: {
+            setex: jest.fn().mockResolvedValue(undefined),
+          } satisfies Partial<RedisService>,
         },
         {
           provide: KafkaProducerService,
-          useValue: { emit: jest.fn().mockResolvedValue(undefined) } satisfies Partial<KafkaProducerService>,
+          useValue: {
+            emit: jest.fn().mockResolvedValue(undefined),
+          } satisfies Partial<KafkaProducerService>,
         },
       ],
     }).compile();
@@ -95,7 +99,10 @@ describe('PricesService', () => {
         expect.objectContaining<Partial<ProcessedPriceMessage>>({
           symbol: 'AAPL',
           price: 151.0,
-          ohlcv: expect.objectContaining({ open: 150.0, close: 151.0 }) as ProcessedPriceMessage['ohlcv'],
+          ohlcv: expect.objectContaining({
+            open: 150.0,
+            close: 151.0,
+          }) as ProcessedPriceMessage['ohlcv'],
         }),
       );
     });

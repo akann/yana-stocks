@@ -109,7 +109,10 @@ export default function WatchlistPage() {
       ) : watchlists && watchlists.length > 0 ? (
         <div className="space-y-4">
           {watchlists.map((wl) => (
-            <div key={wl.id} className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+            <div
+              key={wl.id}
+              className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden"
+            >
               <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
                 <h3 className="font-medium text-white">{wl.name}</h3>
                 <button
@@ -157,7 +160,10 @@ export default function WatchlistPage() {
               {wl.symbols.length > 0 ? (
                 <div className="divide-y divide-gray-800">
                   {wl.symbols.map((sym) => (
-                    <div key={sym} className="px-4 py-3 flex items-center justify-between hover:bg-gray-800/40">
+                    <div
+                      key={sym}
+                      className="px-4 py-3 flex items-center justify-between hover:bg-gray-800/40"
+                    >
                       <Link
                         href={`/stocks/${sym}`}
                         className="font-medium text-white hover:text-blue-400 transition-colors"

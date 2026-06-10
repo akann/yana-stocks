@@ -47,7 +47,9 @@ export function PriceChart({ symbol }: { symbol: string }) {
 
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-      <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Price History</h3>
+      <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+        Price History
+      </h3>
       <ResponsiveContainer width="100%" height={240}>
         <LineChart data={points} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
@@ -67,7 +69,11 @@ export function PriceChart({ symbol }: { symbol: string }) {
             width={55}
           />
           <Tooltip
-            contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px' }}
+            contentStyle={{
+              backgroundColor: '#1f2937',
+              border: '1px solid #374151',
+              borderRadius: '8px',
+            }}
             labelStyle={{ color: '#9ca3af', fontSize: 11 }}
             formatter={(value: number) => [`$${value.toFixed(2)}`, 'Price']}
           />

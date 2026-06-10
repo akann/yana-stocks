@@ -26,7 +26,7 @@ api.interceptors.response.use(
   async (error: unknown) => {
     if (!axios.isAxiosError(error)) return Promise.reject(error);
 
-    const original = error.config as (typeof error.config) & { _retry?: boolean };
+    const original = error.config as typeof error.config & { _retry?: boolean };
     if (error.response?.status !== 401 || original?._retry) return Promise.reject(error);
 
     if (isRefreshing) {
@@ -41,7 +41,8 @@ api.interceptors.response.use(
     if (original) original._retry = true;
     isRefreshing = true;
 
-    const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
+    const refreshToken =
+      typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
     if (!refreshToken) {
       isRefreshing = false;
       return Promise.reject(error);

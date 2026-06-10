@@ -1,8 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { AddStockDto, CreatePortfolioDto } from '@yana-stocks/shared-dto';
 import type { Portfolio as PortfolioType, PortfolioStock } from '@yana-stocks/shared-types';
@@ -35,7 +31,11 @@ export class PortfoliosService {
 
   async create(dto: CreatePortfolioDto, user: AuthUser): Promise<PortfolioType> {
     const doc = await this.portfolioModel.create({ userId: user.id, name: dto.name, stocks: [] });
-    const plain = doc.toObject() as Portfolio & { _id: { toString(): string }; createdAt: Date; updatedAt: Date };
+    const plain = doc.toObject() as Portfolio & {
+      _id: { toString(): string };
+      createdAt: Date;
+      updatedAt: Date;
+    };
 
     await this.kafkaProducer.emitPortfolioEvent({
       type: 'portfolio_created',
@@ -101,7 +101,9 @@ export class PortfoliosService {
     return this.toResponse(saved.toObject<Portfolio>());
   }
 
-  private toResponse(doc: Portfolio & { _id?: { toString(): string }; id?: string }): PortfolioType {
+  private toResponse(
+    doc: Portfolio & { _id?: { toString(): string }; id?: string },
+  ): PortfolioType {
     const stocks: PortfolioStock[] = doc.stocks.map((s) => ({
       symbol: s.symbol,
       shares: s.shares,

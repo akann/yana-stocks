@@ -33,11 +33,19 @@ describe('PortfoliosService', () => {
 
   beforeEach(async () => {
     portfolioModel = {
-      find: jest.fn().mockReturnValue({ lean: () => ({ exec: () => Promise.resolve([mockPortfolioDoc]) }) }),
+      find: jest
+        .fn()
+        .mockReturnValue({ lean: () => ({ exec: () => Promise.resolve([mockPortfolioDoc]) }) }),
       findById: jest.fn(),
-      findOneAndUpdate: jest.fn().mockReturnValue({ lean: () => ({ exec: () => Promise.resolve(mockPortfolioDoc) }) }),
-      findOneAndDelete: jest.fn().mockReturnValue({ exec: () => Promise.resolve(mockPortfolioDoc) }),
-      create: jest.fn().mockResolvedValue({ ...mockPortfolioDoc, toObject: () => mockPortfolioDoc }),
+      findOneAndUpdate: jest
+        .fn()
+        .mockReturnValue({ lean: () => ({ exec: () => Promise.resolve(mockPortfolioDoc) }) }),
+      findOneAndDelete: jest
+        .fn()
+        .mockReturnValue({ exec: () => Promise.resolve(mockPortfolioDoc) }),
+      create: jest
+        .fn()
+        .mockResolvedValue({ ...mockPortfolioDoc, toObject: () => mockPortfolioDoc }),
     };
 
     tradeModel = { create: jest.fn().mockResolvedValue({}) };
@@ -81,13 +89,17 @@ describe('PortfoliosService', () => {
 
   describe('findOne', () => {
     it('throws NotFoundException when portfolio does not exist', async () => {
-      portfolioModel.findById.mockReturnValue({ lean: () => ({ exec: () => Promise.resolve(null) }) });
+      portfolioModel.findById.mockReturnValue({
+        lean: () => ({ exec: () => Promise.resolve(null) }),
+      });
       await expect(service.findOne('missing', 'user-1')).rejects.toThrow(NotFoundException);
     });
 
     it('throws ForbiddenException when portfolio belongs to another user', async () => {
       portfolioModel.findById.mockReturnValue({
-        lean: () => ({ exec: () => Promise.resolve({ ...mockPortfolioDoc, userId: 'other-user' }) }),
+        lean: () => ({
+          exec: () => Promise.resolve({ ...mockPortfolioDoc, userId: 'other-user' }),
+        }),
       });
       await expect(service.findOne('portfolio-1', 'user-1')).rejects.toThrow(ForbiddenException);
     });
@@ -99,7 +111,10 @@ describe('PortfoliosService', () => {
         ...mockPortfolioDoc,
         stocks: [] as Array<{ symbol: string; shares: number; avgCostBasis: number }>,
         save: jest.fn().mockResolvedValue({
-          toObject: () => ({ ...mockPortfolioDoc, stocks: [{ symbol: 'AAPL', shares: 10, avgCostBasis: 150 }] }),
+          toObject: () => ({
+            ...mockPortfolioDoc,
+            stocks: [{ symbol: 'AAPL', shares: 10, avgCostBasis: 150 }],
+          }),
         }),
       };
       portfolioModel.findById.mockReturnValue({ exec: () => Promise.resolve(docMock) });

@@ -29,16 +29,16 @@ packages/
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Monorepo | Turborepo + pnpm workspaces |
-| NestJS services | NestJS, Prisma (user-service), Mongoose, ioredis, KafkaJS, Passport/JWT |
-| Frontend | Next.js 14 App Router, TailwindCSS, TanStack Query, Recharts |
+| Layer           | Technology                                                                        |
+| --------------- | --------------------------------------------------------------------------------- |
+| Monorepo        | Turborepo + pnpm workspaces                                                       |
+| NestJS services | NestJS, Prisma (user-service), Mongoose, ioredis, KafkaJS, Passport/JWT           |
+| Frontend        | Next.js 14 App Router, TailwindCSS, TanStack Query, Recharts                      |
 | Python services | Python 3.12, FastAPI, HuggingFace Transformers, Facebook Prophet, confluent-kafka |
-| Databases | PostgreSQL 16 (users), MongoDB 8 (OHLCV/portfolios), Redis 8 (cache/tokens) |
-| Messaging | Kafka (Redpanda locally, Strimzi in production) |
-| ML storage | MinIO (`yana-stocks-models` bucket) |
-| Data source | Alpaca Markets free tier (paper trading) |
+| Databases       | PostgreSQL 16 (users), MongoDB 8 (OHLCV/portfolios), Redis 8 (cache/tokens)       |
+| Messaging       | Kafka (Redpanda locally, Strimzi in production)                                   |
+| ML storage      | MinIO (`yana-stocks-models` bucket)                                               |
+| Data source     | Alpaca Markets free tier (paper trading)                                          |
 
 ## Prerequisites
 
@@ -91,27 +91,27 @@ pnpm --filter price-processor dev
 
 ## Scripts
 
-| Command | Description |
-|---|---|
-| `pnpm dev` | Start all services in watch mode |
-| `pnpm build` | Build all packages and services |
-| `pnpm test` | Run all unit/integration tests |
-| `pnpm lint` | Lint all packages |
-| `pnpm type-check` | TypeScript type-check all packages |
-| `pnpm format` | Format all files with Prettier |
-| `pnpm docker:up` | Start local infrastructure |
-| `pnpm docker:down` | Stop local infrastructure |
-| `pnpm docker:reset` | Destroy volumes and restart fresh |
+| Command             | Description                        |
+| ------------------- | ---------------------------------- |
+| `pnpm dev`          | Start all services in watch mode   |
+| `pnpm build`        | Build all packages and services    |
+| `pnpm test`         | Run all unit/integration tests     |
+| `pnpm lint`         | Lint all packages                  |
+| `pnpm type-check`   | TypeScript type-check all packages |
+| `pnpm format`       | Format all files with Prettier     |
+| `pnpm docker:up`    | Start local infrastructure         |
+| `pnpm docker:down`  | Stop local infrastructure          |
+| `pnpm docker:reset` | Destroy volumes and restart fresh  |
 
 ## Kafka Topics
 
-| Topic | Partitions | Retention | Producer | Consumer(s) |
-|---|---|---|---|---|
-| `stocks.prices.raw` | 3 | 24h | price-ingestor | price-processor |
-| `stocks.prices.processed` | 3 | 7d | price-processor | ml-predictor, portfolio-api |
-| `stocks.signals.sentiment` | 3 | 7d | sentiment-analyzer | portfolio-api |
-| `stocks.signals.prediction` | 3 | 7d | ml-predictor | portfolio-api |
-| `stocks.portfolio.events` | 3 | 30d | portfolio-service | price-processor |
+| Topic                       | Partitions | Retention | Producer           | Consumer(s)                 |
+| --------------------------- | ---------- | --------- | ------------------ | --------------------------- |
+| `stocks.prices.raw`         | 3          | 24h       | price-ingestor     | price-processor             |
+| `stocks.prices.processed`   | 3          | 7d        | price-processor    | ml-predictor, portfolio-api |
+| `stocks.signals.sentiment`  | 3          | 7d        | sentiment-analyzer | portfolio-api               |
+| `stocks.signals.prediction` | 3          | 7d        | ml-predictor       | portfolio-api               |
+| `stocks.portfolio.events`   | 3          | 30d       | portfolio-service  | price-processor             |
 
 ## Auth Flow
 
@@ -127,13 +127,13 @@ Kong JWT plugin validates access tokens on all `/api/*` routes except `/auth/*`.
 
 ## API Gateway Routes (Kong)
 
-| Path | Service | Auth |
-|---|---|---|
-| `/api/auth/*` | user-service:3000 | None |
-| `/api/stocks/*` | portfolio-api:3000 | JWT |
-| `/api/portfolio/*` | portfolio-service:3000 | JWT |
-| `/api/predict/*` | ml-predictor:8000 | JWT |
-| `/*` | frontend:3000 | Public |
+| Path               | Service                | Auth   |
+| ------------------ | ---------------------- | ------ |
+| `/api/auth/*`      | user-service:3000      | None   |
+| `/api/stocks/*`    | portfolio-api:3000     | JWT    |
+| `/api/portfolio/*` | portfolio-service:3000 | JWT    |
+| `/api/predict/*`   | ml-predictor:8000      | JWT    |
+| `/*`               | frontend:3000          | Public |
 
 ## Testing
 
@@ -161,13 +161,13 @@ GitHub Actions builds only changed services using `turbo --filter=[HEAD^1]`. On 
 
 ## Production Infrastructure
 
-| Resource | Address |
-|---|---|
-| Kafka | `kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092` |
-| MongoDB | `mongodb-headless.mongodb.svc.cluster.local:27017` |
-| Redis | `redis-master.redis.svc.cluster.local:6379` |
-| MinIO | `minio.minio.svc.cluster.local:9000` |
-| Frontend | `https://stocks.yanatech.co.uk` |
+| Resource | Address                                                      |
+| -------- | ------------------------------------------------------------ |
+| Kafka    | `kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092` |
+| MongoDB  | `mongodb-headless.mongodb.svc.cluster.local:27017`           |
+| Redis    | `redis-master.redis.svc.cluster.local:6379`                  |
+| MinIO    | `minio.minio.svc.cluster.local:9000`                         |
+| Frontend | `https://stocks.yanatech.co.uk`                              |
 
 Kubernetes manifests live in the `k8s-apps` repo (`github.com/akann/k8s-apps`). Notable patterns:
 

@@ -117,10 +117,7 @@ export default function PortfolioPage() {
       )}
 
       {addingToPortfolio && (
-        <AddStockModal
-          portfolioId={addingToPortfolio}
-          onClose={() => setAddingToPortfolio(null)}
-        />
+        <AddStockModal portfolioId={addingToPortfolio} onClose={() => setAddingToPortfolio(null)} />
       )}
     </div>
   );
