@@ -370,3 +370,175 @@ MINIO_BUCKET=yana-stocks-models
 NEXT_PUBLIC_API_URL=https://api-gateway.yanatech.co.uk/api
 NEXT_PUBLIC_WS_URL=wss://api-gateway.yanatech.co.uk
 ```
+
+---
+
+## VS Code Claude Code — Getting Started Prompts
+
+Use these prompts in order when building with Claude Code in VS Code.
+
+### Prompt 1 — Monorepo scaffold
+```
+Following CLAUDE.md, scaffold the Turborepo monorepo. Create:
+
+1. turbo.json — pipeline for build, dev, lint, type-check, test, test:e2e
+2. pnpm-workspace.yaml — include apps/*, services/*, packages/*
+3. package.json (root) — with turbo, typescript, eslint, prettier as dev deps
+4. .gitignore — node_modules, dist, .env, .turbo, __pycache__
+5. packages/typescript-config/ — base.json, nestjs.json, nextjs.json
+6. packages/eslint-config/ — index.js for NestJS + Next.js
+7. packages/prettier-config/ — index.js
+8. packages/shared-types/ — all interfaces: Stock, OHLCV, Portfolio, Trade, Watchlist, User, SentimentSignal, PredictionSignal, KafkaMessage
+9. packages/kafka-client/ — KAFKA_TOPICS constant + Kafka config factory
+10. packages/shared-dto/ — CreatePortfolioDto, AddStockDto, RegisterDto, LoginDto
+11. docker-compose.yml — Redpanda (Kafka), MongoDB 8, Redis 8, PostgreSQL 16, MinIO
+```
+
+### Prompt 2 — user-service
+```
+Following CLAUDE.md, scaffold apps/user-service as a NestJS app with:
+- Prisma for PostgreSQL (User model, RefreshToken model)
+- JWT access token (15min) + refresh token (7 days, stored in Redis)
+- Refresh token rotation on every use
+- Endpoints: POST /auth/register, POST /auth/login, POST /auth/refresh, POST /auth/logout, GET /auth/me
+- Guards: JwtAuthGuard, RefreshTokenGuard
+- Swagger decorators on all controllers
+- Dockerfile (multi-stage)
+- .env.example
+```
+
+### Prompt 3 — price-ingestor
+```
+Following CLAUDE.md, scaffold services/price-ingestor as a Python service with:
+- Alpaca Markets SDK (alpaca-trade-api or alpaca-py)
+- Kafka producer via confluent-kafka
+- Poll SYMBOLS env var (default: AAPL,GOOGL,MSFT,AMZN,TSLA,NVDA,META,JPM,V,JNJ)
+- Publish OHLCV bars to stocks.prices.raw topic
+- Structured JSON logging
+- Dockerfile
+- uv for dependency management (pyproject.toml + uv.lock)
+- .env.example
+```
+
+### Prompt 4 — price-processor
+```
+Following CLAUDE.md, scaffold apps/price-processor as a NestJS app with:
+- Kafka consumer for stocks.prices.raw via @nestjs/microservices
+- Kafka producer for stocks.prices.processed
+- Mongoose for MongoDB (OHLCV schema)
+- ioredis for price cache (TTL 5s)
+- Dockerfile (multi-stage)
+- .env.example
+```
+
+### Prompt 5 — portfolio-service
+```
+Following CLAUDE.md, scaffold apps/portfolio-service as a NestJS app with:
+- Mongoose for MongoDB (Portfolio, Watchlist, Trade schemas)
+- Kafka consumer for stocks.prices.processed (portfolio valuation)
+- Kafka producer for stocks.portfolio.events
+- CRUD endpoints for portfolios, watchlists, trades
+- JWT guard on all endpoints
+- Swagger decorators
+- Dockerfile (multi-stage)
+- .env.example
+```
+
+### Prompt 6 — portfolio-api
+```
+Following CLAUDE.md, scaffold apps/portfolio-api as a NestJS aggregator with:
+- ioredis for response caching (TTL 10s)
+- HTTP clients to user-service, portfolio-service, price-processor, ml-predictor
+- Endpoints: GET /stocks/:symbol, GET /stocks/:symbol/history, GET /signals/:symbol, GET /market/movers
+- JWT guard on all endpoints
+- Swagger decorators
+- Dockerfile (multi-stage)
+- .env.example
+```
+
+### Prompt 7 — sentiment-analyzer
+```
+Following CLAUDE.md, scaffold services/sentiment-analyzer as a Python service with:
+- NewsAPI.org client for news fetching
+- HuggingFace transformers with ProsusAI/finbert model
+- Kafka producer for stocks.signals.sentiment via confluent-kafka
+- PyMongo for storing articles + sentiment scores
+- Structured JSON logging
+- Dockerfile
+- uv for dependency management
+- .env.example
+```
+
+### Prompt 8 — ml-predictor
+```
+Following CLAUDE.md, scaffold services/ml-predictor as a Python service with:
+- FastAPI HTTP server on port 8000
+- Facebook Prophet for price prediction
+- Kafka producer for stocks.signals.prediction
+- PyMongo for storing predictions
+- MinIO client for model artifact storage (yana-stocks-models bucket)
+- Endpoint: GET /predict/:symbol
+- Dockerfile
+- uv for dependency management
+- .env.example
+```
+
+### Prompt 9 — frontend
+```
+Following CLAUDE.md, scaffold apps/frontend as a Next.js 14 App Router app with:
+- TailwindCSS
+- Recharts for price charts
+- TanStack Query for data fetching
+- Routes: /, /dashboard, /stocks/[symbol], /portfolio, /watchlist, /login, /register
+- Auth context with JWT access token + refresh token rotation
+- API client pointing to NEXT_PUBLIC_API_URL
+- Dockerfile (multi-stage, standalone output)
+- .env.example
+```
+
+### Prompt 10 — e2e tests
+```
+Following CLAUDE.md, scaffold apps/e2e as a Playwright test suite with:
+- Page Object Model pattern
+- Test suites: auth (register, login, refresh, logout), portfolio (create, add stock, watchlist), stocks (price display, signals)
+- Fixtures: auth.fixture.ts (login helper), data.fixture.ts (test data factories)
+- playwright.config.ts — Chromium + iPhone 14, BASE_URL from env
+- package.json with playwright deps
+```
+
+### Prompt 11 — Kubernetes manifests
+```
+Following CLAUDE.md, create k8s/ manifests for all services:
+- namespace.yaml (yana-stocks)
+- Per service: deployment.yaml, service.yaml, external-secret.yaml, hpa.yaml
+- price-ingestor: keda-scaledobject.yaml (Kafka consumer lag trigger)
+- sentiment-analyzer: keda-scaledobject.yaml
+- ml-predictor: rollout.yaml (Argo Rollouts canary), analysis-template.yaml
+- user-service: cnpg-cluster.yaml (yana-stocks-postgres)
+- frontend: ingress.yaml (stocks.yanatech.co.uk)
+- Kong routes: ingress manifests with ingressClassName: kong for all /api/* routes
+- ArgoCD app-of-apps: argocd-app-yana-stocks.yaml
+```
+
+---
+
+## Harbor Registry
+- **URL:** `harbor.yanatech.co.uk`
+- **Project:** `yana-stocks`
+- **Image format:** `harbor.yanatech.co.uk/yana-stocks/<service>:<tag>`
+- **CI pushes:** SHA tag + `latest` tag on every main branch build
+
+## GitHub Actions
+- **Workflow:** `.github/workflows/ci.yml`
+- **Runner:** `runners-yana-stocks` (self-hosted ARC runner on k8s cluster)
+- **Secrets:** `HARBOR_USERNAME`, `HARBOR_PASSWORD`, `GH_PAT`
+- **On push to main:** lint → type-check → test → docker build → push to Harbor → update image tag in k8s-apps
+
+## Alpaca API
+- **Free tier:** Real-time US stock data (15min delayed), paper trading
+- **Base URL:** `https://data.alpaca.markets`
+- **Symbols to track:** AAPL, GOOGL, MSFT, AMZN, TSLA, NVDA, META, JPM, V, JNJ
+
+## NewsAPI
+- **Free tier:** 100 requests/day, headlines only
+- **Use for:** sentiment-analyzer news feed
