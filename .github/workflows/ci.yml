@@ -246,7 +246,12 @@ jobs:
 
           changed=0
           for svc in $(echo "$MATRIX" | jq -r '.[].name'); do
-            manifest="apps/yana-stocks/${svc}/deployment.yaml"
+            # ml-predictor uses an Argo Rollout; all other services use a Deployment
+            if [[ -f "apps/yana-stocks/${svc}/rollout.yaml" ]]; then
+              manifest="apps/yana-stocks/${svc}/rollout.yaml"
+            else
+              manifest="apps/yana-stocks/${svc}/deployment.yaml"
+            fi
             if [[ -f "$manifest" ]]; then
               yq e ".spec.template.spec.containers[0].image = \"${{ env.IMAGE_PREFIX }}/${svc}:${SHA}\"" \
                 -i "$manifest"
