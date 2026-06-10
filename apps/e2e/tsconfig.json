@@ -1,0 +1,9 @@
+{
+  "extends": "@yana-stocks/typescript-config/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2022", "dom"]
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules", "playwright-report", "test-results"]
+}
