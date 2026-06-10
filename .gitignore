@@ -165,3 +165,6 @@ vite.config.ts.timestamp-*
 # Playwright
 playwright-report/
 test-results/
+
+# Claude Code
+.claude/
