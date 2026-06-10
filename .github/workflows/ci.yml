@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      build_all:
+        description: 'Build and push all service images'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -18,7 +24,7 @@ jobs:
   # 1. Detect what changed
   # ─────────────────────────────────────────────────────────────────
   changes:
-    runs-on: runners-k8s-apps
+    runs-on: runners-yana-stocks
     outputs:
       ts: ${{ steps.filter.outputs.ts }}
       python: ${{ steps.filter.outputs.python }}
@@ -59,11 +65,12 @@ jobs:
             ml-predictor:
               - 'services/ml-predictor/**'
 
-      # Build the Docker build matrix only for pushes to main
+      # Build the Docker build matrix only for pushes/dispatches to main
       - id: matrix
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
+          build_all="${{ github.event.inputs.build_all }}"
           services='[]'
           add() {
             services=$(printf '%s' "$services" | \
@@ -71,21 +78,23 @@ jobs:
                 '. + [{"name":$n,"context":$c,"dockerfile":$f}]')
           }
 
-          [[ "${{ steps.filter.outputs.frontend }}"           == "true" ]] && \
+          include() { [[ "$build_all" == "true" ]] || [[ "$1" == "true" ]]; }
+
+          include "${{ steps.filter.outputs.frontend }}"           && \
             add "frontend"           "."                           "apps/frontend/Dockerfile"
-          [[ "${{ steps.filter.outputs.user-service }}"       == "true" ]] && \
+          include "${{ steps.filter.outputs.user-service }}"       && \
             add "user-service"       "."                           "apps/user-service/Dockerfile"
-          [[ "${{ steps.filter.outputs.price-processor }}"    == "true" ]] && \
+          include "${{ steps.filter.outputs.price-processor }}"    && \
             add "price-processor"    "."                           "apps/price-processor/Dockerfile"
-          [[ "${{ steps.filter.outputs.portfolio-service }}"  == "true" ]] && \
+          include "${{ steps.filter.outputs.portfolio-service }}"  && \
             add "portfolio-service"  "."                           "apps/portfolio-service/Dockerfile"
-          [[ "${{ steps.filter.outputs.portfolio-api }}"      == "true" ]] && \
+          include "${{ steps.filter.outputs.portfolio-api }}"      && \
             add "portfolio-api"      "."                           "apps/portfolio-api/Dockerfile"
-          [[ "${{ steps.filter.outputs.price-ingestor }}"     == "true" ]] && \
+          include "${{ steps.filter.outputs.price-ingestor }}"     && \
             add "price-ingestor"     "services/price-ingestor"     "services/price-ingestor/Dockerfile"
-          [[ "${{ steps.filter.outputs.sentiment-analyzer }}" == "true" ]] && \
+          include "${{ steps.filter.outputs.sentiment-analyzer }}" && \
             add "sentiment-analyzer" "services/sentiment-analyzer" "services/sentiment-analyzer/Dockerfile"
-          [[ "${{ steps.filter.outputs.ml-predictor }}"       == "true" ]] && \
+          include "${{ steps.filter.outputs.ml-predictor }}"       && \
             add "ml-predictor"       "services/ml-predictor"       "services/ml-predictor/Dockerfile"
 
           echo "matrix=$services" >> "$GITHUB_OUTPUT"
@@ -94,9 +103,9 @@ jobs:
   # 2. TypeScript quality (lint + type-check + test)
   # ─────────────────────────────────────────────────────────────────
   ts-quality:
-    runs-on: runners-k8s-apps
+    runs-on: runners-yana-stocks
     needs: changes
-    if: needs.changes.outputs.ts == 'true'
+    if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -144,9 +153,9 @@ jobs:
   # 3. Python quality (ruff + mypy — no pytest to avoid model downloads)
   # ─────────────────────────────────────────────────────────────────
   python-quality:
-    runs-on: runners-k8s-apps
+    runs-on: runners-yana-stocks
     needs: changes
-    if: needs.changes.outputs.python == 'true'
+    if: needs.changes.outputs.python == 'true' || github.event.inputs.build_all == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -179,7 +188,7 @@ jobs:
   # 4. Build and push Docker images  (main branch only)
   # ─────────────────────────────────────────────────────────────────
   docker:
-    runs-on: runners-k8s-apps
+    runs-on: runners-yana-stocks
     needs: [changes, ts-quality, python-quality]
     if: |
       github.ref == 'refs/heads/main' &&
@@ -221,7 +230,7 @@ jobs:
   # 5. GitOps: update image tags in k8s-apps → ArgoCD auto-syncs
   # ─────────────────────────────────────────────────────────────────
   gitops:
-    runs-on: runners-k8s-apps
+    runs-on: runners-yana-stocks
     needs: [changes, docker]
     if: |
       github.ref == 'refs/heads/main' &&
@@ -246,7 +255,12 @@ jobs:
 
           changed=0
           for svc in $(echo "$MATRIX" | jq -r '.[].name'); do
-            manifest="apps/yana-stocks/${svc}/deployment.yaml"
+            # ml-predictor uses an Argo Rollout; all other services use a Deployment
+            if [[ -f "apps/yana-stocks/${svc}/rollout.yaml" ]]; then
+              manifest="apps/yana-stocks/${svc}/rollout.yaml"
+            else
+              manifest="apps/yana-stocks/${svc}/deployment.yaml"
+            fi
             if [[ -f "$manifest" ]]; then
               yq e ".spec.template.spec.containers[0].image = \"${{ env.IMAGE_PREFIX }}/${svc}:${SHA}\"" \
                 -i "$manifest"
