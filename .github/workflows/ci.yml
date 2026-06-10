@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      build_all:
+        description: 'Build and push all service images'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -59,11 +65,12 @@ jobs:
             ml-predictor:
               - 'services/ml-predictor/**'
 
-      # Build the Docker build matrix only for pushes to main
+      # Build the Docker build matrix only for pushes/dispatches to main
       - id: matrix
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         shell: bash
         run: |
+          build_all="${{ github.event.inputs.build_all }}"
           services='[]'
           add() {
             services=$(printf '%s' "$services" | \
@@ -71,21 +78,23 @@ jobs:
                 '. + [{"name":$n,"context":$c,"dockerfile":$f}]')
           }
 
-          [[ "${{ steps.filter.outputs.frontend }}"           == "true" ]] && \
+          include() { [[ "$build_all" == "true" ]] || [[ "$1" == "true" ]]; }
+
+          include "${{ steps.filter.outputs.frontend }}"           && \
             add "frontend"           "."                           "apps/frontend/Dockerfile"
-          [[ "${{ steps.filter.outputs.user-service }}"       == "true" ]] && \
+          include "${{ steps.filter.outputs.user-service }}"       && \
             add "user-service"       "."                           "apps/user-service/Dockerfile"
-          [[ "${{ steps.filter.outputs.price-processor }}"    == "true" ]] && \
+          include "${{ steps.filter.outputs.price-processor }}"    && \
             add "price-processor"    "."                           "apps/price-processor/Dockerfile"
-          [[ "${{ steps.filter.outputs.portfolio-service }}"  == "true" ]] && \
+          include "${{ steps.filter.outputs.portfolio-service }}"  && \
             add "portfolio-service"  "."                           "apps/portfolio-service/Dockerfile"
-          [[ "${{ steps.filter.outputs.portfolio-api }}"      == "true" ]] && \
+          include "${{ steps.filter.outputs.portfolio-api }}"      && \
             add "portfolio-api"      "."                           "apps/portfolio-api/Dockerfile"
-          [[ "${{ steps.filter.outputs.price-ingestor }}"     == "true" ]] && \
+          include "${{ steps.filter.outputs.price-ingestor }}"     && \
             add "price-ingestor"     "services/price-ingestor"     "services/price-ingestor/Dockerfile"
-          [[ "${{ steps.filter.outputs.sentiment-analyzer }}" == "true" ]] && \
+          include "${{ steps.filter.outputs.sentiment-analyzer }}" && \
             add "sentiment-analyzer" "services/sentiment-analyzer" "services/sentiment-analyzer/Dockerfile"
-          [[ "${{ steps.filter.outputs.ml-predictor }}"       == "true" ]] && \
+          include "${{ steps.filter.outputs.ml-predictor }}"       && \
             add "ml-predictor"       "services/ml-predictor"       "services/ml-predictor/Dockerfile"
 
           echo "matrix=$services" >> "$GITHUB_OUTPUT"
@@ -96,7 +105,7 @@ jobs:
   ts-quality:
     runs-on: runners-k8s-apps
     needs: changes
-    if: needs.changes.outputs.ts == 'true'
+    if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -146,7 +155,7 @@ jobs:
   python-quality:
     runs-on: runners-k8s-apps
     needs: changes
-    if: needs.changes.outputs.python == 'true'
+    if: needs.changes.outputs.python == 'true' || github.event.inputs.build_all == 'true'
     strategy:
       fail-fast: false
       matrix:
