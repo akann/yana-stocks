@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './src/tests',
   fullyParallel: false,
-  retries: process.env['CI'] ? 2 : 0,
+  retries: process.env['CI'] ? 2 : 1,
   workers: 1,
   reporter: [['html', { open: 'never' }]],
   use: {

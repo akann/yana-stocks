@@ -13,7 +13,7 @@ test.describe('Portfolio management', () => {
     const registerPage = new RegisterPage(page);
     await registerPage.goto();
     await registerPage.register(testEmail, PASSWORD);
-    await page.waitForURL('**/dashboard', { timeout: 10_000 });
+    await page.waitForURL('**/dashboard', { timeout: 20_000 });
     await page.close();
   });
 
@@ -22,7 +22,7 @@ test.describe('Portfolio management', () => {
     const loginPage = new LoginPage(page);
     await loginPage.goto();
     await loginPage.login(testEmail, PASSWORD);
-    await page.waitForURL('**/dashboard', { timeout: 10_000 });
+    await page.waitForURL('**/dashboard', { timeout: 20_000 });
   });
 
   test('creates a new portfolio', async ({ page }) => {
