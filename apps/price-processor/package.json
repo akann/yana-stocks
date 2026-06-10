@@ -1,5 +1,53 @@
 {
   "name": "@yana-stocks/price-processor",
   "version": "0.0.1",
-  "private": true
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "lint": "eslint src/",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.26",
+    "@nestjs/config": "^4.0.4",
+    "@nestjs/core": "^11.1.26",
+    "@nestjs/mongoose": "^11.0.3",
+    "@nestjs/platform-express": "^11.1.26",
+    "@nestjs/swagger": "^11.4.4",
+    "@yana-stocks/kafka-client": "workspace:*",
+    "@yana-stocks/shared-types": "workspace:*",
+    "ioredis": "^5.11.1",
+    "kafkajs": "^2.2.4",
+    "mongoose": "^8.15.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "^11.1.26",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.0.0",
+    "@yana-stocks/eslint-config": "workspace:*",
+    "@yana-stocks/typescript-config": "workspace:*",
+    "eslint": "^10.4.1",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.4.11",
+    "tsx": "^4.22.4",
+    "typescript": "^5.9.3"
+  },
+  "jest": {
+    "moduleFileExtensions": ["js", "json", "ts"],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.ts$": "ts-jest"
+    },
+    "collectCoverageFrom": ["**/*.(t|j)s", "!**/node_modules/**"],
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
+  }
 }
