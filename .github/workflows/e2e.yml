@@ -1,0 +1,53 @@
+name: E2E Tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Base URL of the frontend to test against (e.g. https://stocks.yanatech.co.uk)'
+        required: true
+        type: string
+
+jobs:
+  e2e:
+    runs-on: runners-k8s-apps
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11'
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        run: echo "dir=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.dir }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile || (pnpm approve-builds --all && pnpm install --frozen-lockfile)
+
+      - name: Install Playwright browsers
+        working-directory: apps/e2e
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        working-directory: apps/e2e
+        env:
+          BASE_URL: ${{ inputs.base_url }}
+        run: pnpm exec playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: apps/e2e/playwright-report/
+          retention-days: 14

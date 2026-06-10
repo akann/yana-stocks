@@ -1,0 +1,261 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: harbor.yanatech.co.uk
+  IMAGE_PREFIX: harbor.yanatech.co.uk/yana-stocks
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────
+  # 1. Detect what changed
+  # ─────────────────────────────────────────────────────────────────
+  changes:
+    runs-on: runners-k8s-apps
+    outputs:
+      ts: ${{ steps.filter.outputs.ts }}
+      python: ${{ steps.filter.outputs.python }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ts:
+              - 'apps/**'
+              - 'packages/**'
+            python:
+              - 'services/**'
+            frontend:
+              - 'apps/frontend/**'
+              - 'packages/**'
+            user-service:
+              - 'apps/user-service/**'
+              - 'packages/**'
+            price-processor:
+              - 'apps/price-processor/**'
+              - 'packages/**'
+            portfolio-service:
+              - 'apps/portfolio-service/**'
+              - 'packages/**'
+            portfolio-api:
+              - 'apps/portfolio-api/**'
+              - 'packages/**'
+            price-ingestor:
+              - 'services/price-ingestor/**'
+            sentiment-analyzer:
+              - 'services/sentiment-analyzer/**'
+            ml-predictor:
+              - 'services/ml-predictor/**'
+
+      # Build the Docker build matrix only for pushes to main
+      - id: matrix
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          services='[]'
+          add() {
+            services=$(printf '%s' "$services" | \
+              jq --arg n "$1" --arg c "$2" --arg f "$3" \
+                '. + [{"name":$n,"context":$c,"dockerfile":$f}]')
+          }
+
+          [[ "${{ steps.filter.outputs.frontend }}"           == "true" ]] && \
+            add "frontend"           "."                           "apps/frontend/Dockerfile"
+          [[ "${{ steps.filter.outputs.user-service }}"       == "true" ]] && \
+            add "user-service"       "."                           "apps/user-service/Dockerfile"
+          [[ "${{ steps.filter.outputs.price-processor }}"    == "true" ]] && \
+            add "price-processor"    "."                           "apps/price-processor/Dockerfile"
+          [[ "${{ steps.filter.outputs.portfolio-service }}"  == "true" ]] && \
+            add "portfolio-service"  "."                           "apps/portfolio-service/Dockerfile"
+          [[ "${{ steps.filter.outputs.portfolio-api }}"      == "true" ]] && \
+            add "portfolio-api"      "."                           "apps/portfolio-api/Dockerfile"
+          [[ "${{ steps.filter.outputs.price-ingestor }}"     == "true" ]] && \
+            add "price-ingestor"     "services/price-ingestor"     "services/price-ingestor/Dockerfile"
+          [[ "${{ steps.filter.outputs.sentiment-analyzer }}" == "true" ]] && \
+            add "sentiment-analyzer" "services/sentiment-analyzer" "services/sentiment-analyzer/Dockerfile"
+          [[ "${{ steps.filter.outputs.ml-predictor }}"       == "true" ]] && \
+            add "ml-predictor"       "services/ml-predictor"       "services/ml-predictor/Dockerfile"
+
+          echo "matrix=$services" >> "$GITHUB_OUTPUT"
+
+  # ─────────────────────────────────────────────────────────────────
+  # 2. TypeScript quality (lint + type-check + test)
+  # ─────────────────────────────────────────────────────────────────
+  ts-quality:
+    runs-on: runners-k8s-apps
+    needs: changes
+    if: needs.changes.outputs.ts == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11'
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        run: echo "dir=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.dir }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        # pnpm 11 requires explicit build approval on first install in a fresh env.
+        # Run once; if it fails on the build-approval check, approve then retry.
+        run: pnpm install --frozen-lockfile || (pnpm approve-builds --all && pnpm install --frozen-lockfile)
+
+      - name: Set Turborepo filter
+        id: turbo-filter
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "filter=[origin/${{ github.base_ref }}]" >> "$GITHUB_OUTPUT"
+          else
+            echo "filter=[HEAD^1]" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Lint, type-check, test
+        run: |
+          pnpm turbo run lint type-check test \
+            --filter='${{ steps.turbo-filter.outputs.filter }}' \
+            --concurrency=4
+
+  # ─────────────────────────────────────────────────────────────────
+  # 3. Python quality (ruff + mypy — no pytest to avoid model downloads)
+  # ─────────────────────────────────────────────────────────────────
+  python-quality:
+    runs-on: runners-k8s-apps
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - { name: price-ingestor,     path: services/price-ingestor }
+          - { name: sentiment-analyzer, path: services/sentiment-analyzer }
+          - { name: ml-predictor,       path: services/ml-predictor }
+    name: python / ${{ matrix.service.name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: ${{ matrix.service.path }}/uv.lock
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.service.path }}
+        run: uv sync --frozen
+
+      - name: Ruff check
+        working-directory: ${{ matrix.service.path }}
+        run: uv run ruff check .
+
+      - name: Mypy
+        working-directory: ${{ matrix.service.path }}
+        run: uv run mypy src/
+
+  # ─────────────────────────────────────────────────────────────────
+  # 4. Build and push Docker images  (main branch only)
+  # ─────────────────────────────────────────────────────────────────
+  docker:
+    runs-on: runners-k8s-apps
+    needs: [changes, ts-quality, python-quality]
+    if: |
+      github.ref == 'refs/heads/main' &&
+      needs.changes.outputs.matrix != '' &&
+      needs.changes.outputs.matrix != '[]' &&
+      (needs.ts-quality.result     == 'success' || needs.ts-quality.result     == 'skipped') &&
+      (needs.python-quality.result == 'success' || needs.python-quality.result == 'skipped')
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.changes.outputs.matrix) }}
+    name: docker / ${{ matrix.service.name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to Harbor
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}:${{ github.sha }}
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}:latest
+          cache-from: type=gha,scope=${{ matrix.service.name }}
+          cache-to: type=gha,scope=${{ matrix.service.name }},mode=max
+
+  # ─────────────────────────────────────────────────────────────────
+  # 5. GitOps: update image tags in k8s-apps → ArgoCD auto-syncs
+  # ─────────────────────────────────────────────────────────────────
+  gitops:
+    runs-on: runners-k8s-apps
+    needs: [changes, docker]
+    if: |
+      github.ref == 'refs/heads/main' &&
+      needs.docker.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: akann/k8s-apps
+          token: ${{ secrets.GH_PAT }}
+          path: k8s-apps
+
+      - uses: mikefarah/yq@v4
+
+      - name: Update deployment image tags
+        env:
+          SHA: ${{ github.sha }}
+          MATRIX: ${{ needs.changes.outputs.matrix }}
+        run: |
+          cd k8s-apps
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          changed=0
+          for svc in $(echo "$MATRIX" | jq -r '.[].name'); do
+            manifest="apps/yana-stocks/${svc}/deployment.yaml"
+            if [[ -f "$manifest" ]]; then
+              yq e ".spec.template.spec.containers[0].image = \"${{ env.IMAGE_PREFIX }}/${svc}:${SHA}\"" \
+                -i "$manifest"
+              changed=1
+            fi
+          done
+
+          if [[ $changed -eq 1 ]]; then
+            git add apps/yana-stocks/
+            git commit -m "ci(yana-stocks): update images → $(echo "$SHA" | cut -c1-7)"
+            git push
+          fi

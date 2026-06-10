@@ -1,3 +1,6 @@
+# Allow .npmrc to be tracked (overrides global ~/.gitignore rule)
+!.npmrc
+
 # Logs
 logs
 *.log
