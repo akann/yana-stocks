@@ -490,9 +490,15 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.20
+      '@yana-stocks/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
       '@yana-stocks/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      eslint:
+        specifier: ^9.0.0
+        version: 9.39.4(jiti@2.7.0)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -508,18 +514,30 @@ importers:
         specifier: ^0.15.1
         version: 0.15.1
     devDependencies:
+      '@yana-stocks/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
       '@yana-stocks/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      eslint:
+        specifier: ^9.0.0
+        version: 9.39.4(jiti@2.7.0)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
 
   packages/shared-types:
     devDependencies:
+      '@yana-stocks/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
       '@yana-stocks/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config
+      eslint:
+        specifier: ^9.0.0
+        version: 9.39.4(jiti@2.7.0)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

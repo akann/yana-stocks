@@ -25,7 +25,7 @@ export class AuthProxyController {
     if (authorization) headers['authorization'] = authorization;
 
     const { status, data } = await firstValueFrom(
-      this.http.request({
+      this.http.request<unknown>({
         method,
         url: `${this.baseUrl}${path}`,
         data: body,

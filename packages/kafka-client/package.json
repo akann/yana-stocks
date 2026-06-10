@@ -17,7 +17,9 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@yana-stocks/eslint-config": "workspace:*",
     "@yana-stocks/typescript-config": "workspace:*",
+    "eslint": "^9.0.0",
     "typescript": "^5.9.3"
   }
 }

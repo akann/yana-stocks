@@ -20,7 +20,9 @@
     "class-validator": "^0.15.1"
   },
   "devDependencies": {
+    "@yana-stocks/eslint-config": "workspace:*",
     "@yana-stocks/typescript-config": "workspace:*",
+    "eslint": "^9.0.0",
     "typescript": "^5.9.3"
   }
 }

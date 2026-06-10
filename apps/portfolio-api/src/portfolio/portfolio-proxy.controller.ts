@@ -27,10 +27,10 @@ export class PortfolioProxyController {
     if (auth) headers['authorization'] = auth;
 
     const { status, data } = await firstValueFrom(
-      this.http.request({
+      this.http.request<unknown>({
         method: req.method,
         url: `${this.baseUrl}${subPath || '/'}`,
-        data: req.body,
+        data: req.body as unknown,
         headers,
         validateStatus: () => true,
       }),
