@@ -97,7 +97,7 @@ jobs:
           include "${{ steps.filter.outputs.ml-predictor }}"       && \
             add "ml-predictor"       "services/ml-predictor"       "services/ml-predictor/Dockerfile"
 
-          echo "matrix=$services" >> "$GITHUB_OUTPUT"
+          echo "matrix=$(printf '%s' "$services" | jq -c .)" >> "$GITHUB_OUTPUT"
 
   # ─────────────────────────────────────────────────────────────────
   # 2. TypeScript quality (lint + type-check + test)
