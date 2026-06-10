@@ -69,6 +69,6 @@ test.describe('Login', () => {
     await loginPage.goto();
     await loginPage.login(testEmail, PASSWORD);
     await page.waitForURL('**/dashboard', { timeout: 10_000 });
-    await expect(page.locator('button', { hasText: 'Logout' })).toBeVisible();
+    await expect(page.locator('button', { hasText: 'Sign out' })).toBeVisible();
   });
 });

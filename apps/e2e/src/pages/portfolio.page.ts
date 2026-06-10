@@ -25,7 +25,7 @@ export class PortfolioPage {
 
   async openAddStock(portfolioName: string) {
     const row = this.page.locator('h3', { hasText: portfolioName });
-    const card = row.locator('..').locator('..');
+    const card = row.locator('..').locator('..').locator('..');
     await card.locator('button', { hasText: '+ Add Stock' }).click();
   }
 
@@ -33,7 +33,7 @@ export class PortfolioPage {
     await this.page.locator('input[placeholder="AAPL"]').fill(symbol);
     await this.page.locator('input[placeholder="10"]').fill(shares);
     await this.page.locator('input[placeholder="150.00"]').fill(price);
-    await this.page.locator('button', { hasText: 'Add Stock' }).click();
+    await this.page.getByRole('button', { name: 'Add Stock', exact: true }).click();
   }
 
   portfolioCard(name: string): Locator {

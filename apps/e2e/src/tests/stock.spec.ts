@@ -46,7 +46,7 @@ test.describe('Stock data display', () => {
     const stockPage = new StockPage(page);
     await stockPage.goto('ZZZNOTREAL');
     await expect(stockPage.symbolHeading()).toContainText('ZZZNOTREAL', { timeout: 5_000 });
-    await expect(page.locator('text=No price history available').or(page.locator('text=No price data'))).toBeVisible({
+    await expect(page.locator('text=No price history available').or(page.locator('text=No price data')).first()).toBeVisible({
       timeout: 10_000,
     });
   });

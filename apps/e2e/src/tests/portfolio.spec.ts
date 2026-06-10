@@ -54,8 +54,9 @@ test.describe('Portfolio management', () => {
 
     await portfolioPage.goto();
     await portfolioPage.createPortfolio(name);
-    await expect(page.locator('h3', { hasText: name })).toBeVisible({ timeout: 5_000 });
-    await expect(page.locator('text=No holdings yet')).toBeVisible({ timeout: 5_000 });
+    const card = portfolioPage.portfolioCard(name);
+    await expect(card.locator('h3', { hasText: name })).toBeVisible({ timeout: 5_000 });
+    await expect(card.getByText('No holdings yet')).toBeVisible({ timeout: 5_000 });
   });
 
   test('portfolio page redirects to login when unauthenticated', async ({ page }) => {

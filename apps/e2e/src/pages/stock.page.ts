@@ -8,9 +8,9 @@ export class StockPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.priceChart = page.locator('text=Price History');
-    this.sentimentPanel = page.locator('text=Sentiment');
-    this.predictionsPanel = page.locator('text=Predictions');
+    this.priceChart = page.locator('h3', { hasText: 'Price History' }).or(page.getByText('No price history available')).first();
+    this.sentimentPanel = page.getByRole('heading', { name: 'Sentiment', exact: true });
+    this.predictionsPanel = page.getByRole('heading', { name: 'Predictions', exact: true });
   }
 
   async goto(symbol: string) {

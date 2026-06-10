@@ -21,7 +21,7 @@ export function RegisterForm() {
     try {
       const { data } = await axios.post<{ accessToken: string; refreshToken: string }>(
         `${process.env.NEXT_PUBLIC_API_URL}/auth/register`,
-        { email, password },
+        { email, password, name: email.split('@')[0] },
       );
       login(data.accessToken, data.refreshToken);
       router.push('/dashboard');

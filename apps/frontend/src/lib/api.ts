@@ -44,7 +44,6 @@ api.interceptors.response.use(
     const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refresh_token') : null;
     if (!refreshToken) {
       isRefreshing = false;
-      if (typeof window !== 'undefined') window.location.href = '/login';
       return Promise.reject(error);
     }
 
