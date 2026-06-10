@@ -1,0 +1,47 @@
+FROM node:24-alpine AS builder
+WORKDIR /app
+
+RUN corepack enable
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/typescript-config/package.json ./packages/typescript-config/
+COPY packages/eslint-config/package.json ./packages/eslint-config/
+COPY packages/prettier-config/package.json ./packages/prettier-config/
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/kafka-client/package.json ./packages/kafka-client/
+COPY apps/portfolio-api/package.json ./apps/portfolio-api/
+
+RUN pnpm install --frozen-lockfile
+
+COPY packages ./packages
+COPY apps/portfolio-api ./apps/portfolio-api
+
+RUN pnpm --filter "@yana-stocks/shared-types" build && \
+    pnpm --filter "@yana-stocks/kafka-client" build && \
+    pnpm --filter "@yana-stocks/portfolio-api" build
+
+FROM node:24-alpine
+WORKDIR /app
+
+RUN corepack enable && \
+    addgroup -S app && \
+    adduser -S app -G app
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY packages/typescript-config/package.json ./packages/typescript-config/
+COPY packages/eslint-config/package.json ./packages/eslint-config/
+COPY packages/prettier-config/package.json ./packages/prettier-config/
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/kafka-client/package.json ./packages/kafka-client/
+COPY apps/portfolio-api/package.json ./apps/portfolio-api/
+
+RUN pnpm install --frozen-lockfile --prod
+
+COPY --from=builder /app/packages/shared-types/dist ./packages/shared-types/dist
+COPY --from=builder /app/packages/kafka-client/dist ./packages/kafka-client/dist
+COPY --from=builder /app/apps/portfolio-api/dist ./apps/portfolio-api/dist
+
+USER app
+WORKDIR /app/apps/portfolio-api
+EXPOSE 3000
+CMD ["node", "dist/main.js"]

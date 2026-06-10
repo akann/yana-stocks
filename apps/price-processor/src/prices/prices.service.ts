@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import type { ProcessedPriceMessage, RawPriceMessage } from '@yana-stocks/shared-types';
+import type { OHLCV, ProcessedPriceMessage, RawPriceMessage } from '@yana-stocks/shared-types';
 import { KAFKA_TOPICS } from '@yana-stocks/kafka-client';
 import { Model } from 'mongoose';
 import { RedisService } from '../redis/redis.service';
@@ -58,6 +58,37 @@ export class PricesService {
     };
 
     await this.kafkaProducer.emit(KAFKA_TOPICS.PRICES_PROCESSED, msg.symbol, processed);
+  }
+
+  async getHistory(
+    symbol: string,
+    opts: { limit: number; from?: string; to?: string },
+  ): Promise<OHLCV[]> {
+    const filter: Record<string, unknown> = { symbol };
+    if (opts.from ?? opts.to) {
+      const tsFilter: Record<string, Date> = {};
+      if (opts.from) tsFilter['$gte'] = new Date(opts.from);
+      if (opts.to) tsFilter['$lte'] = new Date(opts.to);
+      filter['timestamp'] = tsFilter;
+    }
+
+    const bars = await this.priceBarsModel
+      .find(filter)
+      .sort({ timestamp: -1 })
+      .limit(opts.limit)
+      .lean<PriceBar[]>()
+      .exec();
+
+    return bars.map((b) => ({
+      symbol: b.symbol,
+      timestamp: b.timestamp,
+      open: b.open,
+      high: b.high,
+      low: b.low,
+      close: b.close,
+      volume: b.volume,
+      interval: '1m' as const,
+    }));
   }
 
   private truncateToMinute(isoTimestamp: string): Date {
