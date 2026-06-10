@@ -13,10 +13,13 @@ dependencies = [
     "httpx>=0.28.0",
 ]
 
+[project.scripts]
+sentiment-analyzer = "sentiment_analyzer.main:main"
+
 [dependency-groups]
 dev = [
     "pytest>=8.3.0",
-    "pytest-asyncio>=0.24.0",
+    "pytest-mock>=3.14.0",
     "ruff>=0.9.0",
     "mypy>=1.14.0",
     "bandit>=1.9.0",
@@ -25,6 +28,9 @@ dev = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sentiment_analyzer"]
 
 [tool.ruff]
 target-version = "py312"
@@ -35,6 +41,21 @@ src = ["src", "tests"]
 select = ["E", "W", "F", "I", "B", "C4", "UP", "ARG", "SIM"]
 ignore = ["E501"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["sentiment_analyzer"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["transformers.*", "confluent_kafka.*", "pymongo.*", "bson.*"]
+ignore_missing_imports = true
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "-v"]
