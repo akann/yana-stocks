@@ -18,6 +18,7 @@ import { LocalStrategy } from './strategies/local.strategy';
         secret: config.getOrThrow<string>('jwt.secret'),
         signOptions: {
           expiresIn: config.getOrThrow<string>('jwt.expiresIn') as SignOptions['expiresIn'],
+          issuer: 'yana-stocks',
         },
       }),
     }),
