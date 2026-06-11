@@ -78,8 +78,13 @@ jobs:
                 '. + [{"name":$n,"context":$c,"dockerfile":$f}]')
           }
 
-          # Detect changed services via git diff (more reliable than paths-filter outputs
-          # which don't propagate correctly for hyphenated filter names in this runner env)
+          # Detect changed services via git diff
+          echo "=== git log (last 3) ==="
+          git log --oneline -3 2>&1 || true
+          echo "=== git diff HEAD^1 HEAD --name-only ==="
+          git diff --name-only HEAD^1 HEAD 2>&1 || echo "(git diff returned non-zero)"
+          echo "=== end debug ==="
+
           changed() {
             local path="$1"
             if [[ "$build_all" == "true" ]]; then return 0; fi
