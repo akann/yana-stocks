@@ -206,30 +206,42 @@ jobs:
         run: |
           echo "=== DOCKER_HOST from pod env ===" && echo "${DOCKER_HOST:-not set}"
           echo "=== Listening TCP ports ===" && ss -tlnp 2>/dev/null || true
-          echo "=== curl probe (verbose) ===" && curl -v --max-time 3 http://localhost:2375/_ping 2>&1 || true
-          # Probe DinD TCP sidecar
+          echo "=== /var/run contents ===" && ls -la /var/run/ 2>/dev/null || true
+
+          install_docker_cli() {
+            sudo install -m 0755 -d /etc/apt/keyrings
+            sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+              -o /etc/apt/keyrings/docker.asc 2>/dev/null
+            sudo chmod a+r /etc/apt/keyrings/docker.asc
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+              https://download.docker.com/linux/ubuntu \
+              $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+              sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends docker-ce-cli >/dev/null
+          }
+
+          # Probe for up to 60 s; check both Unix socket (containerMode=dind) and TCP
           for i in $(seq 1 30); do
-            if curl -sf --max-time 3 http://localhost:2375/_ping >/dev/null 2>&1; then
-              echo "DinD sidecar ready — installing Docker CLI"
-              sudo install -m 0755 -d /etc/apt/keyrings
-              sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-                -o /etc/apt/keyrings/docker.asc
-              sudo chmod a+r /etc/apt/keyrings/docker.asc
-              echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
-                https://download.docker.com/linux/ubuntu \
-                $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-                sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
-              sudo apt-get update -qq
-              sudo apt-get install -y --no-install-recommends docker-ce-cli >/dev/null
+            # Unix socket — used by containerMode.type=dind
+            if curl -sf --max-time 2 --unix-socket /var/run/docker.sock \
+                http://localhost/_ping >/dev/null 2>&1; then
+              echo "Docker socket ready (attempt $i)"
+              install_docker_cli
+              echo "DOCKER_HOST=unix:///var/run/docker.sock" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            # TCP — used by manual DinD on 2375
+            if curl -sf --max-time 2 http://localhost:2375/_ping >/dev/null 2>&1; then
+              echo "Docker TCP ready (attempt $i)"
+              install_docker_cli
               echo "DOCKER_HOST=tcp://localhost:2375" >> "$GITHUB_ENV"
               exit 0
             fi
             echo "  attempt $i: not ready yet"
             sleep 2
           done
-          # CLI already present and default socket works
-          docker info >/dev/null 2>&1 && echo "Docker ready via socket" && exit 0
-          echo "ERROR: DinD sidecar not reachable after 60 s" >&2
+          echo "ERROR: Docker not reachable after 60 s" >&2
           exit 1
 
       - uses: docker/setup-buildx-action@v3
