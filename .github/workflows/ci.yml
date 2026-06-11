@@ -279,7 +279,12 @@ jobs:
           token: ${{ secrets.GH_PAT }}
           path: k8s-apps
 
-      - uses: mikefarah/yq@v4
+      - name: Install yq
+        run: |
+          mkdir -p $HOME/.local/bin
+          wget -qO $HOME/.local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64
+          chmod +x $HOME/.local/bin/yq
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Update deployment image tags
         env:
