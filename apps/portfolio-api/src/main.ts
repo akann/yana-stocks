@@ -7,7 +7,6 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 
-  app.enableCors();
   app.setGlobalPrefix('api', { exclude: ['health'] });
 
   const swaggerConfig = new DocumentBuilder()
