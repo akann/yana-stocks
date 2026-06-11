@@ -78,35 +78,25 @@ jobs:
                 '. + [{"name":$n,"context":$c,"dockerfile":$f}]')
           }
 
-          # Detect changed services via git diff
-          echo "=== git log (last 3) ==="
-          git log --oneline -3 2>&1 || true
-          echo "=== git diff HEAD^1 HEAD --name-only ==="
-          git diff --name-only HEAD^1 HEAD 2>&1 || echo "(git diff returned non-zero)"
-          echo "=== end debug ==="
+          # Use dorny/paths-filter's 'changes' JSON array output — reliable for
+          # hyphenated filter names where individual step outputs are not accessible.
+          # dorny outputs e.g. ["ts","user-service"] when those filters matched.
+          filter_changes='${{ steps.filter.outputs.changes }}'
 
-          changed() {
-            local path="$1"
+          in_changes() {
+            local name="$1"
             if [[ "$build_all" == "true" ]]; then return 0; fi
-            git diff --name-only HEAD^1 HEAD 2>/dev/null | grep -q "^${path}"
+            printf '%s' "$filter_changes" | jq -e --arg n "$name" '.[] | select(. == $n)' > /dev/null 2>&1
           }
 
-          changed "apps/frontend/"           && add "frontend"           "."                           "apps/frontend/Dockerfile"
-          changed "apps/user-service/"       && add "user-service"       "."                           "apps/user-service/Dockerfile"
-          changed "apps/price-processor/"    && add "price-processor"    "."                           "apps/price-processor/Dockerfile"
-          changed "apps/portfolio-service/"  && add "portfolio-service"  "."                           "apps/portfolio-service/Dockerfile"
-          changed "apps/portfolio-api/"      && add "portfolio-api"      "."                           "apps/portfolio-api/Dockerfile"
-          changed "services/price-ingestor/" && add "price-ingestor"     "services/price-ingestor"     "services/price-ingestor/Dockerfile"
-          changed "services/sentiment-analyzer/" && add "sentiment-analyzer" "services/sentiment-analyzer" "services/sentiment-analyzer/Dockerfile"
-          changed "services/ml-predictor/"   && add "ml-predictor"       "services/ml-predictor"       "services/ml-predictor/Dockerfile"
-          # Any shared package change triggers all TS services
-          if ! [[ "$build_all" == "true" ]] && git diff --name-only HEAD^1 HEAD 2>/dev/null | grep -q "^packages/"; then
-            add "frontend"          "."                           "apps/frontend/Dockerfile"
-            add "user-service"      "."                           "apps/user-service/Dockerfile"
-            add "price-processor"   "."                           "apps/price-processor/Dockerfile"
-            add "portfolio-service" "."                           "apps/portfolio-service/Dockerfile"
-            add "portfolio-api"     "."                           "apps/portfolio-api/Dockerfile"
-          fi
+          in_changes "frontend"           && add "frontend"           "."                           "apps/frontend/Dockerfile"
+          in_changes "user-service"       && add "user-service"       "."                           "apps/user-service/Dockerfile"
+          in_changes "price-processor"    && add "price-processor"    "."                           "apps/price-processor/Dockerfile"
+          in_changes "portfolio-service"  && add "portfolio-service"  "."                           "apps/portfolio-service/Dockerfile"
+          in_changes "portfolio-api"      && add "portfolio-api"      "."                           "apps/portfolio-api/Dockerfile"
+          in_changes "price-ingestor"     && add "price-ingestor"     "services/price-ingestor"     "services/price-ingestor/Dockerfile"
+          in_changes "sentiment-analyzer" && add "sentiment-analyzer" "services/sentiment-analyzer" "services/sentiment-analyzer/Dockerfile"
+          in_changes "ml-predictor"       && add "ml-predictor"       "services/ml-predictor"       "services/ml-predictor/Dockerfile"
 
           matrix_json=$(printf '%s' "$services" | jq -c 'unique_by(.name)')
           echo "matrix=$matrix_json" >> "$GITHUB_OUTPUT"
