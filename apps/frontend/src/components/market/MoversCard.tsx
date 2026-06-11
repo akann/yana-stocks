@@ -1,12 +1,13 @@
 'use client';
 
+import React from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api } from '@/lib/api';
 import type { MarketMovers, MoverEntry } from '@/types';
 
-function MoverRow({ entry, rank }: { entry: MoverEntry; rank: number }) {
+function MoverRow({ entry, rank }: { entry: MoverEntry; rank: number }): React.JSX.Element {
   const positive = entry.changePercent >= 0;
   return (
     <Link
@@ -30,7 +31,7 @@ function MoverRow({ entry, rank }: { entry: MoverEntry; rank: number }) {
   );
 }
 
-export function MoversCard() {
+export function MoversCard(): React.JSX.Element {
   const { data, isLoading } = useQuery<MarketMovers>({
     queryKey: ['movers'],
     queryFn: () => api.get<MarketMovers>('/market/movers').then((r) => r.data),

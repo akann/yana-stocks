@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
@@ -9,7 +9,7 @@ import { PortfolioTable } from '@/components/portfolio/PortfolioTable';
 import { AddStockModal } from '@/components/portfolio/AddStockModal';
 import type { Portfolio } from '@/types';
 
-export default function PortfolioPage() {
+export default function PortfolioPage(): React.JSX.Element {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const qc = useQueryClient();

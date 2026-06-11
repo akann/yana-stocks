@@ -1,9 +1,10 @@
 'use client';
 
+import React from 'react';
 import clsx from 'clsx';
 import type { Portfolio } from '@/types';
 
-export function PortfolioTable({ portfolio }: { portfolio: Portfolio }) {
+export function PortfolioTable({ portfolio }: { portfolio: Portfolio }): React.JSX.Element {
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">

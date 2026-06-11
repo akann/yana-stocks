@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
@@ -9,7 +9,7 @@ interface Props {
   onClose: () => void;
 }
 
-export function AddStockModal({ portfolioId, onClose }: Props) {
+export function AddStockModal({ portfolioId, onClose }: Props): React.JSX.Element {
   const qc = useQueryClient();
   const [symbol, setSymbol] = useState('');
   const [shares, setShares] = useState('');

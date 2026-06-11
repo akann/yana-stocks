@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -7,7 +8,7 @@ import { PriceChart } from '@/components/charts/PriceChart';
 import { SignalsPanel } from '@/components/signals/SignalsPanel';
 import type { StockAggregate } from '@/types';
 
-export default function StockPage() {
+export default function StockPage(): React.JSX.Element {
   const { symbol } = useParams<{ symbol: string }>();
   const upperSymbol = symbol.toUpperCase();
 

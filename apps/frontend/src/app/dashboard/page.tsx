@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import type { Portfolio } from '@/types';
 
-export default function DashboardPage() {
+export default function DashboardPage(): React.JSX.Element {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
 

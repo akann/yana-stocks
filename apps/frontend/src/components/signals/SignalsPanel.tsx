@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api } from '@/lib/api';
@@ -23,7 +24,7 @@ const HORIZON_LABELS: Record<PredictionHorizon, string> = {
   '1w': '1 Week',
 };
 
-export function SignalsPanel({ symbol }: { symbol: string }) {
+export function SignalsPanel({ symbol }: { symbol: string }): React.JSX.Element {
   const { data: signals } = useQuery<SignalsResponse>({
     queryKey: ['signals', symbol],
     queryFn: () => api.get<SignalsResponse>(`/signals/${symbol}`).then((r) => r.data),

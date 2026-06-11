@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MoversCard } from '@/components/market/MoversCard';
 
-export default function HomePage() {
+export default function HomePage(): React.JSX.Element {
   const [symbol, setSymbol] = useState('');
   const router = useRouter();
 

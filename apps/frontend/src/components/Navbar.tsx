@@ -1,11 +1,12 @@
 'use client';
 
+import React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 
-export function Navbar() {
+export function Navbar(): React.JSX.Element {
   const { isAuthenticated, logout } = useAuth();
   const router = useRouter();
 

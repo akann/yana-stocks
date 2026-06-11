@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   LineChart,
@@ -18,7 +19,7 @@ interface ChartPoint {
   price: number;
 }
 
-export function PriceChart({ symbol }: { symbol: string }) {
+export function PriceChart({ symbol }: { symbol: string }): React.JSX.Element {
   const { data, isLoading } = useQuery<OHLCVBar[]>({
     queryKey: ['history', symbol],
     queryFn: () => api.get<OHLCVBar[]>(`/stocks/${symbol}/history?limit=100`).then((r) => r.data),

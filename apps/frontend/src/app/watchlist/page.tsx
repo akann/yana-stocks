@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import type { Watchlist } from '@/types';
 
-export default function WatchlistPage() {
+export default function WatchlistPage(): React.JSX.Element {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const qc = useQueryClient();

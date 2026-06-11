@@ -1,3 +1,4 @@
+import React from 'react';
 import type { Metadata } from 'next';
 import { Providers } from '@/components/Providers';
 import { Navbar } from '@/components/Navbar';
@@ -8,7 +9,7 @@ export const metadata: Metadata = {
   description: 'Real-time stock market data, portfolio management, and ML-powered predictions',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
     <html lang="en">
       <body>
