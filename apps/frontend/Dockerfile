@@ -4,7 +4,17 @@ RUN corepack enable pnpm
 FROM base AS deps
 WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/e2e/package.json ./apps/e2e/
 COPY apps/frontend/package.json ./apps/frontend/
+COPY apps/portfolio-api/package.json ./apps/portfolio-api/
+COPY apps/portfolio-service/package.json ./apps/portfolio-service/
+COPY apps/price-processor/package.json ./apps/price-processor/
+COPY apps/user-service/package.json ./apps/user-service/
+COPY packages/eslint-config/package.json ./packages/eslint-config/
+COPY packages/kafka-client/package.json ./packages/kafka-client/
+COPY packages/prettier-config/package.json ./packages/prettier-config/
+COPY packages/shared-dto/package.json ./packages/shared-dto/
+COPY packages/shared-types/package.json ./packages/shared-types/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
 RUN pnpm install --frozen-lockfile
 
