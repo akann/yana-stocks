@@ -202,14 +202,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Wait for Docker daemon (DinD)
+      - name: Wait for Docker (DinD TCP or socket)
         run: |
-          echo "DOCKER_HOST=${DOCKER_HOST:-not set}"
+          echo "Container DOCKER_HOST=${DOCKER_HOST:-not set}"
+          # Probe TCP first (DinD sidecar), then fall back to socket
           for i in $(seq 1 30); do
-            docker info >/dev/null 2>&1 && echo "Docker ready after ${i}s" && break
+            if docker -H tcp://localhost:2375 info >/dev/null 2>&1; then
+              echo "DOCKER_HOST=tcp://localhost:2375" >> "$GITHUB_ENV"
+              echo "Docker ready via TCP after $((i * 2))s"
+              exit 0
+            elif docker info >/dev/null 2>&1; then
+              echo "Docker ready via default socket"
+              exit 0
+            fi
             sleep 2
           done
-          docker info
+          echo "Docker unavailable after 60s" && exit 1
 
       - uses: docker/setup-buildx-action@v3
 
