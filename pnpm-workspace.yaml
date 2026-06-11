@@ -17,3 +17,6 @@ minimumReleaseAgeExclude:
   - '@turbo/windows-arm64@2.9.17'
   - prettier@3.8.4
   - turbo@2.9.17
+overrides:
+  '@types/react': ^18.3.18
+  '@types/react-dom': ^18.3.5
