@@ -207,7 +207,8 @@ jobs:
           # 1. Probe DinD TCP sidecar via HTTP — no docker CLI needed.
           #    The runner pod spec sets DOCKER_HOST=tcp://localhost:2375 and runs
           #    a privileged docker:dind sidecar, but the runner image has no CLI.
-          for i in $(seq 1 5); do
+          #    DinD can take 30-60 s to initialise when the pod scales from 0.
+          for i in $(seq 1 30); do
             if curl -sf http://localhost:2375/_ping >/dev/null 2>&1; then
               echo "DinD sidecar ready — installing Docker CLI"
               sudo install -m 0755 -d /etc/apt/keyrings
