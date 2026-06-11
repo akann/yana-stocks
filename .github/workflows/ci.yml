@@ -18,6 +18,7 @@ permissions:
 env:
   REGISTRY: harbor.yanatech.co.uk
   IMAGE_PREFIX: harbor.yanatech.co.uk/yana-stocks
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ─────────────────────────────────────────────────────────────────

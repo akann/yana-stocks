@@ -1,7 +1,7 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
 
-RUN corepack enable
+RUN apk upgrade --no-cache && corepack enable
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY packages/typescript-config/package.json ./packages/typescript-config/
@@ -25,7 +25,8 @@ RUN pnpm --filter "@yana-stocks/shared-types" build && \
 FROM node:24-alpine
 WORKDIR /app
 
-RUN corepack enable && \
+RUN apk upgrade --no-cache && \
+    corepack enable && \
     addgroup -S app && \
     adduser -S app -G app
 

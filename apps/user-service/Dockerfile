@@ -1,7 +1,7 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
 
-RUN corepack enable
+RUN apk upgrade --no-cache && corepack enable
 
 # Workspace manifests — copied first for Docker layer cache
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
@@ -29,7 +29,8 @@ RUN pnpm --filter "@yana-stocks/shared-types" build && \
 FROM node:24-alpine
 WORKDIR /app
 
-RUN corepack enable && \
+RUN apk upgrade --no-cache && \
+    corepack enable && \
     addgroup -S app && \
     adduser -S app -G app
 
