@@ -86,7 +86,7 @@ jobs:
           in_changes() {
             local name="$1"
             if [[ "$build_all" == "true" ]]; then return 0; fi
-            printf '%s' "$filter_changes" | jq -e --arg n "$name" '.[] | select(. == $n)' > /dev/null 2>&1
+            printf '%s' "$filter_changes" | grep -qF "\"${name}\""
           }
 
           in_changes "frontend"           && add "frontend"           "."                           "apps/frontend/Dockerfile"
