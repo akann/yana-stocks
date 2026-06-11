@@ -89,7 +89,10 @@ jobs:
           if include "${{ steps.filter.outputs.sentiment-analyzer }}"; then add "sentiment-analyzer" "services/sentiment-analyzer" "services/sentiment-analyzer/Dockerfile"; fi
           if include "${{ steps.filter.outputs.ml-predictor }}";       then add "ml-predictor"       "services/ml-predictor"       "services/ml-predictor/Dockerfile";   fi
 
-          echo "matrix=$(printf '%s' "$services" | jq -c .)" >> "$GITHUB_OUTPUT"
+          matrix_json=$(printf '%s' "$services" | jq -c .)
+          echo "DEBUG: services=$services"
+          echo "DEBUG: matrix_json=$matrix_json"
+          echo "matrix=$matrix_json" >> "$GITHUB_OUTPUT"
 
   # ─────────────────────────────────────────────────────────────────
   # 2. TypeScript quality (lint + type-check + test)
