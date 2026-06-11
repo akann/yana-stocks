@@ -24,7 +24,7 @@ jobs:
   # 1. Detect what changed
   # ─────────────────────────────────────────────────────────────────
   changes:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: runners-yana-stocks
     outputs:
       ts: ${{ steps.filter.outputs.ts }}
       python: ${{ steps.filter.outputs.python }}
@@ -96,7 +96,7 @@ jobs:
   # 2. TypeScript quality (lint + type-check + test)
   # ─────────────────────────────────────────────────────────────────
   ts-quality:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: runners-yana-stocks
     needs: changes
     if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
     steps:
@@ -144,7 +144,7 @@ jobs:
   # 3. Python quality (ruff + mypy — no pytest to avoid model downloads)
   # ─────────────────────────────────────────────────────────────────
   python-quality:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: runners-yana-stocks
     needs: changes
     if: needs.changes.outputs.python == 'true' || github.event.inputs.build_all == 'true'
     strategy:
@@ -179,7 +179,7 @@ jobs:
   # 4. Build and push Docker images  (main branch only)
   # ─────────────────────────────────────────────────────────────────
   docker:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: runners-yana-stocks
     needs: [changes, ts-quality, python-quality]
     if: |
       github.ref == 'refs/heads/main' &&
@@ -267,7 +267,7 @@ jobs:
   # 5. GitOps: update image tags in k8s-apps → ArgoCD auto-syncs
   # ─────────────────────────────────────────────────────────────────
   gitops:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: runners-yana-stocks
     needs: [changes, docker]
     if: |
       github.ref == 'refs/heads/main' &&
