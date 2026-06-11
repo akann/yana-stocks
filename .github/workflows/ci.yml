@@ -204,12 +204,12 @@ jobs:
 
       - name: Set up Docker
         run: |
-          # 1. Probe DinD TCP sidecar via HTTP — no docker CLI needed.
-          #    The runner pod spec sets DOCKER_HOST=tcp://localhost:2375 and runs
-          #    a privileged docker:dind sidecar, but the runner image has no CLI.
-          #    DinD can take 30-60 s to initialise when the pod scales from 0.
+          echo "=== DOCKER_HOST from pod env ===" && echo "${DOCKER_HOST:-not set}"
+          echo "=== Listening TCP ports ===" && ss -tlnp 2>/dev/null || true
+          echo "=== curl probe (verbose) ===" && curl -v --max-time 3 http://localhost:2375/_ping 2>&1 || true
+          # Probe DinD TCP sidecar
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:2375/_ping >/dev/null 2>&1; then
+            if curl -sf --max-time 3 http://localhost:2375/_ping >/dev/null 2>&1; then
               echo "DinD sidecar ready — installing Docker CLI"
               sudo install -m 0755 -d /etc/apt/keyrings
               sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
@@ -224,12 +224,12 @@ jobs:
               echo "DOCKER_HOST=tcp://localhost:2375" >> "$GITHUB_ENV"
               exit 0
             fi
+            echo "  attempt $i: not ready yet"
             sleep 2
           done
-          # 2. CLI already present and default socket works
+          # CLI already present and default socket works
           docker info >/dev/null 2>&1 && echo "Docker ready via socket" && exit 0
-          # 3. No sidecar and no host Docker — should not happen with current runner spec
-          echo "ERROR: Docker unavailable and DinD sidecar not reachable" >&2
+          echo "ERROR: DinD sidecar not reachable after 60 s" >&2
           exit 1
 
       - uses: docker/setup-buildx-action@v3
