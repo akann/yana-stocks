@@ -309,6 +309,12 @@ jobs:
             if [[ -f "$manifest" ]]; then
               yq e ".spec.template.spec.containers[0].image = \"${{ env.IMAGE_PREFIX }}/${svc}:${SHA}\"" \
                 -i "$manifest"
+              # Also update initContainers if any exist in this manifest
+              ic_count=$(yq e '.spec.template.spec.initContainers | length' "$manifest" 2>/dev/null || echo 0)
+              if [[ "${ic_count:-0}" -gt 0 ]]; then
+                yq e ".spec.template.spec.initContainers[0].image = \"${{ env.IMAGE_PREFIX }}/${svc}:${SHA}\"" \
+                  -i "$manifest"
+              fi
               changed=1
             fi
           done
