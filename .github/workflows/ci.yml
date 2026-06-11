@@ -90,8 +90,6 @@ jobs:
           if include "${{ steps.filter.outputs.ml-predictor }}";       then add "ml-predictor"       "services/ml-predictor"       "services/ml-predictor/Dockerfile";   fi
 
           matrix_json=$(printf '%s' "$services" | jq -c .)
-          echo "DEBUG: services=$services"
-          echo "DEBUG: matrix_json=$matrix_json"
           echo "matrix=$matrix_json" >> "$GITHUB_OUTPUT"
 
   # ─────────────────────────────────────────────────────────────────
@@ -191,6 +189,7 @@ jobs:
       (needs.python-quality.result == 'success' || needs.python-quality.result == 'skipped')
     strategy:
       fail-fast: false
+      max-parallel: 3
       matrix:
         service: ${{ fromJson(needs.changes.outputs.matrix) }}
     name: docker / ${{ matrix.service.name }}
