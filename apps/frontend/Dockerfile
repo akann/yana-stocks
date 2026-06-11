@@ -27,13 +27,13 @@ ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_WS_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
-RUN pnpm --filter "@yana-stocks/frontend" build
+RUN mkdir -p apps/frontend/public && pnpm --filter "@yana-stocks/frontend" build
 
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
-COPY --from=builder /app/apps/frontend/public ./public 2>/dev/null || true
+COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/.next/static ./apps/frontend/.next/static
 USER nextjs
