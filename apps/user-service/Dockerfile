@@ -49,6 +49,7 @@ COPY --from=builder /app/packages/shared-dto/dist ./packages/shared-dto/dist
 COPY --from=builder /app/packages/kafka-client/dist ./packages/kafka-client/dist
 COPY --from=builder /app/apps/user-service/dist ./apps/user-service/dist
 COPY --from=builder /app/apps/user-service/prisma ./apps/user-service/prisma
+COPY --from=builder /app/apps/user-service/prisma.config.ts ./apps/user-service/prisma.config.ts
 
 USER app
 WORKDIR /app/apps/user-service
