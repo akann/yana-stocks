@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import configuration from './config/configuration';
+import { HealthController } from './health.controller';
 import { KafkaModule } from './kafka/kafka.module';
 import { PortfoliosModule } from './portfolios/portfolios.module';
 import { TradesModule } from './trades/trades.module';
@@ -21,5 +22,6 @@ import { WatchlistsModule } from './watchlists/watchlists.module';
     TradesModule,
     WatchlistsModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}

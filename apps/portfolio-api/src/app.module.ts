@@ -3,6 +3,7 @@ import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
 import configuration from './config/configuration';
 import { AuthProxyController } from './auth/auth-proxy.controller';
+import { HealthController } from './health.controller';
 import { PortfolioProxyController } from './portfolio/portfolio-proxy.controller';
 import { KafkaModule } from './kafka/kafka.module';
 import { RedisModule } from './redis/redis.module';
@@ -18,6 +19,6 @@ import { StocksModule } from './stocks/stocks.module';
     StocksModule,
     SignalsModule,
   ],
-  controllers: [AuthProxyController, PortfolioProxyController],
+  controllers: [AuthProxyController, HealthController, PortfolioProxyController],
 })
 export class AppModule {}

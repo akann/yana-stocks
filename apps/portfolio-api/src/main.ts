@@ -8,7 +8,7 @@ async function bootstrap(): Promise<void> {
   const config = app.get(ConfigService);
 
   app.enableCors();
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('api', { exclude: ['health'] });
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Portfolio API')
