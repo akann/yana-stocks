@@ -125,6 +125,9 @@ jobs:
         # Run once; if it fails on the build-approval check, approve then retry.
         run: pnpm install --frozen-lockfile || (pnpm approve-builds --all && pnpm install --frozen-lockfile)
 
+      - name: Generate Prisma client
+        run: pnpm --filter @yana-stocks/user-service db:generate
+
       - name: Set Turborepo filter
         id: turbo-filter
         run: |
