@@ -218,7 +218,7 @@ jobs:
           #    /var/run/docker.sock which exists as a directory on containerd nodes.
           echo "No Docker found — installing..."
           curl -fsSL https://get.docker.com | sudo sh
-          sudo dockerd --host=unix:///tmp/dockerd.sock --iptables=false --ip-forward=false --bridge=none &>/tmp/dockerd.log &
+          sudo dockerd --host=unix:///tmp/dockerd.sock --iptables=false --ip-forward=false --bridge=none --storage-driver=vfs &>/tmp/dockerd.log &
           for i in $(seq 1 20); do
             if docker -H unix:///tmp/dockerd.sock info >/dev/null 2>&1; then
               echo "DOCKER_HOST=unix:///tmp/dockerd.sock" >> "$GITHUB_ENV"
