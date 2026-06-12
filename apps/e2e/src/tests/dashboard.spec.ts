@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { RegisterPage, LoginPage } from '../pages/auth.page';
+import { RegisterPage } from '../pages/auth.page';
 import { DashboardPage } from '../pages/dashboard.page';
 import { PortfolioPage } from '../pages/portfolio.page';
 
@@ -7,6 +7,7 @@ const PASSWORD = 'Test1234!';
 
 test.describe('Dashboard', () => {
   let testEmail: string;
+  let savedTokens: { at: string; rt: string } | null = null;
 
   test.beforeAll(async ({ browser }) => {
     testEmail = `e2e+dashboard+${Date.now()}@example.com`;
@@ -15,14 +16,21 @@ test.describe('Dashboard', () => {
     await registerPage.goto();
     await registerPage.register(testEmail, PASSWORD);
     await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
+    savedTokens = await page.evaluate(() => ({
+      at: localStorage.getItem('access_token') ?? '',
+      rt: localStorage.getItem('refresh_token') ?? '',
+    }));
     await page.close();
   });
 
   test.beforeEach(async ({ page }) => {
-    const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await loginPage.login(testEmail, PASSWORD);
-    await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
+    // Inject tokens directly — avoids slow mobile-safari UI login on every test
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.evaluate(({ at, rt }) => {
+      localStorage.setItem('access_token', at);
+      localStorage.setItem('refresh_token', rt);
+    }, savedTokens!);
+    await page.goto('/dashboard');
   });
 
   test('redirects unauthenticated user to login', async ({ page }) => {
