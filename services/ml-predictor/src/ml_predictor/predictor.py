@@ -23,9 +23,11 @@ class PredictionResult:
 
 def train(df: pd.DataFrame) -> Prophet:
     """Fit Prophet on a daily DataFrame with columns ['ds', 'y']."""
+    # Yearly seasonality needs ~1 year of data; disable when data is < 200 days
+    has_yearly = len(df) >= 200
     model = Prophet(
-        weekly_seasonality=True,
-        yearly_seasonality=True,
+        weekly_seasonality=len(df) >= 14,
+        yearly_seasonality=has_yearly,
         daily_seasonality=False,
         interval_width=0.8,
         changepoint_prior_scale=0.05,
@@ -63,9 +65,14 @@ def predict_all(model: Prophet, current_price: float) -> list[PredictionResult]:
     day1 = forecast.iloc[0]
     day7 = forecast.iloc[6]
 
-    # Proportional scaling so predictions are anchored at current market price
+    # Proportional scaling so predictions are anchored at current market price.
+    # Clamp ratio to ±50% of current price to prevent wild extrapolation.
     def scale(raw: float) -> float:
-        return current_price * (raw / last_yhat) if last_yhat > 0 else current_price
+        if last_yhat <= 0:
+            return current_price
+        ratio = raw / last_yhat
+        ratio = max(0.5, min(1.5, ratio))
+        return max(0.01, current_price * ratio)
 
     def conf(upper: float, lower: float) -> float:
         width = abs(upper - lower)
