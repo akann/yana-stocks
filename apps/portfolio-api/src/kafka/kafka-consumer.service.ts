@@ -72,7 +72,7 @@ export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
     };
 
     await Promise.all([
-      this.redis.set(`papi:price:${msg.symbol}`, JSON.stringify(entry), 60),
+      this.redis.set(`papi:price:${msg.symbol}`, JSON.stringify(entry), 86400),
       this.redis.del('papi:movers'),
     ]);
   }
