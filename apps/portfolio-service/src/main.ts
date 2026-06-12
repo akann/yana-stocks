@@ -15,6 +15,11 @@ async function bootstrap(): Promise<void> {
     .build();
   SwaggerModule.setup('api', app, SwaggerModule.createDocument(app, swaggerConfig));
 
+  const corsOrigin = config.get<string>('CORS_ORIGIN');
+  if (corsOrigin) {
+    app.enableCors({ origin: corsOrigin, credentials: true });
+  }
+
   await app.listen(config.getOrThrow<number>('port'));
 }
 
