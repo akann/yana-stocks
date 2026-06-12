@@ -13,7 +13,8 @@
     "test:e2e": "pnpm --filter=e2e test:e2e",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
-    "docker:reset": "docker compose down -v && docker compose up -d"
+    "docker:reset": "docker compose down -v && docker compose up -d",
+    "seed": "pnpm --filter @yana-stocks/portfolio-api seed"
   },
   "devDependencies": {
     "@yana-stocks/prettier-config": "workspace:*",
