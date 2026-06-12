@@ -78,7 +78,7 @@ cp apps/user-service/.env.example apps/user-service/.env
 cd apps/user-service && pnpm prisma migrate dev
 ```
 
-**5. Start services**
+### 5. Start services
 
 ```bash
 # All services in parallel (Turborepo)
