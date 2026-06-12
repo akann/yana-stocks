@@ -4,6 +4,7 @@ import React from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { NewsPanel } from '@/components/news/NewsPanel';
 import { PriceChart } from '@/components/charts/PriceChart';
 import { SignalsPanel } from '@/components/signals/SignalsPanel';
 import type { StockAggregate } from '@/types';
@@ -49,6 +50,8 @@ export default function StockPage(): React.JSX.Element {
           <SignalsPanel symbol={upperSymbol} />
         </div>
       </div>
+
+      <NewsPanel symbol={upperSymbol} />
     </div>
   );
 }
