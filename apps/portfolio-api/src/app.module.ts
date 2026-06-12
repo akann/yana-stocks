@@ -5,6 +5,7 @@ import configuration from './config/configuration';
 import { AuthProxyController } from './auth/auth-proxy.controller';
 import { HealthController } from './health.controller';
 import { PortfolioProxyController } from './portfolio/portfolio-proxy.controller';
+import { PredictProxyController } from './predict/predict-proxy.controller';
 import { KafkaModule } from './kafka/kafka.module';
 import { RedisModule } from './redis/redis.module';
 import { SignalsModule } from './signals/signals.module';
@@ -19,6 +20,6 @@ import { StocksModule } from './stocks/stocks.module';
     StocksModule,
     SignalsModule,
   ],
-  controllers: [AuthProxyController, HealthController, PortfolioProxyController],
+  controllers: [AuthProxyController, HealthController, PortfolioProxyController, PredictProxyController],
 })
 export class AppModule {}

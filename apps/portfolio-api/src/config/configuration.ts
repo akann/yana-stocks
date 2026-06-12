@@ -6,7 +6,8 @@ export default () => ({
   kafka: {
     brokers: (process.env['KAFKA_BROKERS'] ?? 'localhost:19092').split(','),
   },
-  priceProcessorUrl: process.env['PRICE_PROCESSOR_URL'] ?? 'http://localhost:3001',
+  priceProcessorUrl: process.env['PRICE_PROCESSOR_URL'] ?? 'http://localhost:3002',
   userServiceUrl: process.env['USER_SERVICE_URL'] ?? 'http://localhost:3001',
   portfolioServiceUrl: process.env['PORTFOLIO_SERVICE_URL'] ?? 'http://localhost:3003',
+  mlPredictorUrl: process.env['ML_PREDICTOR_URL'] ?? 'http://localhost:8000',
 });
