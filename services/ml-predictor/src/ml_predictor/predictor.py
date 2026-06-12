@@ -65,21 +65,22 @@ def predict_all(model: Prophet, current_price: float) -> list[PredictionResult]:
     day1 = forecast.iloc[0]
     day7 = forecast.iloc[6]
 
-    # Proportional scaling so predictions are anchored at current market price.
-    # Clamp ratio to ±50% of current price to prevent wild extrapolation.
-    def scale(raw: float) -> float:
+    # Proportional scaling: anchor predictions at current market price using
+    # Prophet's % change from its last in-sample value, capped to realistic
+    # daily stock move ranges to prevent wild extrapolation on short datasets.
+    def scale(raw: float, max_move: float = 0.10) -> float:
         if last_yhat <= 0:
             return current_price
-        ratio = raw / last_yhat
-        ratio = max(0.5, min(1.5, ratio))
-        return max(0.01, current_price * ratio)
+        delta_pct = (raw - last_yhat) / last_yhat
+        delta_pct = max(-max_move, min(max_move, delta_pct))
+        return max(0.01, current_price * (1.0 + delta_pct))
 
     def conf(upper: float, lower: float) -> float:
         width = abs(upper - lower)
         return round(max(0.1, min(0.95, 1.0 - width / max(abs(current_price), 1.0))), 4)
 
-    day1_price = scale(float(day1["yhat"]))
-    day7_price = scale(float(day7["yhat"]))
+    day1_price = scale(float(day1["yhat"]), max_move=0.10)
+    day7_price = scale(float(day7["yhat"]), max_move=0.20)
     daily_delta = day1_price - current_price
     day1_conf = conf(float(day1["yhat_upper"]), float(day1["yhat_lower"]))
     day7_conf = conf(float(day7["yhat_upper"]), float(day7["yhat_lower"]))
