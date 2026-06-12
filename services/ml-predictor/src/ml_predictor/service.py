@@ -86,11 +86,11 @@ class PredictorService:
             doc: dict[str, Any] = {
                 "symbol": symbol,
                 "horizon": result.horizon,
-                "current_price": result.current_price,
-                "predicted_price": result.predicted_price,
+                "currentPrice": result.current_price,
+                "predictedPrice": result.predicted_price,
                 "confidence": result.confidence,
                 "model": result.model,
-                "generated_at": generated_at,
+                "generatedAt": generated_at,
             }
             self._storage.upsert_prediction(symbol, result.horizon, doc)
             self._kafka.publish(
