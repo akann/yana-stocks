@@ -31,4 +31,14 @@ export class WatchlistsController {
   ): Promise<Watchlist> {
     return this.watchlistsService.create(dto, user.id);
   }
+
+  @Post(':id/symbols')
+  @ApiOperation({ summary: 'Add a symbol to a watchlist' })
+  addSymbol(
+    @Param('id') id: string,
+    @Body('symbol') symbol: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<Watchlist> {
+    return this.watchlistsService.addSymbol(id, symbol, user.id);
+  }
 }

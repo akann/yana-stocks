@@ -13,7 +13,7 @@ import type { PredictionSignal, SentimentSignal } from '@yana-stocks/shared-type
 import type { PriceCacheEntry } from '../stocks/price-cache.types';
 
 const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
-const TTL = 3600; // 1 hour — long enough to survive dev session restarts
+const TTL = 86_400; // 24 hours — survives overnight dev sessions
 
 interface StockSeed {
   symbol: string;

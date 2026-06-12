@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsString, MaxLength, MinLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class CreateWatchlistDto {
   @IsString()
@@ -6,8 +6,9 @@ export class CreateWatchlistDto {
   @MaxLength(100)
   name!: string;
 
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   @ArrayMaxSize(50)
-  symbols!: string[];
+  symbols?: string[];
 }

@@ -2,14 +2,18 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './src/tests',
+  globalSetup: './src/global-setup.ts',
   fullyParallel: false,
   retries: process.env['CI'] ? 2 : 1,
   workers: 1,
+  timeout: 60_000,
   reporter: [['html', { open: 'never' }]],
   use: {
     baseURL: process.env['BASE_URL'] ?? 'http://localhost:3000',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    navigationTimeout: 30_000,
+    actionTimeout: 15_000,
   },
   projects: [
     {

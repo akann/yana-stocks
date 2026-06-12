@@ -24,9 +24,22 @@ export class WatchlistsService {
     const doc = await this.watchlistModel.create({
       userId,
       name: dto.name,
-      symbols: dto.symbols,
+      symbols: dto.symbols ?? [],
     });
     return this.toResponse(doc.toObject<Watchlist>());
+  }
+
+  async addSymbol(id: string, symbol: string, userId: string): Promise<WatchlistType> {
+    const doc = await this.watchlistModel
+      .findOneAndUpdate(
+        { _id: id, userId },
+        { $addToSet: { symbols: symbol.toUpperCase() } },
+        { new: true },
+      )
+      .lean<Watchlist>()
+      .exec();
+    if (!doc) throw new NotFoundException('Watchlist not found');
+    return this.toResponse(doc);
   }
 
   private toResponse(doc: Watchlist & { _id?: unknown; id?: string }): WatchlistType {

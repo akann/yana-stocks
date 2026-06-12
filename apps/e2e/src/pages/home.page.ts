@@ -4,13 +4,23 @@ export class HomePage {
   readonly page: Page;
   readonly searchInput: Locator;
   readonly searchButton: Locator;
-  readonly moversSection: Locator;
+  readonly gainersSection: Locator;
+  readonly losersSection: Locator;
 
   constructor(page: Page) {
     this.page = page;
     this.searchInput = page.locator('input[placeholder*="Search symbol"]');
     this.searchButton = page.locator('button[type="submit"]');
-    this.moversSection = page.locator('text=Top Movers').first();
+    this.gainersSection = page.locator('h3', { hasText: 'Top Gainers' });
+    this.losersSection = page.locator('h3', { hasText: 'Top Losers' });
+  }
+
+  firstGainerLink(): Locator {
+    return this.gainersSection.locator('../..').locator('a').first();
+  }
+
+  firstLoserLink(): Locator {
+    return this.losersSection.locator('../..').locator('a').first();
   }
 
   async goto() {

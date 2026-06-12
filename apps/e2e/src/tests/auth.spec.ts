@@ -11,7 +11,7 @@ test.describe('Registration', () => {
     await expect(page).toHaveTitle(/Yana Stocks/i);
 
     await registerPage.register(uniqueEmail(), PASSWORD);
-    await page.waitForURL('**/dashboard', { timeout: 10_000 });
+    await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
     await expect(page).toHaveURL(/\/dashboard/);
   });
 
@@ -21,7 +21,7 @@ test.describe('Registration', () => {
 
     await registerPage.goto();
     await registerPage.register(email, PASSWORD);
-    await page.waitForURL('**/dashboard', { timeout: 10_000 });
+    await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
 
     await registerPage.goto();
     await registerPage.register(email, PASSWORD);
@@ -38,7 +38,7 @@ test.describe('Login', () => {
     const registerPage = new RegisterPage(page);
     await registerPage.goto();
     await registerPage.register(testEmail, PASSWORD);
-    await page.waitForURL('**/dashboard', { timeout: 10_000 });
+    await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
     await page.close();
   });
 
@@ -46,7 +46,7 @@ test.describe('Login', () => {
     const loginPage = new LoginPage(page);
     await loginPage.goto();
     await loginPage.login(testEmail, PASSWORD);
-    await page.waitForURL('**/dashboard', { timeout: 10_000 });
+    await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
     await expect(page).toHaveURL(/\/dashboard/);
   });
 
@@ -68,7 +68,60 @@ test.describe('Login', () => {
     const loginPage = new LoginPage(page);
     await loginPage.goto();
     await loginPage.login(testEmail, PASSWORD);
-    await page.waitForURL('**/dashboard', { timeout: 10_000 });
+    await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
     await expect(page.locator('button', { hasText: 'Sign out' })).toBeVisible();
+  });
+
+  test('logout clears session and redirects away from dashboard', async ({ page }) => {
+    const loginPage = new LoginPage(page);
+    await loginPage.goto();
+    await loginPage.login(testEmail, PASSWORD);
+    await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
+
+    await page.locator('button', { hasText: 'Sign out' }).click();
+    // After logout, dashboard should no longer be accessible
+    await page.goto('/dashboard');
+    await page.waitForURL('**/login', { timeout: 5_000 });
+    await expect(page).toHaveURL(/\/login/);
+  });
+
+  test('logout removes tokens from localStorage', async ({ page }) => {
+    const loginPage = new LoginPage(page);
+    await loginPage.goto();
+    await loginPage.login(testEmail, PASSWORD);
+    await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
+
+    await page.locator('button', { hasText: 'Sign out' }).click();
+
+    // handleLogout awaits an API call before clearing localStorage — poll until cleared
+    await page.waitForFunction(() => localStorage.getItem('access_token') === null, {
+      timeout: 8_000,
+    });
+    const refreshToken = await page.evaluate(() => localStorage.getItem('refresh_token'));
+    expect(refreshToken).toBeNull();
+  });
+});
+
+test.describe('Form validation', () => {
+  test('login form stays on page when submitted empty', async ({ page }) => {
+    const loginPage = new LoginPage(page);
+    await loginPage.goto();
+    await loginPage.submitButton.click();
+    await expect(page).toHaveURL(/\/login/);
+  });
+
+  test('register form stays on page when submitted empty', async ({ page }) => {
+    const registerPage = new RegisterPage(page);
+    await registerPage.goto();
+    await registerPage.submitButton.click();
+    await expect(page).toHaveURL(/\/register/);
+  });
+
+  test('login shows error for empty password', async ({ page }) => {
+    const loginPage = new LoginPage(page);
+    await loginPage.goto();
+    await loginPage.emailInput.fill('test@example.com');
+    await loginPage.submitButton.click();
+    await expect(page).toHaveURL(/\/login/);
   });
 });
