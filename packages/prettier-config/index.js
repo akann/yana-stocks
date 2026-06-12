@@ -6,4 +6,13 @@ module.exports = {
   printWidth: 100,
   tabWidth: 2,
   arrowParens: 'always',
+  overrides: [
+    {
+      files: '*.md',
+      options: {
+        proseWrap: 'always',
+        printWidth: 80,
+      },
+    },
+  ],
 };

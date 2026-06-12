@@ -1,6 +1,8 @@
 # yana-stocks
 
-Production-grade microservices platform for real-time stock market data, portfolio management, sentiment analysis, and ML-based price prediction. Runs on a self-hosted Kubernetes cluster managed via ArgoCD GitOps.
+Production-grade microservices platform for real-time stock market data,
+portfolio management, sentiment analysis, and ML-based price prediction. Runs on
+a self-hosted Kubernetes cluster managed via ArgoCD GitOps.
 
 ## Architecture
 
@@ -49,21 +51,22 @@ packages/
 
 ## Local Development
 
-**1. Start infrastructure**
+### 1. Start infrastructure
 
 ```bash
 pnpm docker:up
 ```
 
-This starts Redpanda (Kafka, port 19092), MongoDB (27017), Redis (6379), PostgreSQL (5432), and MinIO (9000/9001).
+This starts Redpanda (Kafka, port 19092), MongoDB (27017), Redis (6379),
+PostgreSQL (5432), and MinIO (9000/9001).
 
-**2. Install dependencies**
+### 2. Install dependencies
 
 ```bash
 pnpm install
 ```
 
-**3. Configure environment**
+### 3. Configure environment
 
 Copy and fill in `.env` files for each service you're running:
 
@@ -72,7 +75,7 @@ Copy and fill in `.env` files for each service you're running:
 cp apps/user-service/.env.example apps/user-service/.env
 ```
 
-**4. Run database migrations** (user-service)
+### 4. Run database migrations (user-service)
 
 ```bash
 cd apps/user-service && pnpm prisma migrate dev
@@ -148,11 +151,13 @@ pnpm --filter e2e test:e2e
 pnpm --filter user-service test
 ```
 
-E2E tests use Playwright with Chromium and iPhone 14 (Page Object Model pattern).
+E2E tests use Playwright with Chromium and iPhone 14 (Page Object Model
+pattern).
 
 ## CI/CD
 
-GitHub Actions builds only changed services using `turbo --filter=[HEAD^1]`. On success:
+GitHub Actions builds only changed services using `turbo --filter=[HEAD^1]`. On
+success:
 
 1. Docker image pushed to `harbor.yanatech.co.uk/yana-stocks/<service>:<tag>`
 2. Image tag updated in `k8s-apps` repo
@@ -169,9 +174,12 @@ GitHub Actions builds only changed services using `turbo --filter=[HEAD^1]`. On 
 | MinIO    | `minio.minio.svc.cluster.local:9000`                         |
 | Frontend | `https://stocks.yanatech.co.uk`                              |
 
-Kubernetes manifests live in the `k8s-apps` repo (`github.com/akann/k8s-apps`). Notable patterns:
+Kubernetes manifests live in the `k8s-apps` repo (`github.com/akann/k8s-apps`).
+Notable patterns:
 
-- **KEDA ScaledObjects** — `price-ingestor`, `sentiment-analyzer` scale on Kafka consumer lag
-- **Argo Rollouts canary** — `ml-predictor` promotes 10% → 50% → 100% on new model versions
+- **KEDA ScaledObjects** — `price-ingestor`, `sentiment-analyzer` scale on Kafka
+  consumer lag
+- **Argo Rollouts canary** — `ml-predictor` promotes 10% → 50% → 100% on new
+  model versions
 - **CNPG** — CloudNativePG cluster for PostgreSQL (user-service)
 - **ESO** — ExternalSecrets pulls from Infisical project `k8s-homelab`
