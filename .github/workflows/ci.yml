@@ -101,6 +101,7 @@ jobs:
           maybe_add "ml-predictor"       "services/ml-predictor"       "services/ml-predictor/Dockerfile"
 
           matrix_json=$(printf '%s' "$services" | jq -c 'unique_by(.name)')
+          echo "computed matrix: $matrix_json"
           echo "matrix=$matrix_json" >> "$GITHUB_OUTPUT"
 
   # ─────────────────────────────────────────────────────────────────
