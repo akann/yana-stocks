@@ -30,6 +30,7 @@ jobs:
       ts: ${{ steps.filter.outputs.ts }}
       python: ${{ steps.filter.outputs.python }}
       matrix: ${{ steps.matrix.outputs.matrix }}
+      has_changes: ${{ steps.matrix.outputs.has_changes }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,8 +102,12 @@ jobs:
           maybe_add "ml-predictor"       "services/ml-predictor"       "services/ml-predictor/Dockerfile"
 
           matrix_json=$(printf '%s' "$services" | jq -c 'unique_by(.name)')
-          echo "computed matrix: $matrix_json"
+          item_count=$(printf '%s' "$matrix_json" | jq 'length')
+          has_changes="false"
+          [[ "$item_count" -gt 0 ]] && has_changes="true"
+          echo "computed matrix ($item_count items): $matrix_json"
           echo "matrix=$matrix_json" >> "$GITHUB_OUTPUT"
+          echo "has_changes=$has_changes" >> "$GITHUB_OUTPUT"
 
   # ─────────────────────────────────────────────────────────────────
   # 2. TypeScript quality (lint + type-check + test)
@@ -198,8 +203,7 @@ jobs:
     needs: [changes, ts-quality, python-quality]
     if: |
       github.ref == 'refs/heads/main' &&
-      needs.changes.outputs.matrix != '' &&
-      needs.changes.outputs.matrix != '[]' &&
+      needs.changes.outputs.has_changes == 'true' &&
       (needs.ts-quality.result     == 'success' || needs.ts-quality.result     == 'skipped') &&
       (needs.python-quality.result == 'success' || needs.python-quality.result == 'skipped')
     strategy:
