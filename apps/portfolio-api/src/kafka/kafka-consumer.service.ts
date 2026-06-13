@@ -13,46 +13,75 @@ import type { PriceCacheEntry } from '../stocks/price-cache.types';
 @Injectable()
 export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(KafkaConsumerService.name);
-  private readonly consumer: Consumer;
+  private readonly kafka: Kafka;
+  private consumer: Consumer;
+  private stopping = false;
 
   constructor(
     config: ConfigService,
     private readonly redis: RedisService,
   ) {
     const brokers = config.getOrThrow<string[]>('kafka.brokers');
-    const kafka = new Kafka({ clientId: 'portfolio-api', brokers });
-    this.consumer = kafka.consumer({ groupId: KAFKA_GROUP_IDS.PORTFOLIO_API });
+    this.kafka = new Kafka({ clientId: 'portfolio-api', brokers });
+    this.consumer = this.kafka.consumer({ groupId: KAFKA_GROUP_IDS.PORTFOLIO_API });
   }
 
   async onModuleInit(): Promise<void> {
-    await this.consumer.connect();
-    await this.consumer.subscribe({
-      topics: [
-        KAFKA_TOPICS.PRICES_PROCESSED,
-        KAFKA_TOPICS.SIGNALS_SENTIMENT,
-        KAFKA_TOPICS.SIGNALS_PREDICTION,
-      ],
-      fromBeginning: false,
+    await this.start();
+  }
+
+  private async start(): Promise<void> {
+    if (this.stopping) return;
+
+    this.consumer.on(this.consumer.events.CRASH, ({ payload }) => {
+      this.logger.error('Kafka consumer crashed: %s — reconnecting in 5s', payload.error.message);
+      void this.restart();
     });
 
-    await this.consumer.run({
-      eachMessage: async ({ topic, message }) => {
-        if (!message.value) return;
-        const raw = message.value.toString();
+    try {
+      await this.consumer.connect();
+      await this.consumer.subscribe({
+        topics: [
+          KAFKA_TOPICS.PRICES_PROCESSED,
+          KAFKA_TOPICS.SIGNALS_SENTIMENT,
+          KAFKA_TOPICS.SIGNALS_PREDICTION,
+        ],
+        fromBeginning: false,
+      });
 
-        try {
-          if (topic === KAFKA_TOPICS.PRICES_PROCESSED) {
-            await this.handlePrice(JSON.parse(raw) as ProcessedPriceMessage);
-          } else if (topic === KAFKA_TOPICS.SIGNALS_SENTIMENT) {
-            await this.handleSentiment(JSON.parse(raw) as SentimentSignal);
-          } else if (topic === KAFKA_TOPICS.SIGNALS_PREDICTION) {
-            await this.handlePrediction(JSON.parse(raw) as PredictionSignal);
+      await this.consumer.run({
+        eachMessage: async ({ topic, message }) => {
+          if (!message.value) return;
+          const raw = message.value.toString();
+
+          try {
+            if (topic === KAFKA_TOPICS.PRICES_PROCESSED) {
+              await this.handlePrice(JSON.parse(raw) as ProcessedPriceMessage);
+            } else if (topic === KAFKA_TOPICS.SIGNALS_SENTIMENT) {
+              await this.handleSentiment(JSON.parse(raw) as SentimentSignal);
+            } else if (topic === KAFKA_TOPICS.SIGNALS_PREDICTION) {
+              await this.handlePrediction(JSON.parse(raw) as PredictionSignal);
+            }
+          } catch (err) {
+            this.logger.error('Failed to process message from %s: %s', topic, String(err));
           }
-        } catch (err) {
-          this.logger.error('Failed to process message from %s: %s', topic, String(err));
-        }
-      },
-    });
+        },
+      });
+    } catch (err) {
+      this.logger.error('Kafka consumer start failed: %s — retrying in 30s', String(err));
+      setTimeout(() => void this.restart(), 30000);
+    }
+  }
+
+  private async restart(): Promise<void> {
+    if (this.stopping) return;
+    try {
+      await this.consumer.disconnect();
+    } catch (err) {
+      this.logger.warn('Kafka disconnect error: %s', String(err));
+    }
+    this.consumer = this.kafka.consumer({ groupId: KAFKA_GROUP_IDS.PORTFOLIO_API });
+    setTimeout(() => void this.start(), 5000);
   }
 
   private async handlePrice(msg: ProcessedPriceMessage): Promise<void> {
@@ -86,6 +115,7 @@ export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
+    this.stopping = true;
     await this.consumer.disconnect();
   }
 }
