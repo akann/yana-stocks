@@ -70,7 +70,8 @@ test.describe('Portfolio management', () => {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
     });
-    await page.goto('/portfolio');
+    // WebKit throws when a client-side redirect interrupts goto — swallow the error
+    await page.goto('/portfolio').catch(() => {});
     await page.waitForURL('**/login', { timeout: 5_000 });
     await expect(page).toHaveURL(/\/login/);
   });

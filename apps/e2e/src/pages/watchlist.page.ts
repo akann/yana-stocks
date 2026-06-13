@@ -11,8 +11,8 @@ export class WatchlistPage {
   constructor(page: Page) {
     this.page = page;
     this.heading = page.locator('h1', { hasText: 'Watchlists' });
-    this.newWatchlistButton = page.locator('button', { hasText: 'New Watchlist' });
-    this.watchlistNameInput = page.locator('input[placeholder="Watchlist name"]');
+    this.newWatchlistButton = page.locator('button', { hasText: 'New Watchlist' }).first();
+    this.watchlistNameInput = page.locator('input[placeholder="e.g. AI Stocks"]');
     this.createButton = page.locator('button[type="submit"]', { hasText: 'Create' });
     this.emptyState = page.locator('text=No watchlists yet');
   }

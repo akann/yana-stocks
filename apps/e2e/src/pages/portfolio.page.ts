@@ -8,8 +8,8 @@ export class PortfolioPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.newPortfolioButton = page.locator('button', { hasText: 'New Portfolio' });
-    this.portfolioNameInput = page.locator('input[placeholder="Portfolio name"]');
+    this.newPortfolioButton = page.locator('button', { hasText: 'New Portfolio' }).first();
+    this.portfolioNameInput = page.locator('input[placeholder="e.g. Tech Growth"]');
     this.createButton = page.locator('button', { hasText: 'Create' }).last();
   }
 

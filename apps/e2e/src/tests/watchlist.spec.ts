@@ -36,7 +36,8 @@ test.describe('Watchlist management', () => {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
     });
-    await page.goto('/watchlist');
+    // WebKit throws when a client-side redirect interrupts goto — swallow the error
+    await page.goto('/watchlist').catch(() => {});
     await page.waitForURL('**/login', { timeout: 5_000 });
     await expect(page).toHaveURL(/\/login/);
   });

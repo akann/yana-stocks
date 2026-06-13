@@ -31,6 +31,7 @@ test.describe('Registration', () => {
 
 test.describe('Login', () => {
   let testEmail: string;
+  let savedTokens: { at: string; rt: string } | null = null;
 
   test.beforeAll(async ({ browser }) => {
     testEmail = uniqueEmail();
@@ -39,6 +40,10 @@ test.describe('Login', () => {
     await registerPage.goto();
     await registerPage.register(testEmail, PASSWORD);
     await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
+    savedTokens = await page.evaluate(() => ({
+      at: localStorage.getItem('access_token') ?? '',
+      rt: localStorage.getItem('refresh_token') ?? '',
+    }));
     await page.close();
   });
 
@@ -86,14 +91,17 @@ test.describe('Login', () => {
   });
 
   test('logout removes tokens from localStorage', async ({ page }) => {
-    const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await loginPage.login(testEmail, PASSWORD);
-    await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
+    // Inject tokens instead of UI login — avoids WebKit email-input fill flakiness
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.evaluate(({ at, rt }) => {
+      localStorage.setItem('access_token', at);
+      localStorage.setItem('refresh_token', rt);
+    }, savedTokens!);
+    await page.goto('/');
 
     await page.locator('button', { hasText: 'Sign out' }).click();
 
-    // handleLogout awaits an API call before clearing localStorage — poll until cleared
+    // handleLogout awaits POST /auth/logout before clearing localStorage — poll until cleared
     await page.waitForFunction(() => localStorage.getItem('access_token') === null, {
       timeout: 8_000,
     });
