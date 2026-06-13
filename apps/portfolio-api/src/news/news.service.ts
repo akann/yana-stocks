@@ -15,12 +15,16 @@ export class NewsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(NewsService.name);
   private client: MongoClient | null = null;
 
+  private dbName = 'sentiment';
+
   async onModuleInit(): Promise<void> {
     const uri = process.env['SENTIMENT_MONGODB_URI'] ?? 'mongodb://localhost:27017/sentiment';
+    // Extract db name from URI path (same logic as sentiment-analyzer/storage.py)
+    this.dbName = uri.split('/').pop()?.split('?')[0] || 'sentiment';
     try {
       this.client = new MongoClient(uri);
       await this.client.connect();
-      this.logger.log('Connected to MongoDB for news');
+      this.logger.log('Connected to MongoDB for news (db: %s)', this.dbName);
     } catch (err) {
       this.logger.error('Failed to connect to MongoDB: %s', String(err));
       this.client = null;
@@ -34,7 +38,7 @@ export class NewsService implements OnModuleInit, OnModuleDestroy {
   async getNews(symbol: string, limit = 10): Promise<NewsArticle[]> {
     if (!this.client) return [];
 
-    const db = this.client.db('sentiment');
+    const db = this.client.db(this.dbName);
     const docs = await db
       .collection('articles')
       .find({ symbol }, { projection: { _id: 0, headline: 1, source: 1, url: 1, published_at: 1, sentiment_label: 1, sentiment_score: 1 } })
