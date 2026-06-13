@@ -79,25 +79,21 @@ jobs:
                 '. + [{"name":$n,"context":$c,"dockerfile":$f}]')
           }
 
-          # Use dorny/paths-filter's 'changes' JSON array output — reliable for
-          # hyphenated filter names where individual step outputs are not accessible.
-          # dorny outputs e.g. ["ts","user-service"] when those filters matched.
-          filter_changes='${{ steps.filter.outputs.changes }}'
-
-          in_changes() {
-            local name="$1"
-            if [[ "$build_all" == "true" ]]; then return 0; fi
-            printf '%s' "$filter_changes" | grep -qF "\"${name}\""
+          # Use individual per-filter boolean outputs from dorny/paths-filter.
+          # The 'changes' JSON array output is unreliable on push events.
+          should_build() {
+            local filter_output="$1"
+            [[ "$build_all" == "true" ]] || [[ "$filter_output" == "true" ]]
           }
 
-          in_changes "frontend"           && add "frontend"           "."                           "apps/frontend/Dockerfile"
-          in_changes "user-service"       && add "user-service"       "."                           "apps/user-service/Dockerfile"
-          in_changes "price-processor"    && add "price-processor"    "."                           "apps/price-processor/Dockerfile"
-          in_changes "portfolio-service"  && add "portfolio-service"  "."                           "apps/portfolio-service/Dockerfile"
-          in_changes "portfolio-api"      && add "portfolio-api"      "."                           "apps/portfolio-api/Dockerfile"
-          in_changes "price-ingestor"     && add "price-ingestor"     "services/price-ingestor"     "services/price-ingestor/Dockerfile"
-          in_changes "sentiment-analyzer" && add "sentiment-analyzer" "services/sentiment-analyzer" "services/sentiment-analyzer/Dockerfile"
-          in_changes "ml-predictor"       && add "ml-predictor"       "services/ml-predictor"       "services/ml-predictor/Dockerfile"
+          should_build "${{ steps.filter.outputs.frontend }}"          && add "frontend"           "."                           "apps/frontend/Dockerfile"
+          should_build "${{ steps.filter.outputs['user-service'] }}"   && add "user-service"       "."                           "apps/user-service/Dockerfile"
+          should_build "${{ steps.filter.outputs['price-processor'] }}" && add "price-processor"   "."                           "apps/price-processor/Dockerfile"
+          should_build "${{ steps.filter.outputs['portfolio-service'] }}" && add "portfolio-service" "."                         "apps/portfolio-service/Dockerfile"
+          should_build "${{ steps.filter.outputs['portfolio-api'] }}"  && add "portfolio-api"      "."                           "apps/portfolio-api/Dockerfile"
+          should_build "${{ steps.filter.outputs['price-ingestor'] }}" && add "price-ingestor"     "services/price-ingestor"     "services/price-ingestor/Dockerfile"
+          should_build "${{ steps.filter.outputs['sentiment-analyzer'] }}" && add "sentiment-analyzer" "services/sentiment-analyzer" "services/sentiment-analyzer/Dockerfile"
+          should_build "${{ steps.filter.outputs['ml-predictor'] }}"   && add "ml-predictor"       "services/ml-predictor"       "services/ml-predictor/Dockerfile"
 
           matrix_json=$(printf '%s' "$services" | jq -c 'unique_by(.name)')
           echo "matrix=$matrix_json" >> "$GITHUB_OUTPUT"
