@@ -1,34 +1,58 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import Link from 'next/link';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
-import type { Watchlist } from '@/types';
+import { WatchlistCard } from '@/components/watchlist/WatchlistCard';
+import type { StockAggregate, Watchlist } from '@/types';
 
 export default function WatchlistPage(): React.JSX.Element {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const qc = useQueryClient();
-  const [newSymbol, setNewSymbol] = useState('');
-  const [targetWatchlistId, setTargetWatchlistId] = useState<string | null>(null);
   const [newListName, setNewListName] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [removingSymbol, setRemovingSymbol] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.replace('/login');
-    }
+    if (!isLoading && !isAuthenticated) router.replace('/login');
   }, [isAuthenticated, isLoading, router]);
 
-  const { data: watchlists, isLoading: listsLoading } = useQuery<Watchlist[]>({
+  // ── Watchlists ───────────────────────────────────────────────
+  const { data: watchlists, isLoading: listsLoading, isError } = useQuery<Watchlist[]>({
     queryKey: ['watchlists'],
     queryFn: () => api.get<Watchlist[]>('/portfolio/watchlists').then((r) => r.data),
     enabled: isAuthenticated,
   });
 
+  // ── Live prices for every watched symbol ─────────────────────
+  const symbols = useMemo(() => {
+    const s = new Set<string>();
+    (watchlists ?? []).forEach((wl) => wl.symbols.forEach((sym) => s.add(sym)));
+    return [...s];
+  }, [watchlists]);
+
+  const priceResults = useQueries({
+    queries: symbols.map((sym) => ({
+      queryKey: ['stock', sym],
+      queryFn: () => api.get<StockAggregate>(`/stocks/${sym}`).then((r) => r.data),
+      refetchInterval: 10_000,
+      staleTime: 5_000,
+    })),
+  });
+
+  const livePrices = useMemo(() => {
+    const map: Record<string, StockAggregate> = {};
+    symbols.forEach((sym, i) => {
+      const d = priceResults[i]?.data;
+      if (d) map[sym] = d;
+    });
+    return map;
+  }, [symbols, priceResults]);
+
+  // ── Mutations ────────────────────────────────────────────────
   const createMutation = useMutation({
     mutationFn: (name: string) => api.post('/portfolio/watchlists', { name }),
     onSuccess: () => {
@@ -38,14 +62,23 @@ export default function WatchlistPage(): React.JSX.Element {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/portfolio/watchlists/${id}`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['watchlists'] }),
+  });
+
   const addSymbolMutation = useMutation({
     mutationFn: ({ id, symbol }: { id: string; symbol: string }) =>
       api.post(`/portfolio/watchlists/${id}/symbols`, { symbol }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['watchlists'] });
-      setNewSymbol('');
-      setTargetWatchlistId(null);
-    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['watchlists'] }),
+  });
+
+  const removeSymbolMutation = useMutation({
+    mutationFn: ({ id, symbol }: { id: string; symbol: string }) =>
+      api.delete(`/portfolio/watchlists/${id}/symbols/${symbol}`),
+    onMutate: ({ symbol }) => setRemovingSymbol(symbol),
+    onSettled: () => setRemovingSymbol(null),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['watchlists'] }),
   });
 
   if (isLoading || !isAuthenticated) {
@@ -54,16 +87,18 @@ export default function WatchlistPage(): React.JSX.Element {
 
   return (
     <div className="space-y-6">
+      {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Watchlists</h1>
         <button
           onClick={() => setShowCreate(true)}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >
-          New Watchlist
+          + New Watchlist
         </button>
       </div>
 
+      {/* ── Create form ── */}
       {showCreate && (
         <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
           <h2 className="text-sm font-semibold text-white mb-3">Create Watchlist</h2>
@@ -75,10 +110,11 @@ export default function WatchlistPage(): React.JSX.Element {
             className="flex gap-2"
           >
             <input
+              autoFocus
               type="text"
               value={newListName}
               onChange={(e) => setNewListName(e.target.value)}
-              placeholder="Watchlist name"
+              placeholder="e.g. AI Stocks"
               className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
               required
             />
@@ -97,90 +133,51 @@ export default function WatchlistPage(): React.JSX.Element {
               {createMutation.isPending ? 'Creating…' : 'Create'}
             </button>
           </form>
+          {createMutation.isError && (
+            <p className="text-red-400 text-xs mt-2">Failed to create watchlist.</p>
+          )}
         </div>
       )}
 
+      {/* ── List ── */}
       {listsLoading ? (
         <div className="space-y-3">
           {[1, 2].map((i) => (
-            <div key={i} className="animate-pulse bg-gray-800 rounded-xl h-24" />
+            <div key={i} className="animate-pulse bg-gray-800 rounded-xl h-40" />
           ))}
         </div>
+      ) : isError ? (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center text-sm text-gray-500">
+          Could not load watchlists — make sure portfolio-service is running on port 3003.
+        </div>
       ) : watchlists && watchlists.length > 0 ? (
-        <div className="space-y-4">
+        <div className="space-y-5">
           {watchlists.map((wl) => (
-            <div
+            <WatchlistCard
               key={wl.id}
-              className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden"
-            >
-              <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
-                <h3 className="font-medium text-white">{wl.name}</h3>
-                <button
-                  onClick={() => setTargetWatchlistId(wl.id)}
-                  className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
-                >
-                  + Add
-                </button>
-              </div>
-              {targetWatchlistId === wl.id && (
-                <div className="px-4 py-3 border-b border-gray-800 bg-gray-800/50">
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const sym = newSymbol.trim().toUpperCase();
-                      if (sym) addSymbolMutation.mutate({ id: wl.id, symbol: sym });
-                    }}
-                    className="flex gap-2"
-                  >
-                    <input
-                      type="text"
-                      value={newSymbol}
-                      onChange={(e) => setNewSymbol(e.target.value)}
-                      placeholder="Symbol (e.g. AAPL)"
-                      className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500 uppercase"
-                      autoFocus
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setTargetWatchlistId(null)}
-                      className="text-gray-400 hover:text-gray-300 text-sm px-2"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={addSymbolMutation.isPending}
-                      className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-3 py-1.5 rounded-lg text-sm transition-colors"
-                    >
-                      Add
-                    </button>
-                  </form>
-                </div>
-              )}
-              {wl.symbols.length > 0 ? (
-                <div className="divide-y divide-gray-800">
-                  {wl.symbols.map((sym) => (
-                    <div
-                      key={sym}
-                      className="px-4 py-3 flex items-center justify-between hover:bg-gray-800/40"
-                    >
-                      <Link
-                        href={`/stocks/${sym}`}
-                        className="font-medium text-white hover:text-blue-400 transition-colors"
-                      >
-                        {sym}
-                      </Link>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500 text-sm px-4 py-4 text-center">No symbols yet</p>
-              )}
-            </div>
+              watchlist={wl}
+              livePrices={livePrices}
+              onDelete={() => deleteMutation.mutate(wl.id)}
+              onAddSymbol={(symbol) => addSymbolMutation.mutate({ id: wl.id, symbol })}
+              onRemoveSymbol={(symbol) => removeSymbolMutation.mutate({ id: wl.id, symbol })}
+              isDeleting={deleteMutation.isPending && deleteMutation.variables === wl.id}
+              removingSymbol={removingSymbol}
+            />
           ))}
         </div>
       ) : (
-        <p className="text-gray-500 text-sm">No watchlists yet. Create one above.</p>
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center space-y-3">
+          <p className="text-gray-400 text-base font-medium">No watchlists yet</p>
+          <p className="text-gray-600 text-sm">
+            Create a watchlist to track symbols with live prices and sentiment.
+          </p>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="mt-2 inline-block bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            + New Watchlist
+          </button>
+        </div>
       )}
     </div>
   );

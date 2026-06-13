@@ -42,6 +42,24 @@ export class WatchlistsService {
     return this.toResponse(doc);
   }
 
+  async removeSymbol(id: string, symbol: string, userId: string): Promise<WatchlistType> {
+    const doc = await this.watchlistModel
+      .findOneAndUpdate(
+        { _id: id, userId },
+        { $pull: { symbols: symbol.toUpperCase() } },
+        { new: true },
+      )
+      .lean<Watchlist>()
+      .exec();
+    if (!doc) throw new NotFoundException('Watchlist not found');
+    return this.toResponse(doc);
+  }
+
+  async remove(id: string, userId: string): Promise<void> {
+    const result = await this.watchlistModel.findOneAndDelete({ _id: id, userId }).exec();
+    if (!result) throw new NotFoundException('Watchlist not found');
+  }
+
   private toResponse(doc: Watchlist & { _id?: unknown; id?: string }): WatchlistType {
     return {
       id: doc.id ?? String(doc._id),

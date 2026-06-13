@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards, ValidationPipe } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, UseGuards, ValidationPipe } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Watchlist } from '@yana-stocks/shared-types';
 import { AuthUser, CurrentUser, UserFromTokenGuard } from '../common/current-user.decorator';
@@ -40,5 +40,22 @@ export class WatchlistsController {
     @CurrentUser() user: AuthUser,
   ): Promise<Watchlist> {
     return this.watchlistsService.addSymbol(id, symbol, user.id);
+  }
+
+  @Delete(':id/symbols/:symbol')
+  @ApiOperation({ summary: 'Remove a symbol from a watchlist' })
+  removeSymbol(
+    @Param('id') id: string,
+    @Param('symbol') symbol: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<Watchlist> {
+    return this.watchlistsService.removeSymbol(id, symbol, user.id);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Delete a watchlist' })
+  remove(@Param('id') id: string, @CurrentUser() user: AuthUser): Promise<void> {
+    return this.watchlistsService.remove(id, user.id);
   }
 }
