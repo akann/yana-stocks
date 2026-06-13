@@ -43,11 +43,13 @@ jobs:
             ts:
               - 'apps/**'
               - 'packages/**'
+              - '.github/workflows/**'
             python:
               - 'services/**'
             frontend:
               - 'apps/frontend/**'
               - 'packages/**'
+              - '.github/workflows/**'
             user-service:
               - 'apps/user-service/**'
               - 'packages/**'
@@ -202,6 +204,7 @@ jobs:
     runs-on: runners-yana-stocks
     needs: [changes, ts-quality, python-quality]
     if: |
+      always() &&
       github.ref == 'refs/heads/main' &&
       needs.changes.outputs.has_changes == 'true' &&
       (needs.ts-quality.result     == 'success' || needs.ts-quality.result     == 'skipped') &&
