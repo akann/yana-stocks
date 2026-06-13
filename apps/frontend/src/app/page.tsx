@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MoversCard } from '@/components/market/MoversCard';
+import { StockBrowser } from '@/components/market/StockBrowser';
 
 export default function HomePage(): React.JSX.Element {
   const [symbol, setSymbol] = useState('');
@@ -38,6 +39,7 @@ export default function HomePage(): React.JSX.Element {
         </form>
       </div>
       <MoversCard />
+      <StockBrowser />
     </div>
   );
 }

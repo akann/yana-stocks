@@ -33,3 +33,17 @@ export interface AggregateStockResponse extends StockResponse {
   sentiment: import('@yana-stocks/shared-types').SentimentSignal | null;
   prediction: import('@yana-stocks/shared-types').PredictionSignal | null;
 }
+
+export interface AssetEntry {
+  symbol: string;
+  name: string;
+  exchange: string;
+  tradable: boolean;
+}
+
+export interface AssetsPage {
+  data: AssetEntry[];
+  total: number;
+  page: number;
+  limit: number;
+}

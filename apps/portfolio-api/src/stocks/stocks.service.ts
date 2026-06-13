@@ -6,6 +6,8 @@ import { firstValueFrom } from 'rxjs';
 import { RedisService } from '../redis/redis.service';
 import type {
   AggregateStockResponse,
+  AssetEntry,
+  AssetsPage,
   MarketMovers,
   MoverEntry,
   PriceCacheEntry,
@@ -18,7 +20,7 @@ export class StocksService {
   constructor(
     private readonly redis: RedisService,
     private readonly httpService: HttpService,
-    config: ConfigService,
+    private readonly config: ConfigService,
   ) {
     this.priceProcessorUrl = config.getOrThrow<string>('priceProcessorUrl');
   }
@@ -95,4 +97,57 @@ export class StocksService {
     await this.redis.set(cacheKey, JSON.stringify(movers), 10);
     return movers;
   }
+
+  async getAssets(search: string, page: number, limit: number): Promise<AssetsPage> {
+    const CACHE_KEY = 'papi:assets:all';
+    const CACHE_TTL = 86400; // 24h — asset list barely changes
+
+    let all: AssetEntry[];
+    const cached = await this.redis.get(CACHE_KEY);
+    if (cached) {
+      all = JSON.parse(cached) as AssetEntry[];
+    } else {
+      const apiKey = this.config.get<string>('alpaca.apiKey') ?? '';
+      const apiSecret = this.config.get<string>('alpaca.apiSecret') ?? '';
+      const response = await firstValueFrom(
+        this.httpService.get<AlpacaAsset[]>(
+          'https://paper-api.alpaca.markets/v2/assets',
+          {
+            params: { status: 'active', asset_class: 'us_equity' },
+            headers: {
+              'APCA-API-KEY-ID': apiKey,
+              'APCA-API-SECRET-KEY': apiSecret,
+            },
+          },
+        ),
+      );
+      all = response.data
+        .filter((a) => a.tradable && a.symbol && a.name)
+        .map((a) => ({ symbol: a.symbol, name: a.name, exchange: a.exchange, tradable: a.tradable }));
+      await this.redis.set(CACHE_KEY, JSON.stringify(all), CACHE_TTL);
+    }
+
+    const filtered = search
+      ? all.filter(
+          (a) =>
+            a.symbol.includes(search.toUpperCase()) ||
+            a.name.toLowerCase().includes(search.toLowerCase()),
+        )
+      : all;
+
+    const start = (page - 1) * limit;
+    return {
+      data: filtered.slice(start, start + limit),
+      total: filtered.length,
+      page,
+      limit,
+    };
+  }
+}
+
+interface AlpacaAsset {
+  symbol: string;
+  name: string;
+  exchange: string;
+  tradable: boolean;
 }

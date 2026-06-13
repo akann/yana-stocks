@@ -11,4 +11,8 @@ export default () => ({
   portfolioServiceUrl: process.env['PORTFOLIO_SERVICE_URL'] ?? 'http://localhost:3003',
   mlPredictorUrl: process.env['ML_PREDICTOR_URL'] ?? 'http://localhost:8000',
   mongodbUri: process.env['MONGODB_URI'] ?? 'mongodb://localhost:27017/yana_stocks',
+  alpaca: {
+    apiKey: process.env['ALPACA_API_KEY'] ?? '',
+    apiSecret: process.env['ALPACA_API_SECRET'] ?? '',
+  },
 });
