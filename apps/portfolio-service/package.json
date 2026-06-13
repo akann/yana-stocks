@@ -9,6 +9,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
+    "test:int": "jest --config jest.int.config.js --runInBand",
     "lint": "eslint src/",
     "type-check": "tsc --noEmit"
   },
@@ -34,6 +35,9 @@
     "@types/express": "^5.0.6",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.0.0",
+    "@types/supertest": "^6.0.3",
+    "dotenv": "^17.4.2",
+    "supertest": "^7.0.0",
     "@yana-stocks/eslint-config": "workspace:*",
     "@yana-stocks/typescript-config": "workspace:*",
     "eslint": "^10.4.1",
@@ -51,7 +55,7 @@
       "ts"
     ],
     "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
+    "testRegex": "(?<!\\.int)\\.spec\\.ts$",
     "transform": {
       "^.+\\.ts$": "ts-jest"
     },
