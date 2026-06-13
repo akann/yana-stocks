@@ -16,7 +16,7 @@ export class NewsService implements OnModuleInit, OnModuleDestroy {
   private client: MongoClient | null = null;
 
   async onModuleInit(): Promise<void> {
-    const uri = process.env['MONGODB_URI'] ?? 'mongodb://localhost:27017/yana_stocks';
+    const uri = process.env['SENTIMENT_MONGODB_URI'] ?? 'mongodb://localhost:27017/sentiment';
     try {
       this.client = new MongoClient(uri);
       await this.client.connect();
@@ -34,7 +34,7 @@ export class NewsService implements OnModuleInit, OnModuleDestroy {
   async getNews(symbol: string, limit = 10): Promise<NewsArticle[]> {
     if (!this.client) return [];
 
-    const db = this.client.db('yana_stocks');
+    const db = this.client.db('sentiment');
     const docs = await db
       .collection('articles')
       .find({ symbol }, { projection: { _id: 0, headline: 1, source: 1, url: 1, published_at: 1, sentiment_label: 1, sentiment_score: 1 } })
