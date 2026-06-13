@@ -87,17 +87,17 @@ test.describe('Stock data content', () => {
     const stockPage = new StockPage(page);
     await stockPage.goto('AAPL');
     // Price should be visible, not the "No price data" fallback
-    await expect(page.locator('span.text-xl.font-semibold')).toBeVisible({ timeout: 10_000 });
-    await expect(page.locator('span.text-xl.font-semibold')).toContainText('$');
+    await expect(page.locator('span.text-3xl.font-bold')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('span.text-3xl.font-bold')).toContainText('$');
   });
 
   test('shows change percentage for a seeded symbol', async ({ page }) => {
     const stockPage = new StockPage(page);
     await stockPage.goto('AAPL');
     // Wait for the price to load first, then the change % will be alongside it
-    await expect(page.locator('span.text-xl.font-semibold')).toBeVisible({ timeout: 10_000 });
-    // AAPL seeded with -2.65% — the change % sits next to the price
-    await expect(page.locator('span.text-sm.font-medium.text-red-400')).toBeVisible({
+    await expect(page.locator('span.text-3xl.font-bold')).toBeVisible({ timeout: 10_000 });
+    // AAPL seeded with -2.65% — change span uses text-base font-semibold + red/green color
+    await expect(page.locator('span.text-base.font-semibold.text-red-400')).toBeVisible({
       timeout: 5_000,
     });
   });

@@ -84,10 +84,11 @@ test.describe('Watchlist management', () => {
     await watchlistPage.openAddSymbol(name);
     await watchlistPage.addSymbol('NVDA');
 
-    await expect(page.locator('a', { hasText: 'NVDA' })).toBeVisible({ timeout: 5_000 });
+    // Symbols render as clickable <td> cells (not <a>) since the live-price table refactor
+    await expect(page.locator('td.font-mono', { hasText: 'NVDA' })).toBeVisible({ timeout: 5_000 });
   });
 
-  test('watchlist symbol is a link that navigates to the stock page', async ({ page }) => {
+  test('watchlist symbol navigates to the stock page when clicked', async ({ page }) => {
     const watchlistPage = new WatchlistPage(page);
     const name = `Nav Watch ${Date.now()}`;
 
@@ -98,7 +99,7 @@ test.describe('Watchlist management', () => {
     await watchlistPage.openAddSymbol(name);
     await watchlistPage.addSymbol('AAPL');
 
-    await page.locator('a', { hasText: 'AAPL' }).click();
+    await page.locator('td.font-mono', { hasText: 'AAPL' }).click();
     await page.waitForURL('**/stocks/AAPL', { timeout: 5_000 });
     await expect(page).toHaveURL(/\/stocks\/AAPL/);
   });
@@ -114,7 +115,7 @@ test.describe('Watchlist management', () => {
     for (const symbol of ['MSFT', 'TSLA']) {
       await watchlistPage.openAddSymbol(name);
       await watchlistPage.addSymbol(symbol);
-      await expect(page.locator('a', { hasText: symbol })).toBeVisible({ timeout: 5_000 });
+      await expect(page.locator('td.font-mono', { hasText: symbol })).toBeVisible({ timeout: 5_000 });
     }
   });
 });

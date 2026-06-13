@@ -37,6 +37,6 @@ export class PortfolioPage {
   }
 
   portfolioCard(name: string): Locator {
-    return this.page.locator('h3', { hasText: name }).locator('../..');
+    return this.page.locator('h3', { hasText: name }).locator('../../..');
   }
 }
