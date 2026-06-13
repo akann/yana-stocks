@@ -26,8 +26,8 @@ export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
     this.consumer = this.kafka.consumer({ groupId: KAFKA_GROUP_IDS.PORTFOLIO_API });
   }
 
-  async onModuleInit(): Promise<void> {
-    await this.start();
+  onModuleInit(): void {
+    void this.start();
   }
 
   private async start(): Promise<void> {
