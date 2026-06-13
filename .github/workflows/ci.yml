@@ -70,7 +70,7 @@ jobs:
       - id: matrix
         shell: bash
         run: |
-          build_all="${{ github.event.inputs.build_all }}"
+          build_all="${{ github.event.inputs.build_all == 'true' && 'true' || '' }}"
           services='[]'
           add() {
             services=$(printf '%s' "$services" | \
@@ -78,13 +78,22 @@ jobs:
                 '. + [{"name":$n,"context":$c,"dockerfile":$f}]')
           }
 
-          # Use git diff to detect changed paths — avoids relying on dorny
-          # individual outputs which silently return empty for hyphenated names.
-          changed=$(git diff --name-only HEAD^1 HEAD 2>/dev/null || git diff --name-only HEAD 2>/dev/null || true)
+          # Use the push event before/after SHAs — same source dorny uses,
+          # avoids HEAD^1 ambiguity in fresh runner checkouts.
+          before="${{ github.event.before }}"
+          after="${{ github.sha }}"
+          if [[ "$build_all" == "true" ]]; then
+            changed="BUILD_ALL"
+          elif [[ -n "$before" && "$before" != "0000000000000000000000000000000000000000" ]]; then
+            changed=$(git diff --name-only "${before}" "${after}" 2>/dev/null || true)
+          else
+            changed=$(git diff --name-only HEAD^1 HEAD 2>/dev/null || true)
+          fi
+          echo "Changed files: $changed"
 
           touches() {
             local pattern="$1"
-            [[ "$build_all" == "true" ]] || echo "$changed" | grep -qE "$pattern"
+            [[ "$changed" == "BUILD_ALL" ]] || echo "$changed" | grep -qE "$pattern"
           }
 
           touches '^apps/frontend/|^packages/'                && add "frontend"           "."                           "apps/frontend/Dockerfile"
