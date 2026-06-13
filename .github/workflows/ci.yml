@@ -70,7 +70,7 @@ jobs:
       - id: matrix
         shell: bash
         run: |
-          build_all="${{ github.event.inputs.build_all == 'true' && 'true' || '' }}"
+          build_all="${{ github.event.inputs.build_all }}"
           services='[]'
           add() {
             services=$(printf '%s' "$services" | \
@@ -78,32 +78,25 @@ jobs:
                 '. + [{"name":$n,"context":$c,"dockerfile":$f}]')
           }
 
-          # Use the push event before/after SHAs — same source dorny uses,
-          # avoids HEAD^1 ambiguity in fresh runner checkouts.
-          before="${{ github.event.before }}"
-          after="${{ github.sha }}"
-          if [[ "$build_all" == "true" ]]; then
-            changed="BUILD_ALL"
-          elif [[ -n "$before" && "$before" != "0000000000000000000000000000000000000000" ]]; then
-            changed=$(git diff --name-only "${before}" "${after}" 2>/dev/null || true)
-          else
-            changed=$(git diff --name-only HEAD^1 HEAD 2>/dev/null || true)
-          fi
-          echo "Changed files: $changed"
+          # Use dorny's changes JSON output — dorny already computed the correct
+          # before→after diff, this avoids re-running git diff in bash.
+          changes_json='${{ steps.filter.outputs.changes }}'
+          echo "dorny changes: $changes_json" >> "$GITHUB_STEP_SUMMARY"
 
-          touches() {
-            local pattern="$1"
-            [[ "$changed" == "BUILD_ALL" ]] || echo "$changed" | grep -qE "$pattern"
+          in_changes() {
+            local name="$1"
+            [[ "$build_all" == "true" ]] || \
+              echo "$changes_json" | jq -e --arg n "$name" 'if type == "array" then contains([$n]) else false end' >/dev/null 2>&1
           }
 
-          touches '^apps/frontend/|^packages/'                && add "frontend"           "."                           "apps/frontend/Dockerfile"
-          touches '^apps/user-service/|^packages/'            && add "user-service"       "."                           "apps/user-service/Dockerfile"
-          touches '^apps/price-processor/|^packages/'         && add "price-processor"    "."                           "apps/price-processor/Dockerfile"
-          touches '^apps/portfolio-service/|^packages/'       && add "portfolio-service"  "."                           "apps/portfolio-service/Dockerfile"
-          touches '^apps/portfolio-api/|^packages/'           && add "portfolio-api"      "."                           "apps/portfolio-api/Dockerfile"
-          touches '^services/price-ingestor/'                 && add "price-ingestor"     "services/price-ingestor"     "services/price-ingestor/Dockerfile"
-          touches '^services/sentiment-analyzer/'             && add "sentiment-analyzer" "services/sentiment-analyzer" "services/sentiment-analyzer/Dockerfile"
-          touches '^services/ml-predictor/'                   && add "ml-predictor"       "services/ml-predictor"       "services/ml-predictor/Dockerfile"
+          in_changes "frontend"          && add "frontend"           "."                           "apps/frontend/Dockerfile"
+          in_changes "user-service"      && add "user-service"       "."                           "apps/user-service/Dockerfile"
+          in_changes "price-processor"   && add "price-processor"    "."                           "apps/price-processor/Dockerfile"
+          in_changes "portfolio-service" && add "portfolio-service"  "."                           "apps/portfolio-service/Dockerfile"
+          in_changes "portfolio-api"     && add "portfolio-api"      "."                           "apps/portfolio-api/Dockerfile"
+          in_changes "price-ingestor"    && add "price-ingestor"     "services/price-ingestor"     "services/price-ingestor/Dockerfile"
+          in_changes "sentiment-analyzer" && add "sentiment-analyzer" "services/sentiment-analyzer" "services/sentiment-analyzer/Dockerfile"
+          in_changes "ml-predictor"      && add "ml-predictor"       "services/ml-predictor"       "services/ml-predictor/Dockerfile"
 
           matrix_json=$(printf '%s' "$services" | jq -c 'unique_by(.name)')
           echo "matrix=$matrix_json" >> "$GITHUB_OUTPUT"
