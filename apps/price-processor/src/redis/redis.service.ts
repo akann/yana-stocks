@@ -1,13 +1,15 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
 @Injectable()
 export class RedisService implements OnModuleDestroy {
   private readonly client: Redis;
+  private readonly logger = new Logger(RedisService.name);
 
   constructor(private readonly config: ConfigService) {
     this.client = new Redis(this.config.getOrThrow<string>('redis.url'));
+    this.client.on('error', (err: Error) => this.logger.error('Redis error: %s', err.message));
   }
 
   async setex(key: string, ttlSeconds: number, value: string): Promise<void> {
