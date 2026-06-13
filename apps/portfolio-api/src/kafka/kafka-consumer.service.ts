@@ -107,11 +107,13 @@ export class KafkaConsumerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async handleSentiment(msg: SentimentSignal): Promise<void> {
-    await this.redis.set(`papi:sentiment:${msg.symbol}`, JSON.stringify(msg), 3600);
+    // 48h TTL — analyzer runs every 24h, keep data across at least 2 cycles
+    await this.redis.set(`papi:sentiment:${msg.symbol}`, JSON.stringify(msg), 172800);
   }
 
   private async handlePrediction(msg: PredictionSignal): Promise<void> {
-    await this.redis.set(`papi:prediction:${msg.symbol}`, JSON.stringify(msg), 3600);
+    // 48h TTL — ml-predictor runs periodically; keep predictions fresh across cycles
+    await this.redis.set(`papi:prediction:${msg.symbol}`, JSON.stringify(msg), 172800);
   }
 
   async onModuleDestroy(): Promise<void> {
