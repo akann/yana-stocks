@@ -14,18 +14,19 @@ import type { AggregateStockResponse, AssetsPage, MarketMovers } from './price-c
 import { StocksService } from './stocks.service';
 
 @ApiTags('stocks')
-@UseGuards(UserFromTokenGuard)
 @Controller()
 export class StocksController {
   constructor(private readonly stocksService: StocksService) {}
 
   @Get('stocks/:symbol')
+  @UseGuards(UserFromTokenGuard)
   @ApiOperation({ summary: 'Get aggregated price, sentiment, and prediction for a symbol' })
   getStock(@Param('symbol') symbol: string): Promise<AggregateStockResponse> {
     return this.stocksService.getStock(symbol.toUpperCase());
   }
 
   @Get('stocks/:symbol/history')
+  @UseGuards(UserFromTokenGuard)
   @ApiOperation({ summary: 'Get OHLCV history for a symbol' })
   getHistory(
     @Param('symbol') symbol: string,
