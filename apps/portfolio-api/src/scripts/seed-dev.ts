@@ -1,18 +1,23 @@
 /**
- * Seed Redis with realistic price, sentiment, and prediction data for local development.
+ * Seed Redis with price/sentiment/prediction data and MongoDB with news articles for local dev.
  * Run: pnpm seed
  *
- * Populates:
+ * Redis keys:
  *   papi:price:<SYMBOL>      — drives /market/movers and /stocks/:symbol price
  *   papi:sentiment:<SYMBOL>  — drives /stocks/:symbol and /signals/:symbol sentiment
  *   papi:prediction:<SYMBOL> — drives /stocks/:symbol and /signals/:symbol prediction
+ *
+ * MongoDB:
+ *   yana_stocks.articles     — drives /news/:symbol
  */
 import 'dotenv/config';
 import Redis from 'ioredis';
+import { MongoClient } from 'mongodb';
 import type { PredictionSignal, SentimentSignal } from '@yana-stocks/shared-types';
 import type { PriceCacheEntry } from '../stocks/price-cache.types';
 
 const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
+const MONGODB_URI = process.env['MONGODB_URI'] ?? 'mongodb://admin:password@localhost:27017/yana_stocks?authSource=admin';
 const TTL = 86_400; // 24 hours — survives overnight dev sessions
 
 interface StockSeed {
@@ -24,6 +29,68 @@ interface StockSeed {
   // 1d predicted price — 1h/4h/1w are derived proportionally
   prediction: { predictedPrice: number; confidence: number };
 }
+
+interface NewsArticleSeed {
+  headline: string;
+  source: string;
+  url: string;
+  sentiment_label: 'positive' | 'neutral' | 'negative';
+  sentiment_score: number;
+  hoursAgo: number;
+}
+
+const NEWS: Record<string, NewsArticleSeed[]> = {
+  NVDA: [
+    { headline: 'Nvidia beats estimates as AI chip demand surges in Q2', source: 'Reuters', url: 'https://reuters.com/nvda-q2', sentiment_label: 'positive', sentiment_score: 0.91, hoursAgo: 1 },
+    { headline: 'Blackwell GPU shipments ahead of schedule, says CEO Jensen Huang', source: 'Bloomberg', url: 'https://bloomberg.com/nvda-blackwell', sentiment_label: 'positive', sentiment_score: 0.85, hoursAgo: 6 },
+    { headline: 'Data center revenue doubles year-over-year for Nvidia', source: 'CNBC', url: 'https://cnbc.com/nvda-datacenter', sentiment_label: 'positive', sentiment_score: 0.82, hoursAgo: 12 },
+  ],
+  TSLA: [
+    { headline: 'Tesla deliveries top expectations, shares rally', source: 'WSJ', url: 'https://wsj.com/tsla-deliveries', sentiment_label: 'positive', sentiment_score: 0.76, hoursAgo: 2 },
+    { headline: 'Full self-driving software update wins positive reviews', source: 'TechCrunch', url: 'https://techcrunch.com/tsla-fsd', sentiment_label: 'positive', sentiment_score: 0.71, hoursAgo: 8 },
+    { headline: 'Tesla faces renewed price war pressure in China', source: 'FT', url: 'https://ft.com/tsla-china', sentiment_label: 'negative', sentiment_score: 0.28, hoursAgo: 18 },
+  ],
+  META: [
+    { headline: 'Meta ad revenue grows 22% YoY on AI-targeted campaigns', source: 'Reuters', url: 'https://reuters.com/meta-revenue', sentiment_label: 'positive', sentiment_score: 0.68, hoursAgo: 3 },
+    { headline: 'Threads hits 200 million daily active users', source: 'Bloomberg', url: 'https://bloomberg.com/meta-threads', sentiment_label: 'positive', sentiment_score: 0.74, hoursAgo: 10 },
+    { headline: 'EU regulators probe Meta data practices', source: 'Guardian', url: 'https://guardian.com/meta-eu', sentiment_label: 'negative', sentiment_score: 0.31, hoursAgo: 22 },
+  ],
+  AMZN: [
+    { headline: 'AWS growth accelerates as enterprise cloud spend rebounds', source: 'CNBC', url: 'https://cnbc.com/amzn-aws', sentiment_label: 'positive', sentiment_score: 0.61, hoursAgo: 4 },
+    { headline: 'Amazon Prime membership tops 200 million globally', source: 'Reuters', url: 'https://reuters.com/amzn-prime', sentiment_label: 'positive', sentiment_score: 0.65, hoursAgo: 14 },
+    { headline: 'Logistics costs rise on last-mile delivery expansion', source: 'FT', url: 'https://ft.com/amzn-logistics', sentiment_label: 'neutral', sentiment_score: 0.42, hoursAgo: 26 },
+  ],
+  GOOGL: [
+    { headline: 'Google Search gains market share after AI Overviews rollout', source: 'Bloomberg', url: 'https://bloomberg.com/googl-search', sentiment_label: 'positive', sentiment_score: 0.52, hoursAgo: 2 },
+    { headline: 'Waymo expands robotaxi service to three new cities', source: 'TechCrunch', url: 'https://techcrunch.com/waymo-expansion', sentiment_label: 'positive', sentiment_score: 0.67, hoursAgo: 9 },
+    { headline: 'DOJ antitrust case could force Google to sell Chrome', source: 'WSJ', url: 'https://wsj.com/googl-doj', sentiment_label: 'negative', sentiment_score: 0.18, hoursAgo: 30 },
+  ],
+  MSFT: [
+    { headline: 'Microsoft Copilot adoption steady; Azure beats by thin margin', source: 'Reuters', url: 'https://reuters.com/msft-azure', sentiment_label: 'neutral', sentiment_score: 0.48, hoursAgo: 5 },
+    { headline: 'GitHub Copilot reaches 1.8 million paid subscribers', source: 'CNBC', url: 'https://cnbc.com/msft-github', sentiment_label: 'positive', sentiment_score: 0.73, hoursAgo: 16 },
+    { headline: 'Xbox gaming division revenue declines 8% year-over-year', source: 'Bloomberg', url: 'https://bloomberg.com/msft-xbox', sentiment_label: 'negative', sentiment_score: 0.26, hoursAgo: 24 },
+  ],
+  JPM: [
+    { headline: 'JPMorgan profit solid but net interest income guidance trimmed', source: 'FT', url: 'https://ft.com/jpm-earnings', sentiment_label: 'neutral', sentiment_score: 0.44, hoursAgo: 3 },
+    { headline: 'JPMorgan expands private credit business with $10B fund', source: 'Bloomberg', url: 'https://bloomberg.com/jpm-credit', sentiment_label: 'positive', sentiment_score: 0.60, hoursAgo: 11 },
+    { headline: 'Fed stress test raises capital requirements for large banks', source: 'WSJ', url: 'https://wsj.com/fed-stress-test', sentiment_label: 'negative', sentiment_score: 0.33, hoursAgo: 20 },
+  ],
+  V: [
+    { headline: 'Visa cross-border volumes slow as consumer spending cools', source: 'Reuters', url: 'https://reuters.com/visa-volumes', sentiment_label: 'neutral', sentiment_score: 0.35, hoursAgo: 4 },
+    { headline: 'Visa launches tokenisation platform for e-commerce merchants', source: 'CNBC', url: 'https://cnbc.com/visa-token', sentiment_label: 'positive', sentiment_score: 0.58, hoursAgo: 15 },
+    { headline: 'Regulators scrutinise Visa debit card interchange fees', source: 'FT', url: 'https://ft.com/visa-fees', sentiment_label: 'negative', sentiment_score: 0.29, hoursAgo: 28 },
+  ],
+  AAPL: [
+    { headline: 'Apple iPhone sales miss in China amid Huawei competition', source: 'Bloomberg', url: 'https://bloomberg.com/aapl-china', sentiment_label: 'negative', sentiment_score: 0.22, hoursAgo: 2 },
+    { headline: 'Apple Vision Pro 2 rumoured for early 2026 launch', source: 'MacRumors', url: 'https://macrumors.com/visionpro2', sentiment_label: 'neutral', sentiment_score: 0.50, hoursAgo: 10 },
+    { headline: 'India manufacturing ramp reduces Apple supply chain risk', source: 'Reuters', url: 'https://reuters.com/aapl-india', sentiment_label: 'positive', sentiment_score: 0.64, hoursAgo: 18 },
+  ],
+  JNJ: [
+    { headline: 'J&J talc liability ruling raises fresh settlement concerns', source: 'Reuters', url: 'https://reuters.com/jnj-talc', sentiment_label: 'negative', sentiment_score: 0.12, hoursAgo: 1 },
+    { headline: 'Johnson & Johnson MedTech segment posts record quarterly revenue', source: 'CNBC', url: 'https://cnbc.com/jnj-medtech', sentiment_label: 'positive', sentiment_score: 0.69, hoursAgo: 12 },
+    { headline: 'Darzalex biosimilar threat looms as patent cliff approaches', source: 'FT', url: 'https://ft.com/jnj-biosimilar', sentiment_label: 'negative', sentiment_score: 0.24, hoursAgo: 20 },
+  ],
+};
 
 const STOCKS: StockSeed[] = [
   {
@@ -149,6 +216,33 @@ async function seed(): Promise<void> {
 
   await pipeline.exec();
   await redis.quit();
+
+  // Seed MongoDB articles collection
+  const mongo = new MongoClient(MONGODB_URI);
+  try {
+    await mongo.connect();
+    const col = mongo.db('yana_stocks').collection('articles');
+    const articles = Object.entries(NEWS).flatMap(([symbol, items]) =>
+      items.map((a) => ({
+        symbol,
+        headline: a.headline,
+        source: a.source,
+        url: a.url,
+        published_at: new Date(now.getTime() - a.hoursAgo * 3_600_000).toISOString(),
+        sentiment_label: a.sentiment_label,
+        sentiment_score: a.sentiment_score,
+        analyzed_at: new Date(now.getTime() - a.hoursAgo * 3_600_000 + 60_000),
+      })),
+    );
+    // Replace existing dev articles — delete by seeded marker, then insert
+    await col.deleteMany({ source: { $in: ['Reuters', 'Bloomberg', 'CNBC', 'WSJ', 'TechCrunch', 'FT', 'Guardian', 'MacRumors', 'Bloomberg'] } });
+    await col.insertMany(articles);
+    console.log(`Seeded ${articles.length} news articles into MongoDB (yana_stocks.articles)\n`);
+  } catch (err) {
+    console.warn(`MongoDB news seed skipped: ${String(err)}`);
+  } finally {
+    await mongo.close();
+  }
 
   console.log(`Seeded ${STOCKS.length} symbols into Redis (${REDIS_URL})\n`);
   console.log('  Symbol  Price        Change   Sentiment  Predicted');

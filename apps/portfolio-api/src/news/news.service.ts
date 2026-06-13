@@ -46,7 +46,7 @@ export class NewsService implements OnModuleInit, OnModuleDestroy {
       headline: d['headline'] as string,
       source: d['source'] as string,
       url: d['url'] as string,
-      publishedAt: String(d['published_at']),
+      publishedAt: new Date(d['published_at'] as string | Date).toISOString(),
       sentimentLabel: d['sentiment_label'] as 'positive' | 'neutral' | 'negative',
       sentimentScore: d['sentiment_score'] as number,
     }));
