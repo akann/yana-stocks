@@ -299,7 +299,8 @@ async function seed(): Promise<void> {
       console.log(`Seeded ${allBarDocs.length} OHLCV bars into MongoDB (price_bars)\n`);
     }
 
-    const col = db.collection('articles');
+    // NewsService reads from 'sentiment' database (hardcoded in news.service.ts)
+    const col = mongo.db('sentiment').collection('articles');
     const articles = Object.entries(NEWS).flatMap(([symbol, items]) =>
       items.map((a) => ({
         symbol,
@@ -315,7 +316,7 @@ async function seed(): Promise<void> {
     // Replace existing dev articles — delete by seeded marker, then insert
     await col.deleteMany({ source: { $in: ['Reuters', 'Bloomberg', 'CNBC', 'WSJ', 'TechCrunch', 'FT', 'Guardian', 'MacRumors', 'Bloomberg'] } });
     await col.insertMany(articles);
-    console.log(`Seeded ${articles.length} news articles into MongoDB (yana_stocks.articles)\n`);
+    console.log(`Seeded ${articles.length} news articles into MongoDB (sentiment.articles)\n`);
   } catch (err) {
     console.warn(`MongoDB news seed skipped: ${String(err)}`);
   } finally {
