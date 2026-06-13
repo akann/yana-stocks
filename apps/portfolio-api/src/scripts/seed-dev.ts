@@ -1,14 +1,17 @@
 /**
- * Seed Redis with price/sentiment/prediction data and MongoDB with news articles for local dev.
+ * Seed Redis with price/sentiment/prediction/history data and MongoDB with news + OHLCV bars.
  * Run: pnpm seed
  *
  * Redis keys:
- *   papi:price:<SYMBOL>      — drives /market/movers and /stocks/:symbol price
- *   papi:sentiment:<SYMBOL>  — drives /stocks/:symbol and /signals/:symbol sentiment
- *   papi:prediction:<SYMBOL> — drives /stocks/:symbol and /signals/:symbol prediction
+ *   papi:price:<SYMBOL>           — drives /market/movers and /stocks/:symbol price
+ *   papi:sentiment:<SYMBOL>       — drives /stocks/:symbol and /signals/:symbol sentiment
+ *   papi:prediction:<SYMBOL>      — drives /stocks/:symbol and /signals/:symbol prediction
+ *   papi:history:<SYMBOL>:<LIMIT> — drives /stocks/:symbol/history (chart data)
+ *   papi:assets:all               — drives /market/assets (stock browser)
  *
  * MongoDB:
- *   yana_stocks.articles     — drives /news/:symbol
+ *   yana_stocks.articles    — drives /news/:symbol
+ *   yana_stocks.price_bars  — drives price-processor /prices/:symbol/history
  */
 import 'dotenv/config';
 import Redis from 'ioredis';
@@ -20,6 +23,47 @@ import type { PriceCacheEntry } from '../stocks/price-cache.types';
 const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 const MONGODB_URI = process.env['MONGODB_URI'] ?? 'mongodb://admin:password@localhost:27017/yana_stocks?authSource=admin';
 const TTL = 86_400; // 24 hours — survives overnight dev sessions
+
+const BARS_PER_DAY = 390; // 6.5 trading hours × 60 min
+
+interface OHLCVBar {
+  symbol: string;
+  timestamp: Date;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  interval: '1m';
+}
+
+/** Generate ~390 1-minute bars as a random walk ending at stock.price */
+function generateBars(stock: StockSeed): OHLCVBar[] {
+  const endPrice = stock.price;
+  const startPrice = endPrice / (1 + stock.changePercent / 100);
+  const bars: OHLCVBar[] = [];
+
+  // Anchor end to current minute
+  const endTime = new Date();
+  endTime.setSeconds(0, 0);
+
+  let prev = startPrice;
+  for (let i = 0; i < BARS_PER_DAY; i++) {
+    const timestamp = new Date(endTime.getTime() - (BARS_PER_DAY - 1 - i) * 60_000);
+    // Linear drift toward endPrice + small Gaussian noise
+    const drift = (endPrice - prev) / (BARS_PER_DAY - i);
+    const noise = (Math.random() - 0.5) * stock.price * 0.0018;
+    const close = Math.max(0.01, parseFloat((prev + drift + noise).toFixed(2)));
+    const open = parseFloat(prev.toFixed(2));
+    const spread = Math.abs(close - open) + stock.price * 0.0005;
+    const high = parseFloat((Math.max(open, close) + Math.random() * spread).toFixed(2));
+    const low = parseFloat((Math.min(open, close) - Math.random() * spread).toFixed(2));
+    const volume = Math.floor((stock.volume / BARS_PER_DAY) * (0.4 + Math.random() * 1.2));
+    bars.push({ symbol: stock.symbol, timestamp, open, high, low, close, volume, interval: '1m' });
+    prev = close;
+  }
+  return bars;
+}
 
 interface StockSeed {
   symbol: string;
@@ -218,14 +262,44 @@ async function seed(): Promise<void> {
   // Seed full asset list so /market/assets works without Alpaca credentials
   pipeline.set('papi:assets:all', JSON.stringify(MOCK_ASSETS), 'EX', TTL);
 
+  // Seed OHLCV history into Redis for common limit values used by the chart.
+  // Bars are stored newest-first (DESC) to match what price-processor returns.
+  const allBars: Record<string, OHLCVBar[]> = {};
+  for (const stock of STOCKS) {
+    const bars = generateBars(stock);
+    allBars[stock.symbol] = bars;
+    const desc = [...bars].reverse(); // newest first
+    for (const limit of [60, 100, 390]) {
+      pipeline.set(
+        `papi:history:${stock.symbol}:${limit}`,
+        JSON.stringify(desc.slice(0, limit)),
+        'EX',
+        TTL,
+      );
+    }
+  }
+
   await pipeline.exec();
   await redis.quit();
 
-  // Seed MongoDB articles collection
+  // Seed MongoDB
   const mongo = new MongoClient(MONGODB_URI);
   try {
     await mongo.connect();
-    const col = mongo.db('yana_stocks').collection('articles');
+    const db = mongo.db('yana_stocks');
+
+    // Price bars (drives price-processor /prices/:symbol/history)
+    const barsCol = db.collection('price_bars');
+    const symbols = STOCKS.map((s) => s.symbol);
+    await barsCol.deleteMany({ symbol: { $in: symbols } });
+    const allBarDocs = Object.values(allBars).flat().map(({ interval: _interval, ...bar }) => bar);
+    if (allBarDocs.length) {
+      await barsCol.insertMany(allBarDocs);
+      await barsCol.createIndex({ symbol: 1, timestamp: -1 });
+      console.log(`Seeded ${allBarDocs.length} OHLCV bars into MongoDB (price_bars)\n`);
+    }
+
+    const col = db.collection('articles');
     const articles = Object.entries(NEWS).flatMap(([symbol, items]) =>
       items.map((a) => ({
         symbol,
