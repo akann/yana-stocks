@@ -292,6 +292,7 @@ jobs:
     runs-on: runners-yana-stocks
     needs: [changes, docker]
     if: |
+      always() &&
       github.ref == 'refs/heads/main' &&
       needs.docker.result == 'success'
     steps:
