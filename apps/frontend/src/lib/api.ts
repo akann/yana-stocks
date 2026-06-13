@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api',
+  // portfolio-api runs on :3004 locally; Next.js dev server occupies :3000
+  baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3004/api',
 });
 
 let isRefreshing = false;

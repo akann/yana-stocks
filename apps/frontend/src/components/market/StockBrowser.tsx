@@ -28,7 +28,7 @@ export function StockBrowser(): React.JSX.Element {
   const [page, setPage] = useState(1);
   const debouncedSearch = useDebounce(search, 300);
 
-  const { data, isLoading } = useQuery<AssetsPage>({
+  const { data, isLoading, isError } = useQuery<AssetsPage>({
     queryKey: ['assets', debouncedSearch, page],
     queryFn: () =>
       api
@@ -78,6 +78,12 @@ export function StockBrowser(): React.JSX.Element {
                   <td className="py-2"><div className="h-4 bg-gray-800 rounded w-12 animate-pulse" /></td>
                 </tr>
               ))
+            ) : isError ? (
+              <tr>
+                <td colSpan={3} className="py-8 text-center text-red-400 text-sm">
+                  Could not load stocks — make sure portfolio-api is running on port 3004
+                </td>
+              </tr>
             ) : data?.data.length ? (
               data.data.map((asset) => (
                 <tr
