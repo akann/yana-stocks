@@ -54,7 +54,7 @@ disallow_untyped_defs = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["alpaca.*", "confluent_kafka.*"]
+module = ["alpaca.*", "confluent_kafka.*", "yfinance.*"]
 ignore_missing_imports = true
 disallow_untyped_defs = false
 
