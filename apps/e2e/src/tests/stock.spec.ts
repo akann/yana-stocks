@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { RegisterPage } from '../pages/auth.page';
 import { HomePage } from '../pages/home.page';
 import { StockPage } from '../pages/stock.page';
 
@@ -60,18 +59,17 @@ test.describe('Stock data content', () => {
   let testEmail: string;
   let savedTokens: { at: string; rt: string } | null = null;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ request }) => {
     testEmail = `e2e+stock+${Date.now()}@example.com`;
-    const page = await browser.newPage();
-    const registerPage = new RegisterPage(page);
-    await registerPage.goto();
-    await registerPage.register(testEmail, PASSWORD);
-    await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
-    savedTokens = await page.evaluate(() => ({
-      at: localStorage.getItem('access_token') ?? '',
-      rt: localStorage.getItem('refresh_token') ?? '',
-    }));
-    await page.close();
+    // Register via API — avoids mobile-safari WebKit email-input flakiness in beforeAll
+    const res = await request.post('http://localhost:3004/api/auth/register', {
+      data: { email: testEmail, name: 'E2E Stock User', password: PASSWORD },
+    });
+    const { accessToken, refreshToken } = (await res.json()) as {
+      accessToken: string;
+      refreshToken: string;
+    };
+    savedTokens = { at: accessToken, rt: refreshToken };
   });
 
   test.beforeEach(async ({ page }) => {
