@@ -52,9 +52,8 @@ class BackfillSettings(BaseSettings):
 def main() -> None:
     settings = BackfillSettings()
 
-    db_name = settings.mongodb_uri.rstrip("/").split("/")[-1]
     mongo: MongoClient[dict[str, object]] = MongoClient(settings.mongodb_uri)
-    collection = mongo[db_name]["price_bars"]
+    collection = mongo.get_default_database()["price_bars"]
 
     end = datetime.now(tz=UTC)
     start = end - timedelta(days=365)
