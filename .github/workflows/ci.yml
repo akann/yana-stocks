@@ -340,6 +340,13 @@ jobs:
       - name: Generate Prisma client
         run: pnpm --filter @yana-stocks/user-service db:generate
 
+      - name: Write frontend .env.local
+        run: |
+          printf '%s\n' \
+            'NEXT_PUBLIC_API_URL=http://localhost:3004/api' \
+            'NEXT_PUBLIC_WS_URL=ws://localhost:3004' \
+            > apps/frontend/.env.local
+
       - name: Build all apps
         run: pnpm turbo run build
 
