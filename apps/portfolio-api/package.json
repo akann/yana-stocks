@@ -56,10 +56,16 @@
       "^.+\\.ts$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s",
-      "!**/node_modules/**"
+      "**/*.ts",
+      "!**/*.spec.ts",
+      "!**/main.ts",
+      "!**/*.module.ts",
+      "!**/*.decorator.ts",
+      "!**/config/configuration.ts",
+      "!**/scripts/**"
     ],
     "coverageDirectory": "../coverage",
+    "coverageReporters": ["text", "lcov", "html"],
     "testEnvironment": "node"
   }
 }
