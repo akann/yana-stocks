@@ -88,6 +88,15 @@ describe('PortfoliosService', () => {
   });
 
   describe('findOne', () => {
+    it('returns the portfolio when it belongs to the user', async () => {
+      portfolioModel.findById.mockReturnValue({
+        lean: () => ({ exec: () => Promise.resolve(mockPortfolioDoc) }),
+      });
+      const result = await service.findOne('portfolio-1', 'user-1');
+      expect(result.id).toBe('portfolio-1');
+      expect(result.name).toBe('My Portfolio');
+    });
+
     it('throws NotFoundException when portfolio does not exist', async () => {
       portfolioModel.findById.mockReturnValue({
         lean: () => ({ exec: () => Promise.resolve(null) }),
@@ -102,6 +111,51 @@ describe('PortfoliosService', () => {
         }),
       });
       await expect(service.findOne('portfolio-1', 'user-1')).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('update', () => {
+    it('renames the portfolio and returns the updated document', async () => {
+      const updated = { ...mockPortfolioDoc, name: 'Renamed' };
+      portfolioModel.findOneAndUpdate.mockReturnValue({
+        lean: () => ({ exec: () => Promise.resolve(updated) }),
+      });
+
+      const result = await service.update('portfolio-1', { name: 'Renamed' }, 'user-1');
+
+      expect(portfolioModel.findOneAndUpdate).toHaveBeenCalledWith(
+        { _id: 'portfolio-1', userId: 'user-1' },
+        { $set: { name: 'Renamed' } },
+        { new: true },
+      );
+      expect(result.name).toBe('Renamed');
+    });
+
+    it('throws NotFoundException when the portfolio is not found', async () => {
+      portfolioModel.findOneAndUpdate.mockReturnValue({
+        lean: () => ({ exec: () => Promise.resolve(null) }),
+      });
+      await expect(service.update('missing', { name: 'X' }, 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe('remove', () => {
+    it('deletes the portfolio', async () => {
+      portfolioModel.findOneAndDelete.mockReturnValue({
+        exec: () => Promise.resolve(mockPortfolioDoc),
+      });
+      await service.remove('portfolio-1', 'user-1');
+      expect(portfolioModel.findOneAndDelete).toHaveBeenCalledWith({
+        _id: 'portfolio-1',
+        userId: 'user-1',
+      });
+    });
+
+    it('throws NotFoundException when the portfolio is not found', async () => {
+      portfolioModel.findOneAndDelete.mockReturnValue({ exec: () => Promise.resolve(null) });
+      await expect(service.remove('missing', 'user-1')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -127,6 +181,37 @@ describe('PortfoliosService', () => {
       expect(kafkaProducer.emitPortfolioEvent).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'stock_added' }),
       );
+    });
+
+    it('averages cost basis when the symbol already exists in the portfolio', async () => {
+      const existing = { symbol: 'AAPL', shares: 10, avgCostBasis: 100 };
+      const docMock = {
+        ...mockPortfolioDoc,
+        userId: 'user-1',
+        stocks: [existing],
+        save: jest.fn().mockResolvedValue({
+          toObject: () => ({
+            ...mockPortfolioDoc,
+            stocks: [{ symbol: 'AAPL', shares: 20, avgCostBasis: 110 }],
+          }),
+        }),
+      };
+      portfolioModel.findById.mockReturnValue({ exec: () => Promise.resolve(docMock) });
+
+      await service.addStock('portfolio-1', { symbol: 'AAPL', shares: 10, price: 120 }, mockUser);
+
+      // (10*100 + 10*120) / 20 = 110
+      expect(existing.shares).toBe(20);
+      expect(existing.avgCostBasis).toBe(110);
+    });
+
+    it('throws ForbiddenException when the portfolio belongs to another user', async () => {
+      const docMock = { ...mockPortfolioDoc, userId: 'other-user', stocks: [] };
+      portfolioModel.findById.mockReturnValue({ exec: () => Promise.resolve(docMock) });
+
+      await expect(
+        service.addStock('portfolio-1', { symbol: 'AAPL', shares: 5, price: 150 }, mockUser),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

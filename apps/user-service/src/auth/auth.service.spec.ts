@@ -130,6 +130,17 @@ describe('AuthService', () => {
     });
   });
 
+  describe('login', () => {
+    it('issues tokens for the given user', async () => {
+      const result = await service.login({ id: mockUser.id, email: mockUser.email });
+
+      expect(jwtService.sign).toHaveBeenCalledWith({ sub: mockUser.id, email: mockUser.email });
+      expect(redis.setex).toHaveBeenCalled();
+      expect(result).toHaveProperty('accessToken');
+      expect(result).toHaveProperty('refreshToken');
+    });
+  });
+
   describe('logout', () => {
     it('deletes the refresh token from Redis', async () => {
       await service.logout('some-refresh-token');
