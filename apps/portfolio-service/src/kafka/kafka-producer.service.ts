@@ -32,10 +32,14 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
   }
 
   async emitPortfolioEvent(event: PortfolioEventMessage): Promise<void> {
-    await this.producer.send({
-      topic: KAFKA_TOPICS.PORTFOLIO_EVENTS,
-      messages: [{ key: event.portfolioId, value: JSON.stringify(event) }],
-    });
+    try {
+      await this.producer.send({
+        topic: KAFKA_TOPICS.PORTFOLIO_EVENTS,
+        messages: [{ key: event.portfolioId, value: JSON.stringify(event) }],
+      });
+    } catch (err) {
+      this.logger.warn('Kafka event drop (producer not ready): %s', String(err));
+    }
   }
 
   async onModuleDestroy(): Promise<void> {

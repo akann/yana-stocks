@@ -84,6 +84,8 @@ test.describe('Login', () => {
     await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
 
     await page.locator('button', { hasText: 'Sign out' }).click();
+    // handleLogout awaits POST /auth/logout then calls router.push('/login') — wait for it
+    await page.waitForURL('**/login', { timeout: 10_000 });
     // After logout, dashboard should no longer be accessible
     await page.goto('/dashboard');
     await page.waitForURL('**/login', { timeout: 5_000 });
