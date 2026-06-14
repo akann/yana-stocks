@@ -163,7 +163,103 @@ jobs:
             --concurrency=4
 
   # ─────────────────────────────────────────────────────────────────
-  # 3. Python quality (ruff + mypy — no pytest to avoid model downloads)
+  # 3. Integration tests (Postgres + MongoDB + Redis as service containers)
+  #    Kafka is mocked in all three suites — no broker needed in CI.
+  # ─────────────────────────────────────────────────────────────────
+  integration-test:
+    runs-on: runners-yana-stocks
+    needs: [changes, ts-quality]
+    if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: yana_stocks_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      mongodb:
+        image: mongo:8
+        env:
+          MONGO_INITDB_ROOT_USERNAME: admin
+          MONGO_INITDB_ROOT_PASSWORD: password
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand({ping:1})' --quiet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        run: echo "dir=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.dir }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile || (pnpm approve-builds --all && pnpm install --frozen-lockfile)
+
+      - name: Generate Prisma client
+        run: pnpm --filter @yana-stocks/user-service db:generate
+
+      - name: Write .env.test files
+        run: |
+          printf '%s\n' \
+            'DATABASE_URL=postgresql://postgres:password@localhost:5432/yana_stocks_test' \
+            'REDIS_URL=redis://localhost:6379' \
+            'JWT_SECRET=int-test-jwt-secret' \
+            'JWT_EXPIRES_IN=15m' \
+            'JWT_REFRESH_SECRET=int-test-refresh-secret' \
+            'JWT_REFRESH_EXPIRES_IN=7d' \
+            > apps/user-service/.env.test
+
+          printf '%s\n' \
+            'MONGODB_URI=mongodb://admin:password@localhost:27017/price_processor_test?authSource=admin' \
+            'REDIS_URL=redis://localhost:6379' \
+            'KAFKA_BROKERS=localhost:19092' \
+            > apps/price-processor/.env.test
+
+          printf '%s\n' \
+            'MONGODB_URI=mongodb://admin:password@localhost:27017/portfolio_service_test?authSource=admin' \
+            'KAFKA_BROKERS=localhost:19092' \
+            > apps/portfolio-service/.env.test
+
+      - name: Run integration tests
+        run: pnpm turbo run test:int --concurrency=3
+
+  # ─────────────────────────────────────────────────────────────────
+  # 4. Python quality (ruff + mypy — no pytest to avoid model downloads)
+  #    Runs in parallel with integration-test (independent of TS services)
   # ─────────────────────────────────────────────────────────────────
   python-quality:
     runs-on: runners-yana-stocks
@@ -198,17 +294,18 @@ jobs:
         run: uv run mypy src/
 
   # ─────────────────────────────────────────────────────────────────
-  # 4. Build and push Docker images  (main branch only)
+  # 5. Build and push Docker images  (main branch only)
   # ─────────────────────────────────────────────────────────────────
   docker:
     runs-on: runners-yana-stocks
-    needs: [changes, ts-quality, python-quality]
+    needs: [changes, ts-quality, integration-test, python-quality]
     if: |
       always() &&
       github.ref == 'refs/heads/main' &&
       needs.changes.outputs.has_changes == 'true' &&
-      (needs.ts-quality.result     == 'success' || needs.ts-quality.result     == 'skipped') &&
-      (needs.python-quality.result == 'success' || needs.python-quality.result == 'skipped')
+      (needs.ts-quality.result        == 'success' || needs.ts-quality.result        == 'skipped') &&
+      (needs.integration-test.result  == 'success' || needs.integration-test.result  == 'skipped') &&
+      (needs.python-quality.result    == 'success' || needs.python-quality.result    == 'skipped')
     strategy:
       fail-fast: false
       max-parallel: 3
@@ -286,7 +383,7 @@ jobs:
           cache-to: type=gha,scope=${{ matrix.service.name }},mode=max
 
   # ─────────────────────────────────────────────────────────────────
-  # 5. GitOps: update image tags in k8s-apps → ArgoCD auto-syncs
+  # 6. GitOps: update image tags in k8s-apps → ArgoCD auto-syncs
   # ─────────────────────────────────────────────────────────────────
   gitops:
     runs-on: runners-yana-stocks
