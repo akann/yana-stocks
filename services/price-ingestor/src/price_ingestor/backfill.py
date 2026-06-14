@@ -6,7 +6,6 @@ Run with:
 """
 
 import logging
-import sys
 from datetime import UTC, datetime, timedelta
 
 from alpaca.data import StockHistoricalDataClient
@@ -65,7 +64,7 @@ def main() -> None:
     )
 
     db_name = settings.mongodb_uri.rstrip("/").split("/")[-1]
-    mongo = MongoClient(settings.mongodb_uri)
+    mongo: MongoClient[dict[str, object]] = MongoClient(settings.mongodb_uri)
     collection = mongo[db_name]["price_bars"]
 
     end = datetime.now(tz=UTC)
@@ -92,7 +91,7 @@ def main() -> None:
                 feed=settings.alpaca_feed,
             )
             bars_response = alpaca.get_stock_bars(request)
-            bars = bars_response.get(symbol, [])
+            bars = bars_response[symbol] if symbol in bars_response else []  # noqa: SIM401
 
             if not bars:
                 logger.warning("No bars returned for %s", symbol)
@@ -141,4 +140,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
