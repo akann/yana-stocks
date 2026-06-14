@@ -9,7 +9,6 @@ import logging
 from datetime import UTC, datetime, timedelta
 
 from alpaca.data import StockHistoricalDataClient
-from alpaca.data.enums import DataFeed
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from pydantic import field_validator
@@ -29,7 +28,6 @@ class BackfillSettings(BaseSettings):
     alpaca_api_key: str
     alpaca_api_secret: str
     alpaca_base_url: str = "https://data.alpaca.markets"
-    alpaca_feed: DataFeed = DataFeed.IEX
 
     mongodb_uri: str = "mongodb://localhost:27017/yana_stocks"
 
@@ -88,7 +86,6 @@ def main() -> None:
                 timeframe=TimeFrame.Day,
                 start=start,
                 end=end,
-                feed=settings.alpaca_feed,
             )
             bars_response = alpaca.get_stock_bars(request)
             bars = bars_response[symbol] if symbol in bars_response else []  # noqa: SIM401
