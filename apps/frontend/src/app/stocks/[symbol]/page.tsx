@@ -34,8 +34,8 @@ export default function StockPage(): React.JSX.Element {
     refetchInterval: 10_000,
   });
 
-  // Fetch 1D minute bars for the day-stats row (shared cache with PriceChart's 1D query)
-  const { data: history } = useQuery<OHLCVBar[]>({
+  // Intraday minute bars for live stocks (open, running high/low, cumulative volume)
+  const { data: historyMin } = useQuery<OHLCVBar[]>({
     queryKey: ['history', upperSymbol, 390, '1m'],
     queryFn: () =>
       api
@@ -43,20 +43,47 @@ export default function StockPage(): React.JSX.Element {
         .then((r) => r.data),
     refetchInterval: 60_000,
     staleTime: 30_000,
+    retry: false,
+  });
+
+  // Daily bars — fires immediately on page load to trigger on-demand Yahoo Finance fetch
+  // before PriceChart mounts; also provides day stats for on-demand stocks
+  const { data: historyDay } = useQuery<OHLCVBar[]>({
+    queryKey: ['history', upperSymbol, 21, '1d'],
+    queryFn: () =>
+      api
+        .get<OHLCVBar[]>(`/stocks/${upperSymbol}/history?limit=21&interval=1d`)
+        .then((r) => r.data),
+    staleTime: 300_000,
+    retry: false,
   });
 
   const dayStats = useMemo(() => {
-    if (!history?.length) return null;
-    const sorted = [...history].sort(
-      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-    );
-    return {
-      open: sorted[0]?.open ?? 0,
-      high: sorted.reduce((m, b) => Math.max(m, b.high), -Infinity),
-      low: sorted.reduce((m, b) => Math.min(m, b.low), Infinity),
-      volume: sorted.reduce((s, b) => s + b.volume, 0),
-    };
-  }, [history]);
+    if (historyMin?.length) {
+      const sorted = [...historyMin].sort(
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+      );
+      return {
+        open: sorted[0]?.open ?? 0,
+        high: sorted.reduce((m, b) => Math.max(m, b.high), -Infinity),
+        low: sorted.reduce((m, b) => Math.min(m, b.low), Infinity),
+        volume: sorted.reduce((s, b) => s + b.volume, 0),
+      };
+    }
+    if (historyDay?.length) {
+      const sorted = [...historyDay].sort(
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+      );
+      const latest = sorted[sorted.length - 1]!;
+      return {
+        open: latest.open,
+        high: latest.high,
+        low: latest.low,
+        volume: latest.volume,
+      };
+    }
+    return null;
+  }, [historyMin, historyDay]);
 
   const price = stock?.price ?? null;
   const change = stock?.change ?? null;
