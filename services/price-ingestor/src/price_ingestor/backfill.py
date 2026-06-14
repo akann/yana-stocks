@@ -72,13 +72,11 @@ def main() -> None:
     for symbol in settings.symbols:
         logger.info("Fetching %s ...", symbol)
         try:
-            df = yf.download(
-                symbol,
+            df = yf.Ticker(symbol).history(
                 start=start.date(),
                 end=end.date(),
                 interval="1d",
                 auto_adjust=True,
-                progress=False,
             )
 
             if df.empty:
