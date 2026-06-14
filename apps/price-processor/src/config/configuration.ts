@@ -9,4 +9,8 @@ export default () => ({
   kafka: {
     brokers: (process.env['KAFKA_BROKERS'] ?? 'localhost:19092').split(','),
   },
+  alpaca: {
+    apiKey: process.env['ALPACA_API_KEY'] ?? '',
+    apiSecret: process.env['ALPACA_API_SECRET'] ?? '',
+  },
 });

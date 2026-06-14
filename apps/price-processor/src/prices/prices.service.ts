@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import type {
   OHLCV,
@@ -16,16 +17,41 @@ import { KafkaProducerService } from './kafka-producer.service';
 import { PriceBar } from './schemas/price-bar.schema';
 
 const PRICE_CACHE_TTL = 5;
+const QUOTE_CACHE_TTL = 3_600;
+
+export interface QuoteEntry {
+  price: number;
+  prevPrice: number;
+  change: number;
+  changePercent: number;
+  volume: number;
+  timestamp: string;
+}
+
+interface AlpacaBar {
+  t: string;
+  o: number;
+  h: number;
+  l: number;
+  c: number;
+  v: number;
+}
 
 @Injectable()
 export class PricesService {
   private readonly logger = new Logger(PricesService.name);
+  private readonly alpacaKey: string;
+  private readonly alpacaSecret: string;
 
   constructor(
     @InjectModel(PriceBar.name) private readonly priceBarsModel: Model<PriceBar>,
     private readonly redis: RedisService,
     private readonly kafkaProducer: KafkaProducerService,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.alpacaKey = config.get<string>('alpaca.apiKey') ?? '';
+    this.alpacaSecret = config.get<string>('alpaca.apiSecret') ?? '';
+  }
 
   async process(msg: RawPriceMessage): Promise<void> {
     const minuteTs = this.truncateToMinute(msg.timestamp);
@@ -102,6 +128,10 @@ export class PricesService {
       bars = await this.fetchAndStoreDailyHistory(symbol, opts.limit, filter);
     }
 
+    if (bars.length === 0 && interval === '1m') {
+      bars = await this.fetchAndStoreMinuteHistory(symbol, opts.limit, filter);
+    }
+
     return bars.map((b) => ({
       symbol: b.symbol,
       timestamp: b.timestamp,
@@ -112,6 +142,131 @@ export class PricesService {
       volume: b.volume,
       interval: (b.interval ?? '1m') as OHLCVInterval,
     }));
+  }
+
+  async getQuote(symbol: string): Promise<QuoteEntry | null> {
+    const cacheKey = `price:quote:${symbol}`;
+    const cached = await this.redis.get(cacheKey);
+    if (cached) return JSON.parse(cached) as QuoteEntry;
+
+    try {
+      const q = await yf.quote(symbol);
+      if (!q.regularMarketPrice) return null;
+
+      const price = q.regularMarketPrice;
+      const change = q.regularMarketChange ?? 0;
+      const changePercent = q.regularMarketChangePercent ?? 0;
+      const volume = q.regularMarketVolume ?? 0;
+      const marketTime = q.regularMarketTime;
+      const timestamp =
+        marketTime instanceof Date
+          ? marketTime.toISOString()
+          : typeof marketTime === 'number'
+            ? new Date(marketTime * 1000).toISOString()
+            : new Date().toISOString();
+
+      const entry: QuoteEntry = {
+        price,
+        prevPrice: price - change,
+        change,
+        changePercent,
+        volume,
+        timestamp,
+      };
+
+      await this.redis.setex(cacheKey, QUOTE_CACHE_TTL, JSON.stringify(entry));
+      return entry;
+    } catch (err) {
+      this.logger.warn('Yahoo Finance quote failed for %s: %s', symbol, (err as Error).message);
+      return null;
+    }
+  }
+
+  private async fetchAndStoreMinuteHistory(
+    symbol: string,
+    limit: number,
+    filter: Record<string, unknown>,
+  ): Promise<PriceBar[]> {
+    if (!this.alpacaKey || !this.alpacaSecret) return [];
+
+    const noDataKey = `hist:no-data-min:${symbol}`;
+    const hasNoData = await this.redis.get(noDataKey);
+    if (hasNoData) return [];
+
+    try {
+      const end = new Date();
+      const start = new Date(end);
+      start.setDate(start.getDate() - 3);
+
+      const params = new URLSearchParams({
+        timeframe: '1Min',
+        start: start.toISOString(),
+        end: end.toISOString(),
+        limit: '10000',
+        adjustment: 'raw',
+        feed: 'iex',
+      });
+
+      const resp = await fetch(
+        `https://data.alpaca.markets/v2/stocks/${encodeURIComponent(symbol)}/bars?${params.toString()}`,
+        {
+          headers: {
+            'APCA-API-KEY-ID': this.alpacaKey,
+            'APCA-API-SECRET-KEY': this.alpacaSecret,
+          },
+        },
+      );
+
+      if (!resp.ok) {
+        if (resp.status === 404 || resp.status === 422) {
+          await this.redis.setex(noDataKey, 86_400, '1');
+        }
+        this.logger.warn('Alpaca bars request failed for %s: HTTP %d', symbol, resp.status);
+        return [];
+      }
+
+      const data = (await resp.json()) as { bars?: AlpacaBar[] };
+      const alpacaBars = data.bars ?? [];
+
+      if (alpacaBars.length === 0) {
+        await this.redis.setex(noDataKey, 86_400, '1');
+        return [];
+      }
+
+      this.logger.log('Fetched %d minute bars from Alpaca for %s', alpacaBars.length, symbol);
+
+      const ops = alpacaBars.map((bar) => ({
+        updateOne: {
+          filter: { symbol, timestamp: new Date(bar.t), interval: '1m' },
+          update: {
+            $setOnInsert: {
+              symbol,
+              timestamp: new Date(bar.t),
+              open: bar.o,
+              high: bar.h,
+              low: bar.l,
+              close: bar.c,
+              volume: bar.v,
+              interval: '1m',
+            },
+          },
+          upsert: true,
+        },
+      }));
+
+      await this.priceBarsModel.bulkWrite(ops, { ordered: false });
+
+      return this.priceBarsModel
+        .find(filter)
+        .sort({ timestamp: -1 })
+        .limit(limit)
+        .lean<PriceBar[]>()
+        .exec();
+    } catch (err) {
+      this.logger.warn('Alpaca minute fetch failed for %s: %s', symbol, (err as Error).message);
+      await this.redis.setex(noDataKey, 3_600, '1');
+      return [];
+    }
   }
 
   private async fetchAndStoreDailyHistory(

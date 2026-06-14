@@ -34,7 +34,24 @@ export class StocksService {
       this.redis.get(`papi:prediction:${symbol}`),
     ]);
 
-    const price = priceRaw ? (JSON.parse(priceRaw) as PriceCacheEntry) : null;
+    let price = priceRaw ? (JSON.parse(priceRaw) as PriceCacheEntry) : null;
+
+    if (!price) {
+      try {
+        const resp = await firstValueFrom(
+          this.httpService.get<PriceCacheEntry>(
+            `${this.priceProcessorUrl}/prices/${symbol}/quote`,
+          ),
+        );
+        if (resp.data?.price) {
+          price = resp.data;
+          await this.redis.set(`papi:price:${symbol}`, JSON.stringify(price), 3_600);
+        }
+      } catch {
+        // quote unavailable — price stays null
+      }
+    }
+
     const sentiment = sentimentRaw ? (JSON.parse(sentimentRaw) as SentimentSignal) : null;
     const prediction = predictionRaw ? (JSON.parse(predictionRaw) as PredictionSignal) : null;
 
