@@ -15,7 +15,8 @@ export class PricesController {
     @Query('limit', new DefaultValuePipe(100), ParseIntPipe) limit: number,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('interval') interval?: string,
   ): Promise<OHLCV[]> {
-    return this.pricesService.getHistory(symbol, { limit, from, to });
+    return this.pricesService.getHistory(symbol, { limit, from, to, interval });
   }
 }

@@ -34,11 +34,13 @@ export default function StockPage(): React.JSX.Element {
     refetchInterval: 10_000,
   });
 
-  // Fetch history for the day-stats row (shared with PriceChart's 1D query)
+  // Fetch 1D minute bars for the day-stats row (shared cache with PriceChart's 1D query)
   const { data: history } = useQuery<OHLCVBar[]>({
-    queryKey: ['history', upperSymbol, 390],
+    queryKey: ['history', upperSymbol, 390, '1m'],
     queryFn: () =>
-      api.get<OHLCVBar[]>(`/stocks/${upperSymbol}/history?limit=390`).then((r) => r.data),
+      api
+        .get<OHLCVBar[]>(`/stocks/${upperSymbol}/history?limit=390&interval=1m`)
+        .then((r) => r.data),
     refetchInterval: 60_000,
     staleTime: 30_000,
   });

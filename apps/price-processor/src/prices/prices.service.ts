@@ -26,7 +26,7 @@ export class PricesService {
       .findOneAndUpdate(
         { symbol: msg.symbol, timestamp: minuteTs },
         {
-          $setOnInsert: { symbol: msg.symbol, timestamp: minuteTs, open: msg.price },
+          $setOnInsert: { symbol: msg.symbol, timestamp: minuteTs, open: msg.price, interval: '1m' },
           $max: { high: msg.price },
           $min: { low: msg.price },
           $set: { close: msg.price },
@@ -62,9 +62,15 @@ export class PricesService {
 
   async getHistory(
     symbol: string,
-    opts: { limit: number; from?: string; to?: string },
+    opts: { limit: number; from?: string; to?: string; interval?: string },
   ): Promise<OHLCV[]> {
     const filter: Record<string, unknown> = { symbol };
+
+    const interval = opts.interval ?? '1m';
+    // null in $in matches both null values and missing fields, so old docs
+    // without an interval field are treated as '1m' bars.
+    filter['interval'] = interval === '1m' ? { $in: ['1m', null] } : interval;
+
     if (opts.from ?? opts.to) {
       const tsFilter: Record<string, Date> = {};
       if (opts.from) tsFilter['$gte'] = new Date(opts.from);
@@ -87,7 +93,7 @@ export class PricesService {
       low: b.low,
       close: b.close,
       volume: b.volume,
-      interval: '1m' as const,
+      interval: b.interval ?? '1m',
     }));
   }
 

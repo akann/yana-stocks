@@ -31,8 +31,9 @@ export class StocksController {
   getHistory(
     @Param('symbol') symbol: string,
     @Query('limit', new DefaultValuePipe(100), ParseIntPipe) limit: number,
+    @Query('interval') interval?: string,
   ): Promise<OHLCV[]> {
-    return this.stocksService.getHistory(symbol.toUpperCase(), limit);
+    return this.stocksService.getHistory(symbol.toUpperCase(), limit, interval);
   }
 
   @Get('market/movers')

@@ -50,14 +50,14 @@ export class StocksService {
     };
   }
 
-  async getHistory(symbol: string, limit = 100): Promise<OHLCV[]> {
-    const cacheKey = `papi:history:${symbol}:${limit}`;
+  async getHistory(symbol: string, limit = 100, interval = '1m'): Promise<OHLCV[]> {
+    const cacheKey = `papi:history:${symbol}:${limit}:${interval}`;
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached) as OHLCV[];
 
     const response = await firstValueFrom(
       this.httpService.get<OHLCV[]>(
-        `${this.priceProcessorUrl}/prices/${symbol}/history?limit=${limit}`,
+        `${this.priceProcessorUrl}/prices/${symbol}/history?limit=${limit}&interval=${interval}`,
       ),
     );
 

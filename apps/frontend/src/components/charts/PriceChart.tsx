@@ -17,8 +17,12 @@ import { api } from '@/lib/api';
 import type { OHLCVBar } from '@/types';
 
 const RANGES = [
-  { label: '1H', limit: 60 },
-  { label: '1D', limit: 390 },
+  { label: '1H', limit: 60, interval: '1m' },
+  { label: '1D', limit: 390, interval: '1m' },
+  { label: '1W', limit: 5, interval: '1d' },
+  { label: '1M', limit: 21, interval: '1d' },
+  { label: '3M', limit: 63, interval: '1d' },
+  { label: '1Y', limit: 252, interval: '1d' },
 ] as const;
 type RangeLabel = (typeof RANGES)[number]['label'];
 
@@ -61,14 +65,18 @@ interface Props {
 
 export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
   const [range, setRange] = useState<RangeLabel>('1D');
-  const activeLimit = RANGES.find((r) => r.label === range)!.limit;
+  const activeRange = RANGES.find((r) => r.label === range)!;
 
   const { data, isLoading } = useQuery<OHLCVBar[]>({
-    queryKey: ['history', symbol, activeLimit],
+    queryKey: ['history', symbol, activeRange.limit, activeRange.interval],
     queryFn: () =>
-      api.get<OHLCVBar[]>(`/stocks/${symbol}/history?limit=${activeLimit}`).then((r) => r.data),
-    refetchInterval: 30_000,
-    staleTime: 10_000,
+      api
+        .get<OHLCVBar[]>(
+          `/stocks/${symbol}/history?limit=${activeRange.limit}&interval=${activeRange.interval}`,
+        )
+        .then((r) => r.data),
+    refetchInterval: activeRange.interval === '1d' ? 3_600_000 : 30_000,
+    staleTime: activeRange.interval === '1d' ? 1_800_000 : 10_000,
   });
 
   const { points, domain, isUp } = useMemo(() => {
@@ -79,12 +87,15 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
       (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
     );
 
+    const isDaily = activeRange.interval === '1d';
     const pts: ChartPoint[] = sorted.map((bar) => ({
-      time: new Date(bar.timestamp).toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-      }),
+      time: isDaily
+        ? new Date(bar.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : new Date(bar.timestamp).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          }),
       close: bar.close,
       open: bar.open,
       high: bar.high,
@@ -140,12 +151,8 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
       </div>
 
       {!points.length ? (
-        <div className="h-64 flex flex-col items-center justify-center gap-2 text-gray-500 text-sm">
-          <span>No price history available</span>
-          <span className="text-xs text-gray-600">
-            Run <code className="bg-gray-800 px-1 rounded">pnpm seed</code> or start the
-            price-ingestor
-          </span>
+        <div className="h-64 flex items-center justify-center text-gray-500 text-sm">
+          No price history available
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={272}>

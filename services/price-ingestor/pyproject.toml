@@ -6,12 +6,14 @@ requires-python = ">=3.12"
 dependencies = [
     "alpaca-py>=0.36.0",
     "confluent-kafka>=2.6.0",
+    "pymongo>=4.10.0",
     "pydantic>=2.10.0",
     "pydantic-settings>=2.7.0",
 ]
 
 [project.scripts]
 price-ingestor = "price_ingestor.main:main"
+backfill-history = "price_ingestor.backfill:main"
 
 [dependency-groups]
 dev = [

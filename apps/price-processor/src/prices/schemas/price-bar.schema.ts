@@ -25,7 +25,11 @@ export class PriceBar {
 
   @Prop({ required: true })
   volume!: number;
+
+  @Prop({ default: '1m' })
+  interval!: string;
 }
 
 export const PriceBarSchema = SchemaFactory.createForClass(PriceBar);
 PriceBarSchema.index({ symbol: 1, timestamp: 1 }, { unique: true });
+PriceBarSchema.index({ symbol: 1, interval: 1, timestamp: -1 });
