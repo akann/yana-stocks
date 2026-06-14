@@ -17,9 +17,18 @@ export class KafkaProducerService implements OnModuleInit, OnModuleDestroy {
     this.producer = kafka.producer();
   }
 
-  async onModuleInit(): Promise<void> {
-    await this.producer.connect();
-    this.logger.log('Kafka producer connected');
+  onModuleInit(): void {
+    void this.connect();
+  }
+
+  private async connect(): Promise<void> {
+    try {
+      await this.producer.connect();
+      this.logger.log('Kafka producer connected');
+    } catch (err) {
+      this.logger.error('Kafka producer connect failed: %s — retrying in 30s', String(err));
+      setTimeout(() => void this.connect(), 30_000);
+    }
   }
 
   async emitPortfolioEvent(event: PortfolioEventMessage): Promise<void> {
