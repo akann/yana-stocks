@@ -44,7 +44,9 @@ export class StocksController {
   }
 
   @Get('market/assets')
-  @ApiOperation({ summary: 'Browse all tradable US equity assets from Alpaca with search and pagination' })
+  @ApiOperation({
+    summary: 'Browse all tradable US equity assets from Alpaca with search and pagination',
+  })
   getAssets(
     @Query('search') search = '',
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,

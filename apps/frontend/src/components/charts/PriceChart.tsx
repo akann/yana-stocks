@@ -66,15 +66,14 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
   const { data, isLoading } = useQuery<OHLCVBar[]>({
     queryKey: ['history', symbol, activeLimit],
     queryFn: () =>
-      api
-        .get<OHLCVBar[]>(`/stocks/${symbol}/history?limit=${activeLimit}`)
-        .then((r) => r.data),
+      api.get<OHLCVBar[]>(`/stocks/${symbol}/history?limit=${activeLimit}`).then((r) => r.data),
     refetchInterval: 30_000,
     staleTime: 10_000,
   });
 
   const { points, domain, isUp } = useMemo(() => {
-    if (!data?.length) return { points: [], domain: ['auto', 'auto'] as ['auto', 'auto'], isUp: true };
+    if (!data?.length)
+      return { points: [], domain: ['auto', 'auto'] as ['auto', 'auto'], isUp: true };
 
     const sorted = [...data].sort(
       (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
@@ -102,10 +101,10 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
 
     return {
       points: pts,
-      domain: [
-        parseFloat((minLow - pad).toFixed(2)),
-        parseFloat((maxHigh + pad).toFixed(2)),
-      ] as [number, number],
+      domain: [parseFloat((minLow - pad).toFixed(2)), parseFloat((maxHigh + pad).toFixed(2))] as [
+        number,
+        number,
+      ],
       isUp: (closes[closes.length - 1] ?? 0) >= (closes[0] ?? 0),
     };
   }, [data]);

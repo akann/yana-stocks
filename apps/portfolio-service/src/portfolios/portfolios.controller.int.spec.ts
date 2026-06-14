@@ -29,7 +29,9 @@ interface PortfolioResponse {
 
 function makeTestJwt(sub: string, email: string): string {
   const header = Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url');
-  const payload = Buffer.from(JSON.stringify({ sub, email, iat: Date.now() })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({ sub, email, iat: Date.now() })).toString(
+    'base64url',
+  );
   return `${header}.${payload}.test-signature`;
 }
 
@@ -162,7 +164,11 @@ describe('PortfoliosController (integration)', () => {
     });
 
     it('returns 403 when the portfolio belongs to another user', async () => {
-      const doc = await portfolioModel.create({ userId: OTHER_USER_ID, name: 'Not Mine', stocks: [] });
+      const doc = await portfolioModel.create({
+        userId: OTHER_USER_ID,
+        name: 'Not Mine',
+        stocks: [],
+      });
       await request(server)
         .get(`/portfolios/${doc._id.toString()}`)
         .set('Authorization', AUTH)
@@ -170,13 +176,20 @@ describe('PortfoliosController (integration)', () => {
     });
 
     it('returns 404 for a non-existent portfolio', async () => {
-      await request(server).get('/portfolios/000000000000000000000001').set('Authorization', AUTH).expect(404);
+      await request(server)
+        .get('/portfolios/000000000000000000000001')
+        .set('Authorization', AUTH)
+        .expect(404);
     });
   });
 
   describe('POST /portfolios/:id/stocks', () => {
     it('adds a stock holding, records a trade, and emits stock_added', async () => {
-      const doc = await portfolioModel.create({ userId: USER_ID, name: 'Trading Portfolio', stocks: [] });
+      const doc = await portfolioModel.create({
+        userId: USER_ID,
+        name: 'Trading Portfolio',
+        stocks: [],
+      });
       const portfolioId = doc._id.toString();
 
       const body = (
@@ -203,7 +216,11 @@ describe('PortfoliosController (integration)', () => {
     });
 
     it('averages cost basis when the same symbol is added again', async () => {
-      const doc = await portfolioModel.create({ userId: USER_ID, name: 'Avg Cost Portfolio', stocks: [] });
+      const doc = await portfolioModel.create({
+        userId: USER_ID,
+        name: 'Avg Cost Portfolio',
+        stocks: [],
+      });
       const id = doc._id.toString();
 
       await request(server)
@@ -225,7 +242,11 @@ describe('PortfoliosController (integration)', () => {
     });
 
     it('returns 403 when the portfolio belongs to another user', async () => {
-      const doc = await portfolioModel.create({ userId: OTHER_USER_ID, name: 'Not Mine', stocks: [] });
+      const doc = await portfolioModel.create({
+        userId: OTHER_USER_ID,
+        name: 'Not Mine',
+        stocks: [],
+      });
       await request(server)
         .post(`/portfolios/${doc._id.toString()}/stocks`)
         .set('Authorization', AUTH)

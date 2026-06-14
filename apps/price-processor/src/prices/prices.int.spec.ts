@@ -156,9 +156,8 @@ describe('PricesService / PricesController (integration)', () => {
         volume: 3000,
       });
 
-      const bars = (
-        await request(server).get(`/prices/${SYM}/history`).expect(200)
-      ).body as OHLCVBar[];
+      const bars = (await request(server).get(`/prices/${SYM}/history`).expect(200))
+        .body as OHLCVBar[];
 
       expect(bars).toHaveLength(1);
       expect(bars[0]!.symbol).toBe(SYM);
@@ -171,22 +170,44 @@ describe('PricesService / PricesController (integration)', () => {
 
     it('returns bars sorted by timestamp descending', async () => {
       await priceBarModel.insertMany([
-        { symbol: SYM, timestamp: new Date('2025-01-01T10:00:00Z'), open: 100, high: 100, low: 100, close: 100, volume: 1 },
-        { symbol: SYM, timestamp: new Date('2025-01-01T10:01:00Z'), open: 102, high: 102, low: 102, close: 102, volume: 1 },
-        { symbol: SYM, timestamp: new Date('2025-01-01T10:02:00Z'), open: 104, high: 104, low: 104, close: 104, volume: 1 },
+        {
+          symbol: SYM,
+          timestamp: new Date('2025-01-01T10:00:00Z'),
+          open: 100,
+          high: 100,
+          low: 100,
+          close: 100,
+          volume: 1,
+        },
+        {
+          symbol: SYM,
+          timestamp: new Date('2025-01-01T10:01:00Z'),
+          open: 102,
+          high: 102,
+          low: 102,
+          close: 102,
+          volume: 1,
+        },
+        {
+          symbol: SYM,
+          timestamp: new Date('2025-01-01T10:02:00Z'),
+          open: 104,
+          high: 104,
+          low: 104,
+          close: 104,
+          volume: 1,
+        },
       ]);
 
-      const bars = (
-        await request(server).get(`/prices/${SYM}/history?limit=3`).expect(200)
-      ).body as OHLCVBar[];
+      const bars = (await request(server).get(`/prices/${SYM}/history?limit=3`).expect(200))
+        .body as OHLCVBar[];
 
       expect(bars.map((b) => b.close)).toEqual([104, 102, 100]); // newest first
     });
 
     it('returns an empty array when no bars exist', async () => {
-      const bars = (
-        await request(server).get('/prices/DOESNOTEXIST_XYZ/history').expect(200)
-      ).body as OHLCVBar[];
+      const bars = (await request(server).get('/prices/DOESNOTEXIST_XYZ/history').expect(200))
+        .body as OHLCVBar[];
 
       expect(bars).toEqual([]);
     });
@@ -204,9 +225,8 @@ describe('PricesService / PricesController (integration)', () => {
         })),
       );
 
-      const bars = (
-        await request(server).get(`/prices/${SYM}/history?limit=2`).expect(200)
-      ).body as OHLCVBar[];
+      const bars = (await request(server).get(`/prices/${SYM}/history?limit=2`).expect(200))
+        .body as OHLCVBar[];
 
       expect(bars).toHaveLength(2);
     });

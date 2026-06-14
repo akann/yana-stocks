@@ -41,7 +41,20 @@ export class NewsService implements OnModuleInit, OnModuleDestroy {
     const db = this.client.db(this.dbName);
     const docs = await db
       .collection('articles')
-      .find({ symbol }, { projection: { _id: 0, headline: 1, source: 1, url: 1, published_at: 1, sentiment_label: 1, sentiment_score: 1 } })
+      .find(
+        { symbol },
+        {
+          projection: {
+            _id: 0,
+            headline: 1,
+            source: 1,
+            url: 1,
+            published_at: 1,
+            sentiment_label: 1,
+            sentiment_score: 1,
+          },
+        },
+      )
       .sort({ analyzed_at: -1 })
       .limit(limit)
       .toArray();

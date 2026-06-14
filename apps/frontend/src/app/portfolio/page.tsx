@@ -10,7 +10,10 @@ import { AddStockModal } from '@/components/portfolio/AddStockModal';
 import type { Portfolio, StockAggregate } from '@/types';
 
 function fmt(n: number, digits = 2): string {
-  return n.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  return n.toLocaleString('en-US', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
 }
 
 export default function PortfolioPage(): React.JSX.Element {
@@ -26,7 +29,11 @@ export default function PortfolioPage(): React.JSX.Element {
   }, [isAuthenticated, isLoading, router]);
 
   // ── Portfolios ──────────────────────────────────────────────
-  const { data: portfolios, isLoading: portfoliosLoading, isError } = useQuery<Portfolio[]>({
+  const {
+    data: portfolios,
+    isLoading: portfoliosLoading,
+    isError,
+  } = useQuery<Portfolio[]>({
     queryKey: ['portfolios'],
     queryFn: () => api.get<Portfolio[]>('/portfolio/portfolios').then((r) => r.data),
     enabled: isAuthenticated,
@@ -91,8 +98,7 @@ export default function PortfolioPage(): React.JSX.Element {
     return <div className="animate-pulse bg-gray-800 rounded-xl h-32" />;
   }
 
-  const pnlColor =
-    (summary?.pnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400';
+  const pnlColor = (summary?.pnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400';
 
   return (
     <div className="space-y-6">
@@ -156,7 +162,9 @@ export default function PortfolioPage(): React.JSX.Element {
           </h2>
           <div className="grid grid-cols-3 gap-6">
             <div>
-              <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Market Value</div>
+              <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                Market Value
+              </div>
               <div className="text-xl font-bold text-white">${fmt(summary.totalValue)}</div>
             </div>
             <div>
@@ -171,9 +179,7 @@ export default function PortfolioPage(): React.JSX.Element {
                 {summary.pnl >= 0 ? '+' : ''}${fmt(Math.abs(summary.pnl))}
                 <span className="text-sm font-medium ml-2">
                   ({summary.pnl >= 0 ? '+' : ''}
-                  {summary.totalCost > 0
-                    ? fmt((summary.pnl / summary.totalCost) * 100)
-                    : '0.00'}
+                  {summary.totalCost > 0 ? fmt((summary.pnl / summary.totalCost) * 100) : '0.00'}
                   %)
                 </span>
               </div>
@@ -209,7 +215,9 @@ export default function PortfolioPage(): React.JSX.Element {
       ) : (
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center space-y-3">
           <p className="text-gray-400 text-base font-medium">No portfolios yet</p>
-          <p className="text-gray-600 text-sm">Create your first portfolio to track your holdings.</p>
+          <p className="text-gray-600 text-sm">
+            Create your first portfolio to track your holdings.
+          </p>
           <button
             onClick={() => setShowCreate(true)}
             className="mt-2 inline-block bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"

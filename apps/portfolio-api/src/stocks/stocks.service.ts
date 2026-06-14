@@ -117,8 +117,7 @@ export class StocksService {
     const filtered = q
       ? all.filter(
           (a) =>
-            a.symbol.includes(q.toUpperCase()) ||
-            a.name.toLowerCase().includes(q.toLowerCase()),
+            a.symbol.includes(q.toUpperCase()) || a.name.toLowerCase().includes(q.toLowerCase()),
         )
       : all;
 
@@ -136,28 +135,28 @@ export class StocksService {
     const apiSecret = this.config.get<string>('alpaca.apiSecret') ?? '';
 
     if (!apiKey || !apiSecret) {
-      this.logger.warn(
-        'ALPACA_API_KEY / ALPACA_API_SECRET not set — using curated dev asset list',
-      );
+      this.logger.warn('ALPACA_API_KEY / ALPACA_API_SECRET not set — using curated dev asset list');
       return MOCK_ASSETS;
     }
 
     try {
       const response = await firstValueFrom(
-        this.httpService.get<AlpacaAsset[]>(
-          'https://paper-api.alpaca.markets/v2/assets',
-          {
-            params: { status: 'active', asset_class: 'us_equity' },
-            headers: {
-              'APCA-API-KEY-ID': apiKey,
-              'APCA-API-SECRET-KEY': apiSecret,
-            },
+        this.httpService.get<AlpacaAsset[]>('https://paper-api.alpaca.markets/v2/assets', {
+          params: { status: 'active', asset_class: 'us_equity' },
+          headers: {
+            'APCA-API-KEY-ID': apiKey,
+            'APCA-API-SECRET-KEY': apiSecret,
           },
-        ),
+        }),
       );
       return response.data
         .filter((a) => a.tradable && a.symbol && a.name)
-        .map((a) => ({ symbol: a.symbol, name: a.name, exchange: a.exchange, tradable: a.tradable }));
+        .map((a) => ({
+          symbol: a.symbol,
+          name: a.name,
+          exchange: a.exchange,
+          tradable: a.tradable,
+        }));
     } catch (err) {
       this.logger.error(`Alpaca assets fetch failed, falling back to dev list: ${String(err)}`);
       return MOCK_ASSETS;

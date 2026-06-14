@@ -29,7 +29,8 @@ function PnlCell({ pnl, pnlPct }: { pnl: number; pnlPct: number }) {
         {pos ? '+' : '−'}${fmtUsd(Math.abs(pnl))}
       </span>
       <span className="block text-xs opacity-75">
-        {pos ? '+' : '−'}{Math.abs(pnlPct).toFixed(2)}%
+        {pos ? '+' : '−'}
+        {Math.abs(pnlPct).toFixed(2)}%
       </span>
     </div>
   );
@@ -71,7 +72,10 @@ export function PortfolioTable({
             <span className="text-sm text-gray-400 shrink-0">
               ${fmtUsd(totalMktValue)}
               <span
-                className={clsx('ml-2 text-xs font-medium', totalPnl >= 0 ? 'text-green-400' : 'text-red-400')}
+                className={clsx(
+                  'ml-2 text-xs font-medium',
+                  totalPnl >= 0 ? 'text-green-400' : 'text-red-400',
+                )}
               >
                 {totalPnl >= 0 ? '+' : '−'}${fmtUsd(Math.abs(totalPnl))} (
                 {totalPnl >= 0 ? '+' : '−'}
@@ -86,7 +90,10 @@ export function PortfolioTable({
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-xs text-gray-400">Delete portfolio?</span>
             <button
-              onClick={() => { onDelete(); setConfirmDelete(false); }}
+              onClick={() => {
+                onDelete();
+                setConfirmDelete(false);
+              }}
               disabled={isDeleting}
               className="text-xs text-red-400 hover:text-red-300 font-medium disabled:opacity-50"
             >
@@ -106,8 +113,12 @@ export function PortfolioTable({
             title="Delete portfolio"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
             </svg>
           </button>
         )}
@@ -122,10 +133,14 @@ export function PortfolioTable({
                 <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-gray-800">
                   <th className="text-left px-5 py-2.5 font-medium">Symbol</th>
                   <th className="text-right px-4 py-2.5 font-medium">Shares</th>
-                  <th className="text-right px-4 py-2.5 font-medium hidden sm:table-cell">Avg Cost</th>
+                  <th className="text-right px-4 py-2.5 font-medium hidden sm:table-cell">
+                    Avg Cost
+                  </th>
                   <th className="text-right px-4 py-2.5 font-medium">Live Price</th>
                   <th className="text-right px-4 py-2.5 font-medium hidden md:table-cell">Day %</th>
-                  <th className="text-right px-4 py-2.5 font-medium hidden lg:table-cell">Mkt Value</th>
+                  <th className="text-right px-4 py-2.5 font-medium hidden lg:table-cell">
+                    Mkt Value
+                  </th>
                   <th className="text-right px-5 py-2.5 font-medium">P&amp;L</th>
                 </tr>
               </thead>
@@ -197,15 +212,16 @@ export function PortfolioTable({
           </div>
         </>
       ) : (
-        <div className="px-5 py-10 text-center text-gray-500 text-sm">
-          No holdings yet.
-        </div>
+        <div className="px-5 py-10 text-center text-gray-500 text-sm">No holdings yet.</div>
       )}
 
       {/* ── Add Stock footer ── */}
       <div className="px-5 py-3 border-t border-gray-800 flex justify-end">
         <button
-          onClick={(e) => { e.stopPropagation(); onAddStock(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddStock();
+          }}
           className="text-sm text-blue-400 hover:text-blue-300 font-medium transition-colors"
         >
           + Add Stock

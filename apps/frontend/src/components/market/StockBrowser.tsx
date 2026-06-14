@@ -73,9 +73,15 @@ export function StockBrowser(): React.JSX.Element {
             {isLoading ? (
               Array.from({ length: LIMIT }).map((_, i) => (
                 <tr key={i} className="border-b border-gray-800/50">
-                  <td className="py-2 pr-4"><div className="h-4 bg-gray-800 rounded w-16 animate-pulse" /></td>
-                  <td className="py-2 pr-4"><div className="h-4 bg-gray-800 rounded w-48 animate-pulse" /></td>
-                  <td className="py-2"><div className="h-4 bg-gray-800 rounded w-12 animate-pulse" /></td>
+                  <td className="py-2 pr-4">
+                    <div className="h-4 bg-gray-800 rounded w-16 animate-pulse" />
+                  </td>
+                  <td className="py-2 pr-4">
+                    <div className="h-4 bg-gray-800 rounded w-48 animate-pulse" />
+                  </td>
+                  <td className="py-2">
+                    <div className="h-4 bg-gray-800 rounded w-12 animate-pulse" />
+                  </td>
                 </tr>
               ))
             ) : isError ? (
@@ -91,14 +97,18 @@ export function StockBrowser(): React.JSX.Element {
                   onClick={() => router.push(`/stocks/${asset.symbol}`)}
                   className="border-b border-gray-800/50 hover:bg-gray-800/50 cursor-pointer transition-colors"
                 >
-                  <td className="py-2 pr-4 font-mono font-semibold text-blue-400">{asset.symbol}</td>
+                  <td className="py-2 pr-4 font-mono font-semibold text-blue-400">
+                    {asset.symbol}
+                  </td>
                   <td className="py-2 pr-4 text-gray-300 truncate max-w-xs">{asset.name}</td>
                   <td className="py-2 text-gray-500 text-xs">{asset.exchange}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={3} className="py-8 text-center text-gray-500">No stocks found</td>
+                <td colSpan={3} className="py-8 text-center text-gray-500">
+                  No stocks found
+                </td>
               </tr>
             )}
           </tbody>
@@ -118,7 +128,9 @@ export function StockBrowser(): React.JSX.Element {
             >
               Prev
             </button>
-            <span className="text-gray-400">{page} / {totalPages}</span>
+            <span className="text-gray-400">
+              {page} / {totalPages}
+            </span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}

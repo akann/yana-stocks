@@ -21,7 +21,11 @@ export default function WatchlistPage(): React.JSX.Element {
   }, [isAuthenticated, isLoading, router]);
 
   // ── Watchlists ───────────────────────────────────────────────
-  const { data: watchlists, isLoading: listsLoading, isError } = useQuery<Watchlist[]>({
+  const {
+    data: watchlists,
+    isLoading: listsLoading,
+    isError,
+  } = useQuery<Watchlist[]>({
     queryKey: ['watchlists'],
     queryFn: () => api.get<Watchlist[]>('/portfolio/watchlists').then((r) => r.data),
     enabled: isAuthenticated,

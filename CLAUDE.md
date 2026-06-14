@@ -216,7 +216,15 @@ Kong JWT plugin validates accessToken on all /api/* except /auth/*
 TypeScript interfaces used across all services and frontend:
 
 ```typescript
-(Stock, OHLCV, Portfolio, Trade, Watchlist, User, SentimentSignal, PredictionSignal, KafkaMessage);
+(Stock,
+  OHLCV,
+  Portfolio,
+  Trade,
+  Watchlist,
+  User,
+  SentimentSignal,
+  PredictionSignal,
+  KafkaMessage);
 ```
 
 ### packages/shared-dto

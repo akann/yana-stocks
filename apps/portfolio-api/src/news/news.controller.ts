@@ -12,10 +12,7 @@ export class NewsController {
 
   @Get(':symbol')
   @ApiOperation({ summary: 'Get recent news articles with sentiment for a symbol' })
-  getNews(
-    @Param('symbol') symbol: string,
-    @Query('limit') limit?: string,
-  ): Promise<NewsArticle[]> {
+  getNews(@Param('symbol') symbol: string, @Query('limit') limit?: string): Promise<NewsArticle[]> {
     const parsedLimit = limit ? Math.min(parseInt(limit, 10), 50) : 10;
     return this.newsService.getNews(symbol.toUpperCase(), parsedLimit);
   }

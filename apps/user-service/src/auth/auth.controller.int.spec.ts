@@ -39,8 +39,7 @@ describe('AuthController (integration)', () => {
     await app.close();
   });
 
-  const uid = () =>
-    `int+${Date.now()}+${Math.random().toString(36).slice(2, 7)}@example.com`;
+  const uid = () => `int+${Date.now()}+${Math.random().toString(36).slice(2, 7)}@example.com`;
   const PASSWORD = 'TestPass1!';
 
   describe('POST /auth/register', () => {
@@ -59,7 +58,9 @@ describe('AuthController (integration)', () => {
 
     it('returns 409 when email is already registered', async () => {
       const email = uid();
-      await request(server).post('/auth/register').send({ email, name: 'First', password: PASSWORD });
+      await request(server)
+        .post('/auth/register')
+        .send({ email, name: 'First', password: PASSWORD });
       await request(server)
         .post('/auth/register')
         .send({ email, name: 'Dupe', password: PASSWORD })
@@ -90,7 +91,9 @@ describe('AuthController (integration)', () => {
   describe('POST /auth/login', () => {
     it('returns tokens for valid credentials', async () => {
       const email = uid();
-      await request(server).post('/auth/register').send({ email, name: 'Login User', password: PASSWORD });
+      await request(server)
+        .post('/auth/register')
+        .send({ email, name: 'Login User', password: PASSWORD });
 
       const body = (
         await request(server).post('/auth/login').send({ email, password: PASSWORD }).expect(200)
@@ -102,8 +105,13 @@ describe('AuthController (integration)', () => {
 
     it('returns 401 for a wrong password', async () => {
       const email = uid();
-      await request(server).post('/auth/register').send({ email, name: 'User', password: PASSWORD });
-      await request(server).post('/auth/login').send({ email, password: 'wrong-password' }).expect(401);
+      await request(server)
+        .post('/auth/register')
+        .send({ email, name: 'User', password: PASSWORD });
+      await request(server)
+        .post('/auth/login')
+        .send({ email, password: 'wrong-password' })
+        .expect(401);
     });
 
     it('returns 401 for an unknown email', async () => {
@@ -118,7 +126,9 @@ describe('AuthController (integration)', () => {
     it('returns the user profile for a valid access token', async () => {
       const email = uid();
       const tokens = (
-        await request(server).post('/auth/register').send({ email, name: 'Me User', password: PASSWORD })
+        await request(server)
+          .post('/auth/register')
+          .send({ email, name: 'Me User', password: PASSWORD })
       ).body as AuthTokens;
 
       const profile = (
@@ -148,21 +158,32 @@ describe('AuthController (integration)', () => {
     it('issues new tokens and rejects the consumed refresh token', async () => {
       const email = uid();
       const initial = (
-        await request(server).post('/auth/register').send({ email, name: 'Refresh User', password: PASSWORD })
+        await request(server)
+          .post('/auth/register')
+          .send({ email, name: 'Refresh User', password: PASSWORD })
       ).body as AuthTokens;
 
       const rotated = (
-        await request(server).post('/auth/refresh').send({ refreshToken: initial.refreshToken }).expect(200)
+        await request(server)
+          .post('/auth/refresh')
+          .send({ refreshToken: initial.refreshToken })
+          .expect(200)
       ).body as AuthTokens;
 
       expect(rotated.accessToken).toBeTruthy();
       expect(rotated.refreshToken).not.toBe(initial.refreshToken);
 
-      await request(server).post('/auth/refresh').send({ refreshToken: initial.refreshToken }).expect(401);
+      await request(server)
+        .post('/auth/refresh')
+        .send({ refreshToken: initial.refreshToken })
+        .expect(401);
     });
 
     it('returns 401 for a made-up refresh token', async () => {
-      await request(server).post('/auth/refresh').send({ refreshToken: 'totally-fake-token' }).expect(401);
+      await request(server)
+        .post('/auth/refresh')
+        .send({ refreshToken: 'totally-fake-token' })
+        .expect(401);
     });
   });
 
@@ -170,7 +191,9 @@ describe('AuthController (integration)', () => {
     it('invalidates the refresh token so it cannot be reused', async () => {
       const email = uid();
       const tokens = (
-        await request(server).post('/auth/register').send({ email, name: 'Logout User', password: PASSWORD })
+        await request(server)
+          .post('/auth/register')
+          .send({ email, name: 'Logout User', password: PASSWORD })
       ).body as AuthTokens;
 
       await request(server)
@@ -179,7 +202,10 @@ describe('AuthController (integration)', () => {
         .send({ refreshToken: tokens.refreshToken })
         .expect(204);
 
-      await request(server).post('/auth/refresh').send({ refreshToken: tokens.refreshToken }).expect(401);
+      await request(server)
+        .post('/auth/refresh')
+        .send({ refreshToken: tokens.refreshToken })
+        .expect(401);
     });
 
     it('returns 401 without an Authorization header', async () => {

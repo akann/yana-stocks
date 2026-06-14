@@ -115,7 +115,9 @@ test.describe('Watchlist management', () => {
     for (const symbol of ['MSFT', 'TSLA']) {
       await watchlistPage.openAddSymbol(name);
       await watchlistPage.addSymbol(symbol);
-      await expect(page.locator('td.font-mono', { hasText: symbol })).toBeVisible({ timeout: 5_000 });
+      await expect(page.locator('td.font-mono', { hasText: symbol })).toBeVisible({
+        timeout: 5_000,
+      });
     }
   });
 });

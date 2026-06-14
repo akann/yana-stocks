@@ -67,7 +67,10 @@ export function WatchlistCard({
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-xs text-gray-400">Delete?</span>
             <button
-              onClick={() => { onDelete(); setConfirmDelete(false); }}
+              onClick={() => {
+                onDelete();
+                setConfirmDelete(false);
+              }}
               disabled={isDeleting}
               className="text-xs text-red-400 hover:text-red-300 font-medium disabled:opacity-50"
             >
@@ -87,8 +90,12 @@ export function WatchlistCard({
             title="Delete watchlist"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
             </svg>
           </button>
         )}
@@ -104,7 +111,9 @@ export function WatchlistCard({
                 <th className="text-right px-4 py-2.5 font-medium">Price</th>
                 <th className="text-right px-4 py-2.5 font-medium">Change</th>
                 <th className="text-right px-4 py-2.5 font-medium hidden sm:table-cell">Day %</th>
-                <th className="text-left px-4 py-2.5 font-medium hidden md:table-cell">Sentiment</th>
+                <th className="text-left px-4 py-2.5 font-medium hidden md:table-cell">
+                  Sentiment
+                </th>
                 <th className="px-5 py-2.5" />
               </tr>
             </thead>
@@ -128,9 +137,7 @@ export function WatchlistCard({
 
                     <td className="px-4 py-3.5 text-right tabular-nums">
                       {agg?.price != null ? (
-                        <span className="text-white font-medium">
-                          ${agg.price.toFixed(2)}
-                        </span>
+                        <span className="text-white font-medium">${agg.price.toFixed(2)}</span>
                       ) : (
                         <span className="text-gray-600">—</span>
                       )}
@@ -154,7 +161,8 @@ export function WatchlistCard({
                             dayPos ? 'text-green-400' : 'text-red-400',
                           )}
                         >
-                          {dayPos ? '+' : ''}{agg.changePercent.toFixed(2)}%
+                          {dayPos ? '+' : ''}
+                          {agg.changePercent.toFixed(2)}%
                         </span>
                       ) : (
                         <span className="text-gray-600 text-xs">—</span>
@@ -179,8 +187,18 @@ export function WatchlistCard({
                         {isRemoving ? (
                           <span className="text-xs">…</span>
                         ) : (
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          <svg
+                            className="w-3.5 h-3.5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
                           </svg>
                         )}
                       </button>
@@ -212,7 +230,10 @@ export function WatchlistCard({
             />
             <button
               type="button"
-              onClick={() => { setShowAdd(false); setAddInput(''); }}
+              onClick={() => {
+                setShowAdd(false);
+                setAddInput('');
+              }}
               className="text-gray-400 hover:text-gray-300 text-sm px-2"
             >
               Cancel

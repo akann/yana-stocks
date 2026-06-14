@@ -22,6 +22,11 @@ import { StocksModule } from './stocks/stocks.module';
     SignalsModule,
     NewsModule,
   ],
-  controllers: [AuthProxyController, HealthController, PortfolioProxyController, PredictProxyController],
+  controllers: [
+    AuthProxyController,
+    HealthController,
+    PortfolioProxyController,
+    PredictProxyController,
+  ],
 })
 export class AppModule {}
