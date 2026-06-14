@@ -7,16 +7,16 @@ Run with:
 
 import logging
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from alpaca.data import StockHistoricalDataClient
 from alpaca.data.enums import DataFeed
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
-from pymongo import MongoClient, UpdateOne
-from pymongo.errors import BulkWriteError
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pymongo import MongoClient, UpdateOne
+from pymongo.errors import BulkWriteError
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -68,7 +68,7 @@ def main() -> None:
     mongo = MongoClient(settings.mongodb_uri)
     collection = mongo[db_name]["price_bars"]
 
-    end = datetime.now(tz=timezone.utc)
+    end = datetime.now(tz=UTC)
     start = end - timedelta(days=365)
 
     logger.info(
@@ -92,7 +92,7 @@ def main() -> None:
                 feed=settings.alpaca_feed,
             )
             bars_response = alpaca.get_stock_bars(request)
-            bars = bars_response[symbol] if symbol in bars_response else []
+            bars = bars_response.get(symbol, [])
 
             if not bars:
                 logger.warning("No bars returned for %s", symbol)
