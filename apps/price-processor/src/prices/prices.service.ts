@@ -37,6 +37,14 @@ interface AlpacaBar {
   v: number;
 }
 
+interface YFQuoteFields {
+  regularMarketPrice?: number | null;
+  regularMarketChange?: number | null;
+  regularMarketChangePercent?: number | null;
+  regularMarketVolume?: number | null;
+  regularMarketTime?: Date | number | null;
+}
+
 @Injectable()
 export class PricesService {
   private readonly logger = new Logger(PricesService.name);
@@ -150,13 +158,14 @@ export class PricesService {
     if (cached) return JSON.parse(cached) as QuoteEntry;
 
     try {
-      const q = await yf.quote(symbol);
+      // Cast through unknown — yf.quote() loses its generic type at runtime
+      const q = (await yf.quote(symbol)) as unknown as YFQuoteFields;
       if (!q.regularMarketPrice) return null;
 
-      const price = q.regularMarketPrice;
-      const change = q.regularMarketChange ?? 0;
-      const changePercent = q.regularMarketChangePercent ?? 0;
-      const volume = q.regularMarketVolume ?? 0;
+      const price: number = q.regularMarketPrice;
+      const change: number = q.regularMarketChange ?? 0;
+      const changePercent: number = q.regularMarketChangePercent ?? 0;
+      const volume: number = q.regularMarketVolume ?? 0;
       const marketTime = q.regularMarketTime;
       const timestamp =
         marketTime instanceof Date
