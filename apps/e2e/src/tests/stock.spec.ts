@@ -62,7 +62,8 @@ test.describe('Stock data content', () => {
   test.beforeAll(async ({ request }) => {
     testEmail = `e2e+stock+${Date.now()}@example.com`;
     // Register via API — avoids mobile-safari WebKit email-input flakiness in beforeAll
-    const res = await request.post('http://localhost:3004/api/auth/register', {
+    const apiBase = process.env['API_URL'] ?? 'http://localhost:3004/api';
+    const res = await request.post(`${apiBase}/auth/register`, {
       data: { email: testEmail, name: 'E2E Stock User', password: PASSWORD },
     });
     const { accessToken, refreshToken } = (await res.json()) as {

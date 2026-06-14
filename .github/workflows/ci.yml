@@ -258,7 +258,152 @@ jobs:
         run: pnpm turbo run test:int --concurrency=3
 
   # ─────────────────────────────────────────────────────────────────
-  # 4. Python quality (ruff + mypy — no pytest to avoid model downloads)
+  # 4. E2E tests — full local stack (Postgres + MongoDB + Redis + all services)
+  # ─────────────────────────────────────────────────────────────────
+  e2e:
+    runs-on: runners-yana-stocks
+    needs: [changes, ts-quality, integration-test]
+    if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: yana_stocks
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      mongodb:
+        image: mongo:8
+        env:
+          MONGO_INITDB_ROOT_USERNAME: admin
+          MONGO_INITDB_ROOT_PASSWORD: password
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand({ping:1})' --quiet"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        run: echo "dir=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.dir }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile || (pnpm approve-builds --all && pnpm install --frozen-lockfile)
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('apps/e2e/package.json') }}
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @yana-stocks/e2e exec playwright install --with-deps chromium webkit
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+
+      - name: Install Playwright OS dependencies
+        run: pnpm --filter @yana-stocks/e2e exec playwright install-deps chromium webkit
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+
+      - name: Generate Prisma client
+        run: pnpm --filter @yana-stocks/user-service db:generate
+
+      - name: Build all apps
+        run: pnpm turbo run build
+
+      - name: Migrate database
+        run: pnpm --filter @yana-stocks/user-service db:migrate:deploy
+        env:
+          DATABASE_URL: postgresql://postgres:password@localhost:5432/yana_stocks
+
+      - name: Start backend services
+        run: |
+          mkdir -p logs
+          pnpm --filter @yana-stocks/user-service      start > logs/user-service.log      2>&1 &
+          pnpm --filter @yana-stocks/portfolio-service start > logs/portfolio-service.log 2>&1 &
+          pnpm --filter @yana-stocks/portfolio-api     start > logs/portfolio-api.log     2>&1 &
+          pnpm --filter @yana-stocks/frontend          start > logs/frontend.log          2>&1 &
+
+      - name: Wait for all services to be ready
+        run: |
+          wait_for() {
+            local url=$1 name=$2
+            echo "Waiting for $name at $url..."
+            for i in $(seq 1 30); do
+              if curl -sf "$url" >/dev/null 2>&1; then
+                echo "  $name ready (attempt $i)"
+                return 0
+              fi
+              sleep 2
+            done
+            echo "ERROR: $name not ready after 60s" >&2
+            cat logs/${name}.log 2>/dev/null || true
+            return 1
+          }
+          wait_for http://localhost:3001/health user-service
+          wait_for http://localhost:3003/health portfolio-service
+          wait_for http://localhost:3004/health portfolio-api
+          wait_for http://localhost:3000     frontend
+
+      - name: Seed test data
+        run: pnpm seed
+
+      - name: Run e2e tests
+        run: pnpm test:e2e
+        env:
+          BASE_URL: http://localhost:3000
+          API_URL: http://localhost:3004/api
+          CI: 'true'
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: apps/e2e/playwright-report/
+          retention-days: 7
+
+      - name: Upload service logs
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-service-logs
+          path: logs/
+          retention-days: 3
+
+  # ─────────────────────────────────────────────────────────────────
+  # 5. Python quality (ruff + mypy — no pytest to avoid model downloads)
   #    Runs in parallel with integration-test (independent of TS services)
   # ─────────────────────────────────────────────────────────────────
   python-quality:
@@ -294,17 +439,18 @@ jobs:
         run: uv run mypy src/
 
   # ─────────────────────────────────────────────────────────────────
-  # 5. Build and push Docker images  (main branch only)
+  # 6. Build and push Docker images  (main branch only)
   # ─────────────────────────────────────────────────────────────────
   docker:
     runs-on: runners-yana-stocks
-    needs: [changes, ts-quality, integration-test, python-quality]
+    needs: [changes, ts-quality, integration-test, e2e, python-quality]
     if: |
       always() &&
       github.ref == 'refs/heads/main' &&
       needs.changes.outputs.has_changes == 'true' &&
       (needs.ts-quality.result        == 'success' || needs.ts-quality.result        == 'skipped') &&
       (needs.integration-test.result  == 'success' || needs.integration-test.result  == 'skipped') &&
+      (needs.e2e.result               == 'success' || needs.e2e.result               == 'skipped') &&
       (needs.python-quality.result    == 'success' || needs.python-quality.result    == 'skipped')
     strategy:
       fail-fast: false
@@ -383,7 +529,7 @@ jobs:
           cache-to: type=gha,scope=${{ matrix.service.name }},mode=max
 
   # ─────────────────────────────────────────────────────────────────
-  # 6. GitOps: update image tags in k8s-apps → ArgoCD auto-syncs
+  # 7. GitOps: update image tags in k8s-apps → ArgoCD auto-syncs
   # ─────────────────────────────────────────────────────────────────
   gitops:
     runs-on: runners-yana-stocks
