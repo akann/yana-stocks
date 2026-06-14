@@ -45,7 +45,7 @@ export class StocksService {
         );
         if (resp.data?.price) {
           price = resp.data;
-          await this.redis.set(`papi:price:${symbol}`, JSON.stringify(price), 3_600);
+          await this.redis.set(`papi:price:${symbol}`, JSON.stringify(price), 900);
         }
       } catch {
         // quote unavailable — price stays null

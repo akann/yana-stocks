@@ -17,7 +17,12 @@ import { KafkaProducerService } from './kafka-producer.service';
 import { PriceBar } from './schemas/price-bar.schema';
 
 const PRICE_CACHE_TTL = 5;
-const QUOTE_CACHE_TTL = 3_600;
+const QUOTE_CACHE_TTL = 900; // 15 minutes — matches ON_DEMAND_FETCH_TTL
+const ON_DEMAND_FETCH_TTL = 900; // 15 minutes
+
+const PREDEFINED_SYMBOLS = new Set([
+  'AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'NVDA', 'META', 'JPM', 'V', 'JNJ',
+]);
 
 export interface QuoteEntry {
   price: number;
@@ -132,12 +137,14 @@ export class PricesService {
       .lean<PriceBar[]>()
       .exec();
 
-    if (bars.length === 0 && interval === '1d') {
-      bars = await this.fetchAndStoreDailyHistory(symbol, opts.limit, filter);
-    }
-
-    if (bars.length === 0 && interval === '1m') {
-      bars = await this.fetchAndStoreMinuteHistory(symbol, opts.limit, filter);
+    if (!PREDEFINED_SYMBOLS.has(symbol)) {
+      const isFresh = !!(await this.redis.get(`hist:fetched:${symbol}`));
+      if (!isFresh && interval === '1d') {
+        bars = await this.fetchAndStoreDailyHistory(symbol, opts.limit, filter);
+      }
+      if (!isFresh && interval === '1m') {
+        bars = await this.fetchAndStoreMinuteHistory(symbol, opts.limit, filter);
+      }
     }
 
     return bars.map((b) => ({
@@ -243,6 +250,7 @@ export class PricesService {
       }
 
       this.logger.log('Fetched %d minute bars from Alpaca for %s', alpacaBars.length, symbol);
+      await this.redis.setex(`hist:fetched:${symbol}`, ON_DEMAND_FETCH_TTL, '1');
 
       const ops = alpacaBars.map((bar) => ({
         updateOne: {
@@ -327,6 +335,7 @@ export class PricesService {
       }
 
       this.logger.log('Fetched %d daily bars from Yahoo Finance for %s', rows.length, symbol);
+      await this.redis.setex(`hist:fetched:${symbol}`, ON_DEMAND_FETCH_TTL, '1');
 
       const ops = rows.map((row) => ({
         updateOne: {
