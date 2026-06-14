@@ -36,7 +36,6 @@ describe('AuthController (integration)', () => {
   });
 
   afterAll(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     await prisma.user.deleteMany({});
     await app.close();
   });
@@ -83,8 +82,9 @@ describe('AuthController (integration)', () => {
         .send({ email, name: 'Persist Check', password: PASSWORD })
         .expect(201);
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-      const user = await (prisma.user.findUnique({ where: { email } }) as unknown as Promise<UserRecord | null>);
+      const user = await (prisma.user.findUnique({
+        where: { email },
+      }) as unknown as Promise<UserRecord | null>);
       expect(user).not.toBeNull();
       expect(user!.name).toBe('Persist Check');
       expect(user!.password).not.toBe(PASSWORD); // stored as bcrypt hash

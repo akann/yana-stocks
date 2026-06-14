@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import type { OHLCV, ProcessedPriceMessage, RawPriceMessage } from '@yana-stocks/shared-types';
+import type {
+  OHLCV,
+  OHLCVInterval,
+  ProcessedPriceMessage,
+  RawPriceMessage,
+} from '@yana-stocks/shared-types';
 import { KAFKA_TOPICS } from '@yana-stocks/kafka-client';
 import { Model } from 'mongoose';
 import { RedisService } from '../redis/redis.service';
@@ -26,7 +31,12 @@ export class PricesService {
       .findOneAndUpdate(
         { symbol: msg.symbol, timestamp: minuteTs },
         {
-          $setOnInsert: { symbol: msg.symbol, timestamp: minuteTs, open: msg.price, interval: '1m' },
+          $setOnInsert: {
+            symbol: msg.symbol,
+            timestamp: minuteTs,
+            open: msg.price,
+            interval: '1m',
+          },
           $max: { high: msg.price },
           $min: { low: msg.price },
           $set: { close: msg.price },
@@ -93,7 +103,7 @@ export class PricesService {
       low: b.low,
       close: b.close,
       volume: b.volume,
-      interval: b.interval ?? '1m',
+      interval: (b.interval ?? '1m') as OHLCVInterval,
     }));
   }
 

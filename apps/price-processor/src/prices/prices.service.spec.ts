@@ -15,6 +15,7 @@ const mockBar: PriceBar = {
   low: 149.5,
   close: 151.0,
   volume: 1500,
+  interval: '1m',
 };
 
 const rawMsg: RawPriceMessage = {

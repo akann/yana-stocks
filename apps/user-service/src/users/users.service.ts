@@ -16,12 +16,10 @@ export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
   findByEmail(email: string): Promise<UserRecord | null> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return this.prisma.user.findUnique({ where: { email } });
   }
 
   findById(id: string): Promise<UserRecord | null> {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return this.prisma.user.findUnique({ where: { id } });
   }
 
@@ -30,7 +28,6 @@ export class UsersService {
     if (existing) throw new ConflictException('Email already registered');
 
     const hashed = await bcrypt.hash(password, 12);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     return this.prisma.user.create({ data: { email, name, password: hashed } });
   }
 

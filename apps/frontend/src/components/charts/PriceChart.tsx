@@ -71,9 +71,9 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
     queryKey: ['history', symbol, activeRange.limit, activeRange.interval],
     queryFn: () =>
       api
-        .get<OHLCVBar[]>(
-          `/stocks/${symbol}/history?limit=${activeRange.limit}&interval=${activeRange.interval}`,
-        )
+        .get<
+          OHLCVBar[]
+        >(`/stocks/${symbol}/history?limit=${activeRange.limit}&interval=${activeRange.interval}`)
         .then((r) => r.data),
     refetchInterval: activeRange.interval === '1d' ? 3_600_000 : 30_000,
     staleTime: activeRange.interval === '1d' ? 1_800_000 : 10_000,
@@ -118,7 +118,7 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
       ],
       isUp: (closes[closes.length - 1] ?? 0) >= (closes[0] ?? 0),
     };
-  }, [data]);
+  }, [data, activeRange.interval]);
 
   const strokeColor = isUp ? '#22c55e' : '#ef4444';
   const gradientId = `price-grad-${symbol}`;
