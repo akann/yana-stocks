@@ -1,3 +1,4 @@
+import type { Server } from 'node:http';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
 import { Test } from '@nestjs/testing';
@@ -9,11 +10,26 @@ import { KafkaProducerService } from '../kafka/kafka-producer.service';
 import { Trade } from '../trades/schemas/trade.schema';
 import { Portfolio } from './schemas/portfolio.schema';
 
+interface StockHolding {
+  symbol: string;
+  shares: number;
+  avgCostBasis: number;
+  currentValue?: number;
+}
+
+interface PortfolioResponse {
+  id: string;
+  userId: string;
+  name: string;
+  stocks: StockHolding[];
+  totalValue?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 function makeTestJwt(sub: string, email: string): string {
   const header = Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url');
-  const payload = Buffer.from(JSON.stringify({ sub, email, iat: Date.now() })).toString(
-    'base64url',
-  );
+  const payload = Buffer.from(JSON.stringify({ sub, email, iat: Date.now() })).toString('base64url');
   return `${header}.${payload}.test-signature`;
 }
 
@@ -24,6 +40,7 @@ const AUTH = `Bearer ${makeTestJwt(USER_ID, USER_EMAIL)}`;
 
 describe('PortfoliosController (integration)', () => {
   let app: INestApplication;
+  let server: Server;
   let portfolioModel: Model<Portfolio>;
   let tradeModel: Model<Trade>;
 
@@ -51,6 +68,7 @@ describe('PortfoliosController (integration)', () => {
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
     await app.init();
 
+    server = app.getHttpServer() as Server;
     portfolioModel = moduleRef.get(getModelToken(Portfolio.name));
     tradeModel = moduleRef.get(getModelToken(Trade.name));
   });
@@ -67,11 +85,13 @@ describe('PortfoliosController (integration)', () => {
 
   describe('POST /portfolios', () => {
     it('creates a portfolio and writes it to MongoDB', async () => {
-      const { body } = await request(app.getHttpServer())
-        .post('/portfolios')
-        .set('Authorization', AUTH)
-        .send({ name: 'My Tech Portfolio' })
-        .expect(201);
+      const body = (
+        await request(server)
+          .post('/portfolios')
+          .set('Authorization', AUTH)
+          .send({ name: 'My Tech Portfolio' })
+          .expect(201)
+      ).body as PortfolioResponse;
 
       expect(body.id).toBeTruthy();
       expect(body.name).toBe('My Tech Portfolio');
@@ -84,7 +104,7 @@ describe('PortfoliosController (integration)', () => {
     });
 
     it('emits a portfolio_created Kafka event', async () => {
-      await request(app.getHttpServer())
+      await request(server)
         .post('/portfolios')
         .set('Authorization', AUTH)
         .send({ name: 'Event Portfolio' })
@@ -96,18 +116,11 @@ describe('PortfoliosController (integration)', () => {
     });
 
     it('returns 401 without an Authorization header', async () => {
-      await request(app.getHttpServer())
-        .post('/portfolios')
-        .send({ name: 'Unauth' })
-        .expect(401);
+      await request(server).post('/portfolios').send({ name: 'Unauth' }).expect(401);
     });
 
     it('returns 400 for a missing name', async () => {
-      await request(app.getHttpServer())
-        .post('/portfolios')
-        .set('Authorization', AUTH)
-        .send({})
-        .expect(400);
+      await request(server).post('/portfolios').set('Authorization', AUTH).send({}).expect(400);
     });
   });
 
@@ -116,25 +129,21 @@ describe('PortfoliosController (integration)', () => {
       await portfolioModel.create({ userId: USER_ID, name: 'Mine', stocks: [] });
       await portfolioModel.create({ userId: OTHER_USER_ID, name: 'Theirs', stocks: [] });
 
-      const { body } = await request(app.getHttpServer())
-        .get('/portfolios')
-        .set('Authorization', AUTH)
-        .expect(200);
+      const portfolios = (
+        await request(server).get('/portfolios').set('Authorization', AUTH).expect(200)
+      ).body as PortfolioResponse[];
 
-      expect(Array.isArray(body)).toBe(true);
-      const portfolios = body as Array<{ userId: string; name: string }>;
       expect(portfolios.every((p) => p.userId === USER_ID)).toBe(true);
       expect(portfolios.find((p) => p.name === 'Mine')).toBeTruthy();
       expect(portfolios.find((p) => p.name === 'Theirs')).toBeUndefined();
     });
 
     it('returns an empty array when the user has no portfolios', async () => {
-      const { body } = await request(app.getHttpServer())
-        .get('/portfolios')
-        .set('Authorization', AUTH)
-        .expect(200);
+      const portfolios = (
+        await request(server).get('/portfolios').set('Authorization', AUTH).expect(200)
+      ).body as PortfolioResponse[];
 
-      expect(body).toEqual([]);
+      expect(portfolios).toEqual([]);
     });
   });
 
@@ -142,28 +151,26 @@ describe('PortfoliosController (integration)', () => {
     it('returns the portfolio when it belongs to the requesting user', async () => {
       const doc = await portfolioModel.create({ userId: USER_ID, name: 'Fetch Me', stocks: [] });
 
-      const { body } = await request(app.getHttpServer())
-        .get(`/portfolios/${doc._id.toString()}`)
-        .set('Authorization', AUTH)
-        .expect(200);
+      const body = (
+        await request(server)
+          .get(`/portfolios/${doc._id.toString()}`)
+          .set('Authorization', AUTH)
+          .expect(200)
+      ).body as PortfolioResponse;
 
       expect(body.name).toBe('Fetch Me');
     });
 
     it('returns 403 when the portfolio belongs to another user', async () => {
       const doc = await portfolioModel.create({ userId: OTHER_USER_ID, name: 'Not Mine', stocks: [] });
-
-      await request(app.getHttpServer())
+      await request(server)
         .get(`/portfolios/${doc._id.toString()}`)
         .set('Authorization', AUTH)
         .expect(403);
     });
 
     it('returns 404 for a non-existent portfolio', async () => {
-      await request(app.getHttpServer())
-        .get('/portfolios/000000000000000000000001')
-        .set('Authorization', AUTH)
-        .expect(404);
+      await request(server).get('/portfolios/000000000000000000000001').set('Authorization', AUTH).expect(404);
     });
   });
 
@@ -172,14 +179,15 @@ describe('PortfoliosController (integration)', () => {
       const doc = await portfolioModel.create({ userId: USER_ID, name: 'Trading Portfolio', stocks: [] });
       const portfolioId = doc._id.toString();
 
-      const { body } = await request(app.getHttpServer())
-        .post(`/portfolios/${portfolioId}/stocks`)
-        .set('Authorization', AUTH)
-        .send({ symbol: 'AAPL', shares: 10, price: 150 })
-        .expect(201);
+      const body = (
+        await request(server)
+          .post(`/portfolios/${portfolioId}/stocks`)
+          .set('Authorization', AUTH)
+          .send({ symbol: 'AAPL', shares: 10, price: 150 })
+          .expect(201)
+      ).body as PortfolioResponse;
 
-      const holding = (body.stocks as Array<{ symbol: string; shares: number; avgCostBasis: number }>)
-        .find((s) => s.symbol === 'AAPL');
+      const holding = body.stocks.find((s) => s.symbol === 'AAPL');
       expect(holding).toBeTruthy();
       expect(holding!.shares).toBe(10);
       expect(holding!.avgCostBasis).toBe(150);
@@ -198,27 +206,27 @@ describe('PortfoliosController (integration)', () => {
       const doc = await portfolioModel.create({ userId: USER_ID, name: 'Avg Cost Portfolio', stocks: [] });
       const id = doc._id.toString();
 
-      await request(app.getHttpServer())
+      await request(server)
         .post(`/portfolios/${id}/stocks`)
         .set('Authorization', AUTH)
         .send({ symbol: 'MSFT', shares: 10, price: 100 });
 
-      const { body } = await request(app.getHttpServer())
-        .post(`/portfolios/${id}/stocks`)
-        .set('Authorization', AUTH)
-        .send({ symbol: 'MSFT', shares: 10, price: 120 })
-        .expect(201);
+      const body = (
+        await request(server)
+          .post(`/portfolios/${id}/stocks`)
+          .set('Authorization', AUTH)
+          .send({ symbol: 'MSFT', shares: 10, price: 120 })
+          .expect(201)
+      ).body as PortfolioResponse;
 
-      const holding = (body.stocks as Array<{ symbol: string; shares: number; avgCostBasis: number }>)
-        .find((s) => s.symbol === 'MSFT');
+      const holding = body.stocks.find((s) => s.symbol === 'MSFT');
       expect(holding!.shares).toBe(20);
       expect(holding!.avgCostBasis).toBe(110); // (10*100 + 10*120) / 20
     });
 
     it('returns 403 when the portfolio belongs to another user', async () => {
       const doc = await portfolioModel.create({ userId: OTHER_USER_ID, name: 'Not Mine', stocks: [] });
-
-      await request(app.getHttpServer())
+      await request(server)
         .post(`/portfolios/${doc._id.toString()}/stocks`)
         .set('Authorization', AUTH)
         .send({ symbol: 'TSLA', shares: 5, price: 200 })
@@ -230,11 +238,13 @@ describe('PortfoliosController (integration)', () => {
     it('renames the portfolio', async () => {
       const doc = await portfolioModel.create({ userId: USER_ID, name: 'Old Name', stocks: [] });
 
-      const { body } = await request(app.getHttpServer())
-        .put(`/portfolios/${doc._id.toString()}`)
-        .set('Authorization', AUTH)
-        .send({ name: 'New Name' })
-        .expect(200);
+      const body = (
+        await request(server)
+          .put(`/portfolios/${doc._id.toString()}`)
+          .set('Authorization', AUTH)
+          .send({ name: 'New Name' })
+          .expect(200)
+      ).body as PortfolioResponse;
 
       expect(body.name).toBe('New Name');
     });
@@ -245,17 +255,14 @@ describe('PortfoliosController (integration)', () => {
       const doc = await portfolioModel.create({ userId: USER_ID, name: 'To Delete', stocks: [] });
       const id = doc._id.toString();
 
-      await request(app.getHttpServer())
-        .delete(`/portfolios/${id}`)
-        .set('Authorization', AUTH)
-        .expect(204);
+      await request(server).delete(`/portfolios/${id}`).set('Authorization', AUTH).expect(204);
 
       const found = await portfolioModel.findById(id).exec();
       expect(found).toBeNull();
     });
 
     it('returns 404 when deleting a non-existent portfolio', async () => {
-      await request(app.getHttpServer())
+      await request(server)
         .delete('/portfolios/000000000000000000000001')
         .set('Authorization', AUTH)
         .expect(404);

@@ -1,3 +1,4 @@
+import type { Server } from 'node:http';
 import { INestApplication } from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
 import { Test } from '@nestjs/testing';
@@ -11,10 +12,22 @@ import { KafkaProducerService } from './kafka-producer.service';
 import { PricesService } from './prices.service';
 import { PriceBar } from './schemas/price-bar.schema';
 
+interface OHLCVBar {
+  symbol: string;
+  timestamp: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  interval: string;
+}
+
 const SYM = 'INT_TEST_SYM';
 
 describe('PricesService / PricesController (integration)', () => {
   let app: INestApplication;
+  let server: Server;
   let pricesService: PricesService;
   let priceBarModel: Model<PriceBar>;
   let rawRedis: Redis;
@@ -42,6 +55,7 @@ describe('PricesService / PricesController (integration)', () => {
     app = moduleRef.createNestApplication();
     await app.init();
 
+    server = app.getHttpServer() as Server;
     pricesService = moduleRef.get(PricesService);
     priceBarModel = moduleRef.get(getModelToken(PriceBar.name));
     rawRedis = new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379');
@@ -142,18 +156,17 @@ describe('PricesService / PricesController (integration)', () => {
         volume: 3000,
       });
 
-      const { body } = await request(app.getHttpServer())
-        .get(`/prices/${SYM}/history`)
-        .expect(200);
+      const bars = (
+        await request(server).get(`/prices/${SYM}/history`).expect(200)
+      ).body as OHLCVBar[];
 
-      expect(body).toHaveLength(1);
-      const bar = body[0] as Record<string, unknown>;
-      expect(bar['symbol']).toBe(SYM);
-      expect(bar['open']).toBe(100);
-      expect(bar['high']).toBe(110);
-      expect(bar['low']).toBe(95);
-      expect(bar['close']).toBe(105);
-      expect(bar['interval']).toBe('1m');
+      expect(bars).toHaveLength(1);
+      expect(bars[0]!.symbol).toBe(SYM);
+      expect(bars[0]!.open).toBe(100);
+      expect(bars[0]!.high).toBe(110);
+      expect(bars[0]!.low).toBe(95);
+      expect(bars[0]!.close).toBe(105);
+      expect(bars[0]!.interval).toBe('1m');
     });
 
     it('returns bars sorted by timestamp descending', async () => {
@@ -163,20 +176,19 @@ describe('PricesService / PricesController (integration)', () => {
         { symbol: SYM, timestamp: new Date('2025-01-01T10:02:00Z'), open: 104, high: 104, low: 104, close: 104, volume: 1 },
       ]);
 
-      const { body } = await request(app.getHttpServer())
-        .get(`/prices/${SYM}/history?limit=3`)
-        .expect(200);
+      const bars = (
+        await request(server).get(`/prices/${SYM}/history?limit=3`).expect(200)
+      ).body as OHLCVBar[];
 
-      const closes = (body as Array<{ close: number }>).map((b) => b.close);
-      expect(closes).toEqual([104, 102, 100]); // newest first
+      expect(bars.map((b) => b.close)).toEqual([104, 102, 100]); // newest first
     });
 
     it('returns an empty array when no bars exist', async () => {
-      const { body } = await request(app.getHttpServer())
-        .get('/prices/DOESNOTEXIST_XYZ/history')
-        .expect(200);
+      const bars = (
+        await request(server).get('/prices/DOESNOTEXIST_XYZ/history').expect(200)
+      ).body as OHLCVBar[];
 
-      expect(body).toEqual([]);
+      expect(bars).toEqual([]);
     });
 
     it('respects the limit query parameter', async () => {
@@ -192,11 +204,11 @@ describe('PricesService / PricesController (integration)', () => {
         })),
       );
 
-      const { body } = await request(app.getHttpServer())
-        .get(`/prices/${SYM}/history?limit=2`)
-        .expect(200);
+      const bars = (
+        await request(server).get(`/prices/${SYM}/history?limit=2`).expect(200)
+      ).body as OHLCVBar[];
 
-      expect(body).toHaveLength(2);
+      expect(bars).toHaveLength(2);
     });
   });
 });
