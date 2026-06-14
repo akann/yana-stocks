@@ -17,6 +17,8 @@ import { api } from '@/lib/api';
 import type { OHLCVBar } from '@/types';
 
 const RANGES = [
+  { label: '1H', limit: 60, interval: '1m' },
+  { label: '1D', limit: 390, interval: '1m' },
   { label: '1W', limit: 5, interval: '1d' },
   { label: '1M', limit: 21, interval: '1d' },
   { label: '3M', limit: 63, interval: '1d' },
@@ -74,8 +76,8 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
           `/stocks/${symbol}/history?limit=${activeRange.limit}&interval=${activeRange.interval}`,
         )
         .then((r) => r.data),
-    refetchInterval: 3_600_000,
-    staleTime: 300_000,
+    refetchInterval: activeRange.interval === '1d' ? 3_600_000 : 30_000,
+    staleTime: activeRange.interval === '1d' ? 300_000 : 10_000,
   });
 
   const { points, domain, isUp } = useMemo(() => {
@@ -86,8 +88,15 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
       (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
     );
 
+    const isDaily = activeRange.interval === '1d';
     const pts: ChartPoint[] = sorted.map((bar) => ({
-      time: new Date(bar.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      time: isDaily
+        ? new Date(bar.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : new Date(bar.timestamp).toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          }),
       close: bar.close,
       open: bar.open,
       high: bar.high,
@@ -110,7 +119,7 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
       ],
       isUp: (closes[closes.length - 1] ?? 0) >= (closes[0] ?? 0),
     };
-  }, [data]);
+  }, [data, activeRange.interval]);
 
   const strokeColor = isUp ? '#22c55e' : '#ef4444';
   const gradientId = `price-grad-${symbol}`;
