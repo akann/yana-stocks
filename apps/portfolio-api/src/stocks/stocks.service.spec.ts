@@ -122,7 +122,7 @@ describe('StocksService', () => {
       const result = await service.getHistory('AAPL');
 
       expect(result).toHaveLength(1);
-      expect(redis.set).toHaveBeenCalledWith('papi:history:AAPL:100', expect.any(String), 30);
+      expect(redis.set).toHaveBeenCalledWith('papi:history:AAPL:100:1m', expect.any(String), 30);
     });
   });
 
