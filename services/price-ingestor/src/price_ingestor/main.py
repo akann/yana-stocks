@@ -54,7 +54,7 @@ def main() -> None:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    run(Settings())  # type: ignore[call-arg]  # required fields populated from env vars
+    run(Settings())
 
 
 if __name__ == "__main__":
