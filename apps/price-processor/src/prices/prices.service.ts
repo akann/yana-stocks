@@ -8,7 +8,9 @@ import type {
 } from '@yana-stocks/shared-types';
 import { KAFKA_TOPICS } from '@yana-stocks/kafka-client';
 import { Model } from 'mongoose';
-import yahooFinance from 'yahoo-finance2';
+import YahooFinance from 'yahoo-finance2';
+
+const yf = new YahooFinance();
 import { RedisService } from '../redis/redis.service';
 import { KafkaProducerService } from './kafka-producer.service';
 import { PriceBar } from './schemas/price-bar.schema';
@@ -126,11 +128,33 @@ export class PricesService {
       const start = new Date(end);
       start.setFullYear(start.getFullYear() - 1);
 
-      const rows = await yahooFinance.historical(symbol, {
+      const chart = await yf.chart(symbol, {
         period1: start,
         period2: end,
         interval: '1d',
-        events: 'history',
+        return: 'array',
+      });
+
+      // Filter out any rows where core OHLCV fields are null
+      const rows = chart.quotes.flatMap((q) => {
+        if (
+          q.open === null ||
+          q.high === null ||
+          q.low === null ||
+          q.close === null ||
+          q.volume === null
+        )
+          return [];
+        return [
+          {
+            date: q.date,
+            open: q.open,
+            high: q.high,
+            low: q.low,
+            close: q.close,
+            volume: q.volume,
+          },
+        ];
       });
 
       if (rows.length === 0) {
