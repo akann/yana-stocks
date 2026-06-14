@@ -100,10 +100,7 @@ export default function StockPage(): React.JSX.Element {
                 )}
               </div>
             ) : (
-              <p className="text-gray-500 text-sm">
-                No price data — run{' '}
-                <code className="text-xs bg-gray-800 px-1.5 py-0.5 rounded">pnpm seed</code>
-              </p>
+              <p className="text-gray-500 text-sm">No price data available</p>
             )}
           </div>
 
