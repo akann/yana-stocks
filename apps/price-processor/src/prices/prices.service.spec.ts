@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import { getModelToken } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
 import type { ProcessedPriceMessage, RawPriceMessage } from '@yana-stocks/shared-types';
@@ -55,6 +56,10 @@ describe('PricesService', () => {
           useValue: {
             emit: jest.fn().mockResolvedValue(undefined),
           } satisfies Partial<KafkaProducerService>,
+        },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn().mockReturnValue('') },
         },
       ],
     }).compile();
