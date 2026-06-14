@@ -1,16 +1,17 @@
-"""One-time backfill of 1-year daily OHLCV bars from Alpaca into MongoDB.
+"""One-time backfill of 1-year daily OHLCV bars using yfinance into MongoDB.
 
 Run with:
     backfill-history          # uses .env in cwd
     uv run backfill-history
+
+yfinance is used instead of Alpaca because Alpaca's free tier does not
+serve historical daily bars (only real-time snapshots).
 """
 
 import logging
 from datetime import UTC, datetime, timedelta
 
-from alpaca.data import StockHistoricalDataClient
-from alpaca.data.requests import StockBarsRequest
-from alpaca.data.timeframe import TimeFrame
+import yfinance as yf
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pymongo import MongoClient, UpdateOne
@@ -24,10 +25,6 @@ class BackfillSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
-
-    alpaca_api_key: str
-    alpaca_api_secret: str
-    alpaca_base_url: str = "https://data.alpaca.markets"
 
     mongodb_uri: str = "mongodb://localhost:27017/yana_stocks"
 
@@ -55,12 +52,6 @@ class BackfillSettings(BaseSettings):
 def main() -> None:
     settings = BackfillSettings()
 
-    alpaca = StockHistoricalDataClient(
-        api_key=settings.alpaca_api_key,
-        secret_key=settings.alpaca_api_secret,
-        url_override=settings.alpaca_base_url,
-    )
-
     db_name = settings.mongodb_uri.rstrip("/").split("/")[-1]
     mongo: MongoClient[dict[str, object]] = MongoClient(settings.mongodb_uri)
     collection = mongo[db_name]["price_bars"]
@@ -81,38 +72,40 @@ def main() -> None:
     for symbol in settings.symbols:
         logger.info("Fetching %s ...", symbol)
         try:
-            request = StockBarsRequest(
-                symbol_or_symbols=symbol,
-                timeframe=TimeFrame.Day,
-                start=start,
-                end=end,
+            df = yf.download(
+                symbol,
+                start=start.date(),
+                end=end.date(),
+                interval="1d",
+                auto_adjust=True,
+                progress=False,
             )
-            bars_response = alpaca.get_stock_bars(request)
-            bars = bars_response[symbol] if symbol in bars_response else []  # noqa: SIM401
 
-            if not bars:
+            if df.empty:
                 logger.warning("No bars returned for %s", symbol)
                 continue
 
-            ops = [
-                UpdateOne(
-                    {"symbol": symbol, "timestamp": bar.timestamp, "interval": "1d"},
-                    {
-                        "$setOnInsert": {
-                            "symbol": symbol,
-                            "timestamp": bar.timestamp,
-                            "open": float(bar.open),
-                            "high": float(bar.high),
-                            "low": float(bar.low),
-                            "close": float(bar.close),
-                            "volume": float(bar.volume),
-                            "interval": "1d",
-                        }
-                    },
-                    upsert=True,
+            ops: list[UpdateOne] = []
+            for ts, row in df.iterrows():
+                timestamp = ts.to_pydatetime().replace(tzinfo=UTC)
+                ops.append(
+                    UpdateOne(
+                        {"symbol": symbol, "timestamp": timestamp, "interval": "1d"},
+                        {
+                            "$setOnInsert": {
+                                "symbol": symbol,
+                                "timestamp": timestamp,
+                                "open": float(row["Open"]),
+                                "high": float(row["High"]),
+                                "low": float(row["Low"]),
+                                "close": float(row["Close"]),
+                                "volume": float(row["Volume"]),
+                                "interval": "1d",
+                            }
+                        },
+                        upsert=True,
+                    )
                 )
-                for bar in bars
-            ]
 
             result = collection.bulk_write(ops, ordered=False)
             total_upserted += result.upserted_count
@@ -120,7 +113,7 @@ def main() -> None:
             logger.info(
                 "%s: %d bars fetched, %d inserted, %d already existed",
                 symbol,
-                len(bars),
+                len(ops),
                 result.upserted_count,
                 result.matched_count,
             )
