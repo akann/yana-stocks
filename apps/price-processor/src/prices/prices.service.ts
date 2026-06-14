@@ -8,6 +8,7 @@ import type {
 } from '@yana-stocks/shared-types';
 import { KAFKA_TOPICS } from '@yana-stocks/kafka-client';
 import { Model } from 'mongoose';
+import yahooFinance from 'yahoo-finance2';
 import { RedisService } from '../redis/redis.service';
 import { KafkaProducerService } from './kafka-producer.service';
 import { PriceBar } from './schemas/price-bar.schema';
@@ -88,12 +89,16 @@ export class PricesService {
       filter['timestamp'] = tsFilter;
     }
 
-    const bars = await this.priceBarsModel
+    let bars = await this.priceBarsModel
       .find(filter)
       .sort({ timestamp: -1 })
       .limit(opts.limit)
       .lean<PriceBar[]>()
       .exec();
+
+    if (bars.length === 0 && interval === '1d') {
+      bars = await this.fetchAndStoreDailyHistory(symbol, opts.limit, filter);
+    }
 
     return bars.map((b) => ({
       symbol: b.symbol,
@@ -105,6 +110,68 @@ export class PricesService {
       volume: b.volume,
       interval: (b.interval ?? '1m') as OHLCVInterval,
     }));
+  }
+
+  private async fetchAndStoreDailyHistory(
+    symbol: string,
+    limit: number,
+    filter: Record<string, unknown>,
+  ): Promise<PriceBar[]> {
+    const noDataKey = `hist:no-data:${symbol}`;
+    const hasNoData = await this.redis.get(noDataKey);
+    if (hasNoData) return [];
+
+    try {
+      const end = new Date();
+      const start = new Date(end);
+      start.setFullYear(start.getFullYear() - 1);
+
+      const rows = await yahooFinance.historical(symbol, {
+        period1: start,
+        period2: end,
+        interval: '1d',
+        events: 'history',
+      });
+
+      if (rows.length === 0) {
+        await this.redis.setex(noDataKey, 86_400, '1');
+        return [];
+      }
+
+      this.logger.log('Fetched %d daily bars from Yahoo Finance for %s', rows.length, symbol);
+
+      const ops = rows.map((row) => ({
+        updateOne: {
+          filter: { symbol, timestamp: row.date, interval: '1d' },
+          update: {
+            $setOnInsert: {
+              symbol,
+              timestamp: row.date,
+              open: row.open,
+              high: row.high,
+              low: row.low,
+              close: row.close,
+              volume: row.volume,
+              interval: '1d',
+            },
+          },
+          upsert: true,
+        },
+      }));
+
+      await this.priceBarsModel.bulkWrite(ops, { ordered: false });
+
+      return this.priceBarsModel
+        .find(filter)
+        .sort({ timestamp: -1 })
+        .limit(limit)
+        .lean<PriceBar[]>()
+        .exec();
+    } catch (err) {
+      this.logger.warn('Yahoo Finance fetch failed for %s: %s', symbol, (err as Error).message);
+      await this.redis.setex(noDataKey, 3_600, '1');
+      return [];
+    }
   }
 
   private truncateToMinute(isoTimestamp: string): Date {

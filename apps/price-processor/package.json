@@ -26,7 +26,8 @@
     "kafkajs": "^2.2.4",
     "mongoose": "^8.15.1",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "yahoo-finance2": "^2.13.3"
   },
   "devDependencies": {
     "@nestjs/testing": "^11.1.26",
