@@ -4,6 +4,7 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AppModule } from '../app.module';
 import { PrismaService } from '../prisma/prisma.service';
+import type { UserRecord } from '../users/users.service';
 
 interface AuthTokens {
   accessToken: string;
@@ -35,6 +36,7 @@ describe('AuthController (integration)', () => {
   });
 
   afterAll(async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     await prisma.user.deleteMany({});
     await app.close();
   });
@@ -81,7 +83,8 @@ describe('AuthController (integration)', () => {
         .send({ email, name: 'Persist Check', password: PASSWORD })
         .expect(201);
 
-      const user = await prisma.user.findUnique({ where: { email } });
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      const user = await (prisma.user.findUnique({ where: { email } }) as unknown as Promise<UserRecord | null>);
       expect(user).not.toBeNull();
       expect(user!.name).toBe('Persist Check');
       expect(user!.password).not.toBe(PASSWORD); // stored as bcrypt hash
