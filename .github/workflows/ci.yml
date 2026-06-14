@@ -139,6 +139,12 @@ jobs:
           key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-
 
+      - uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-ts-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-ts-${{ runner.os }}-
+
       - name: Install dependencies
         # pnpm 11 requires explicit build approval on first install in a fresh env.
         # Run once; if it fails on the build-approval check, approve then retry.
@@ -318,6 +324,12 @@ jobs:
           path: ${{ steps.pnpm-store.outputs.dir }}
           key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-
+
+      - uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-e2e-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-e2e-${{ runner.os }}-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile || (pnpm approve-builds --all && pnpm install --frozen-lockfile)

@@ -76,7 +76,7 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
         >(`/stocks/${symbol}/history?limit=${activeRange.limit}&interval=${activeRange.interval}`)
         .then((r) => r.data),
     refetchInterval: activeRange.interval === '1d' ? 3_600_000 : 30_000,
-    staleTime: activeRange.interval === '1d' ? 1_800_000 : 10_000,
+    staleTime: activeRange.interval === '1d' ? 300_000 : 10_000,
   });
 
   const { points, domain, isUp } = useMemo(() => {

@@ -29,12 +29,14 @@ export function SignalsPanel({ symbol }: { symbol: string }): React.JSX.Element 
     queryKey: ['signals', symbol],
     queryFn: () => api.get<SignalsResponse>(`/signals/${symbol}`).then((r) => r.data),
     refetchInterval: 60_000,
+    retry: false,
   });
 
   const { data: predictions } = useQuery<PredictResponse>({
     queryKey: ['predict', symbol],
     queryFn: () => api.get<PredictResponse>(`/predict/${symbol}`).then((r) => r.data),
     staleTime: 60_000,
+    retry: false,
   });
 
   const sentiment = signals?.sentiment;
