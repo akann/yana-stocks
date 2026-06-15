@@ -64,6 +64,10 @@ describe('PricesService / PricesController (integration)', () => {
   afterEach(async () => {
     await priceBarModel.deleteMany({ symbol: SYM });
     await rawRedis.del(`price:latest:${SYM}`);
+    await rawRedis.del(`hist:fetched:${SYM}:1m`);
+    await rawRedis.del(`hist:fetched:${SYM}:1d`);
+    await rawRedis.del(`hist:no-data-min:${SYM}`);
+    await rawRedis.del(`hist:no-data:${SYM}`);
     jest.clearAllMocks();
   });
 
@@ -145,6 +149,12 @@ describe('PricesService / PricesController (integration)', () => {
   });
 
   describe('GET /prices/:symbol/history', () => {
+    beforeEach(async () => {
+      // Mark data as fresh so getHistory skips the on-demand external fetch
+      // for this non-predefined test symbol.
+      await rawRedis.setex(`hist:fetched:${SYM}:1m`, 900, '1');
+    });
+
     it('returns OHLCV bars seeded directly into MongoDB', async () => {
       await priceBarModel.create({
         symbol: SYM,
