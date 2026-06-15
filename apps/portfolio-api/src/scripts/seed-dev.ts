@@ -3,11 +3,11 @@
  * Run: pnpm seed
  *
  * Redis keys:
- *   papi:price:<SYMBOL>           — drives /market/movers and /stocks/:symbol price
- *   papi:sentiment:<SYMBOL>       — drives /stocks/:symbol and /signals/:symbol sentiment
- *   papi:prediction:<SYMBOL>      — drives /stocks/:symbol and /signals/:symbol prediction
- *   papi:history:<SYMBOL>:<LIMIT> — drives /stocks/:symbol/history (chart data)
- *   papi:assets:all               — drives /market/assets (stock browser)
+ *   papi:price:<SYMBOL>                    — drives /market/movers and /stocks/:symbol price
+ *   papi:sentiment:<SYMBOL>                — drives /stocks/:symbol and /signals/:symbol sentiment
+ *   papi:prediction:<SYMBOL>               — drives /stocks/:symbol and /signals/:symbol prediction
+ *   papi:history:<SYMBOL>:<LIMIT>:<INTERVAL> — drives /stocks/:symbol/history (chart data)
+ *   papi:assets:all                        — drives /market/assets (stock browser)
  *
  * MongoDB:
  *   yana_stocks.articles    — drives /news/:symbol
@@ -27,6 +27,7 @@ const MONGODB_URI =
 const TTL = 86_400; // 24 hours — survives overnight dev sessions
 
 const BARS_PER_DAY = 390; // 6.5 trading hours × 60 min
+const TRADING_DAYS = 252; // ~1 year of daily bars
 
 interface OHLCVBar {
   symbol: string;
@@ -36,11 +37,11 @@ interface OHLCVBar {
   low: number;
   close: number;
   volume: number;
-  interval: '1m';
+  interval: '1m' | '1d';
 }
 
 /** Generate ~390 1-minute bars as a random walk ending at stock.price */
-function generateBars(stock: StockSeed): OHLCVBar[] {
+function generateMinuteBars(stock: StockSeed): OHLCVBar[] {
   const endPrice = stock.price;
   const startPrice = endPrice / (1 + stock.changePercent / 100);
   const bars: OHLCVBar[] = [];
@@ -62,6 +63,43 @@ function generateBars(stock: StockSeed): OHLCVBar[] {
     const low = parseFloat((Math.min(open, close) - Math.random() * spread).toFixed(2));
     const volume = Math.floor((stock.volume / BARS_PER_DAY) * (0.4 + Math.random() * 1.2));
     bars.push({ symbol: stock.symbol, timestamp, open, high, low, close, volume, interval: '1m' });
+    prev = close;
+  }
+  return bars;
+}
+
+/**
+ * Generate ~252 daily bars (1 year) ending at stock.price.
+ * Timestamps are spaced ~1.4 calendar days apart to approximate trading days
+ * without needing exact weekend/holiday logic.
+ */
+function generateDailyBars(stock: StockSeed): OHLCVBar[] {
+  const endPrice = stock.price;
+  // Simulate a realistic year-ago start: positive stocks up ~20%, negative ones down ~10%
+  const annualReturn = stock.changePercent >= 0 ? 0.18 : -0.08;
+  const startPrice = endPrice / (1 + annualReturn);
+
+  const endTime = new Date();
+  endTime.setHours(16, 0, 0, 0); // market close
+  // ~1.4 calendar days per trading day (accounts for weekends)
+  const MS_PER_TRADING_DAY = 1.4 * 24 * 60 * 60 * 1000;
+
+  const bars: OHLCVBar[] = [];
+  let prev = startPrice;
+
+  for (let i = 0; i < TRADING_DAYS; i++) {
+    const timestamp = new Date(
+      endTime.getTime() - (TRADING_DAYS - 1 - i) * MS_PER_TRADING_DAY,
+    );
+    const drift = (endPrice - prev) / (TRADING_DAYS - i);
+    const noise = (Math.random() - 0.5) * stock.price * 0.012;
+    const close = Math.max(0.01, parseFloat((prev + drift + noise).toFixed(2)));
+    const open = parseFloat(prev.toFixed(2));
+    const spread = Math.abs(close - open) + stock.price * 0.004;
+    const high = parseFloat((Math.max(open, close) + Math.random() * spread).toFixed(2));
+    const low = parseFloat((Math.min(open, close) - Math.random() * spread).toFixed(2));
+    const volume = Math.floor(stock.volume * (0.6 + Math.random() * 0.8));
+    bars.push({ symbol: stock.symbol, timestamp, open, high, low, close, volume, interval: '1d' });
     prev = close;
   }
   return bars;
@@ -477,10 +515,13 @@ async function seed(): Promise<void> {
   const now = new Date();
   const pipeline = redis.pipeline();
 
+  const allMinuteBars: Record<string, OHLCVBar[]> = {};
+  const allDailyBars: Record<string, OHLCVBar[]> = {};
+
   for (const stock of STOCKS) {
     const { symbol, price, changePercent, volume, sentiment, prediction } = stock;
 
-    // Price
+    // ── Price ──────────────────────────────────────────────────────────────
     const change = parseFloat(((price * changePercent) / (100 + changePercent)).toFixed(2));
     const priceEntry: PriceCacheEntry = {
       price,
@@ -492,7 +533,7 @@ async function seed(): Promise<void> {
     };
     pipeline.set(`papi:price:${symbol}`, JSON.stringify(priceEntry), 'EX', TTL);
 
-    // Sentiment
+    // ── Sentiment ──────────────────────────────────────────────────────────
     const sentimentEntry: SentimentSignal = {
       symbol,
       score: sentiment.score,
@@ -504,7 +545,7 @@ async function seed(): Promise<void> {
     };
     pipeline.set(`papi:sentiment:${symbol}`, JSON.stringify(sentimentEntry), 'EX', TTL);
 
-    // Multi-horizon predictions for /predict/:symbol (papi:predictions plural)
+    // ── Predictions ────────────────────────────────────────────────────────
     // Scale the 1d delta proportionally: 1h=25%, 4h=55%, 1d=100%, 1w=300%
     const delta1d = prediction.predictedPrice - price;
     const horizons: Array<{
@@ -527,9 +568,34 @@ async function seed(): Promise<void> {
       generatedAt: now,
     }));
     pipeline.set(`papi:predictions:${symbol}`, JSON.stringify(predictions), 'EX', TTL);
-
     // Single-prediction key still used by /signals/:symbol
     pipeline.set(`papi:prediction:${symbol}`, JSON.stringify(predictions[2]), 'EX', TTL);
+
+    // ── History — 1m bars (1H and 1D chart ranges) ─────────────────────────
+    const minuteBars = generateMinuteBars(stock);
+    allMinuteBars[symbol] = minuteBars;
+    const minuteDesc = [...minuteBars].reverse(); // newest first
+    for (const limit of [60, 390]) {
+      pipeline.set(
+        `papi:history:${symbol}:${limit}:1m`,
+        JSON.stringify(minuteDesc.slice(0, limit)),
+        'EX',
+        TTL,
+      );
+    }
+
+    // ── History — 1d bars (1W / 1M / 3M / 6M / 1Y chart ranges) ──────────
+    const dailyBars = generateDailyBars(stock);
+    allDailyBars[symbol] = dailyBars;
+    const dailyDesc = [...dailyBars].reverse(); // newest first
+    for (const limit of [5, 21, 63, 126, 252]) {
+      pipeline.set(
+        `papi:history:${symbol}:${limit}:1d`,
+        JSON.stringify(dailyDesc.slice(0, limit)),
+        'EX',
+        TTL,
+      );
+    }
   }
 
   // Bust movers cache so it recomputes on next request
@@ -538,43 +604,35 @@ async function seed(): Promise<void> {
   // Seed full asset list so /market/assets works without Alpaca credentials
   pipeline.set('papi:assets:all', JSON.stringify(MOCK_ASSETS), 'EX', TTL);
 
-  // Seed OHLCV history into Redis for common limit values used by the chart.
-  // Bars are stored newest-first (DESC) to match what price-processor returns.
-  const allBars: Record<string, OHLCVBar[]> = {};
-  for (const stock of STOCKS) {
-    const bars = generateBars(stock);
-    allBars[stock.symbol] = bars;
-    const desc = [...bars].reverse(); // newest first
-    for (const limit of [60, 100, 390]) {
-      pipeline.set(
-        `papi:history:${stock.symbol}:${limit}`,
-        JSON.stringify(desc.slice(0, limit)),
-        'EX',
-        TTL,
-      );
-    }
-  }
-
   await pipeline.exec();
   await redis.quit();
 
-  // Seed MongoDB
+  // ── MongoDB ──────────────────────────────────────────────────────────────
   const mongo = new MongoClient(MONGODB_URI);
   try {
     await mongo.connect();
     const db = mongo.db('yana_stocks');
-
-    // Price bars (drives price-processor /prices/:symbol/history)
     const barsCol = db.collection('price_bars');
     const symbols = STOCKS.map((s) => s.symbol);
+
     await barsCol.deleteMany({ symbol: { $in: symbols } });
-    const allBarDocs = Object.values(allBars)
+
+    // 1m bars — strip the interval field; the query uses $in: ['1m', null] so
+    // docs without an interval field are treated as 1m bars (backwards compat).
+    const minuteBarDocs = Object.values(allMinuteBars)
       .flat()
       .map(({ interval: _interval, ...bar }) => bar);
+
+    // 1d bars — keep the interval field; the query filters by interval: '1d'.
+    const dailyBarDocs = Object.values(allDailyBars).flat();
+
+    const allBarDocs = [...minuteBarDocs, ...dailyBarDocs];
     if (allBarDocs.length) {
       await barsCol.insertMany(allBarDocs);
       await barsCol.createIndex({ symbol: 1, timestamp: -1 });
-      console.log(`Seeded ${allBarDocs.length} OHLCV bars into MongoDB (price_bars)\n`);
+      console.log(
+        `Seeded ${minuteBarDocs.length} 1m bars + ${dailyBarDocs.length} 1d bars into MongoDB (price_bars)\n`,
+      );
     }
 
     // NewsService reads from 'sentiment' database (hardcoded in news.service.ts)
@@ -591,7 +649,6 @@ async function seed(): Promise<void> {
         analyzed_at: new Date(now.getTime() - a.hoursAgo * 3_600_000 + 60_000),
       })),
     );
-    // Replace existing dev articles — delete by seeded marker, then insert
     await col.deleteMany({
       source: {
         $in: [
@@ -603,14 +660,13 @@ async function seed(): Promise<void> {
           'FT',
           'Guardian',
           'MacRumors',
-          'Bloomberg',
         ],
       },
     });
     await col.insertMany(articles);
     console.log(`Seeded ${articles.length} news articles into MongoDB (sentiment.articles)\n`);
   } catch (err) {
-    console.warn(`MongoDB news seed skipped: ${String(err)}`);
+    console.warn(`MongoDB seed skipped: ${String(err)}`);
   } finally {
     await mongo.close();
   }
