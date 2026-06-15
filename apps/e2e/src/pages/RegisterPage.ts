@@ -1,0 +1,27 @@
+import type { Locator, Page } from '@playwright/test';
+
+export class RegisterPage {
+  readonly emailInput: Locator;
+  readonly passwordInput: Locator;
+  readonly submitButton: Locator;
+  readonly error: Locator;
+  readonly signInLink: Locator;
+
+  constructor(private readonly page: Page) {
+    this.emailInput = page.locator('input[type="email"]');
+    this.passwordInput = page.locator('input[type="password"]');
+    this.submitButton = page.getByRole('button', { name: /create account/i });
+    this.error = page.getByText('Registration failed');
+    this.signInLink = page.getByRole('link', { name: 'Sign in' });
+  }
+
+  async goto() {
+    await this.page.goto('/register');
+  }
+
+  async register(email: string, password: string) {
+    await this.emailInput.fill(email);
+    await this.passwordInput.fill(password);
+    await this.submitButton.click();
+  }
+}

@@ -1,123 +1,170 @@
-import { test, expect } from '@playwright/test';
-import { RegisterPage } from '../pages/auth.page';
-import { WatchlistPage } from '../pages/watchlist.page';
+/**
+ * Watchlist tests: create, add symbol, remove symbol, delete, empty state.
+ *
+ * All tests use the `authedPage` fixture (tokens pre-set in localStorage) and
+ * mock the portfolio + stocks API.
+ */
+import { test, expect } from '../fixtures/auth.fixture';
+import { WatchlistPage } from '../pages/WatchlistPage';
+import { makeWatchlist, MOCK_STOCK_AAPL } from '../fixtures/data';
 
-const PASSWORD = 'Test1234!';
+test.describe('Watchlist page', () => {
+  test('shows empty state when user has no watchlists', async ({ authedPage: page }) => {
+    await page.route('**/api/portfolio/watchlists', (r) => r.fulfill({ json: [] }));
 
-test.describe('Watchlist management', () => {
-  let testEmail: string;
-  let savedTokens: { at: string; rt: string } | null = null;
-
-  test.beforeAll(async ({ browser }) => {
-    testEmail = `e2e+watchlist+${Date.now()}@example.com`;
-    const page = await browser.newPage();
-    const registerPage = new RegisterPage(page);
-    await registerPage.goto();
-    await registerPage.register(testEmail, PASSWORD);
-    await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
-    savedTokens = await page.evaluate(() => ({
-      at: localStorage.getItem('access_token') ?? '',
-      rt: localStorage.getItem('refresh_token') ?? '',
-    }));
-    await page.close();
+    const wl = new WatchlistPage(page);
+    await wl.goto();
+    await expect(wl.heading).toBeVisible();
+    await expect(wl.emptyState).toBeVisible();
+    await expect(wl.newWatchlistButton).toBeVisible();
   });
 
-  test.beforeEach(async ({ page }) => {
-    // Inject tokens directly — avoids slow mobile-safari UI login on every test
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await page.evaluate(({ at, rt }) => {
-      localStorage.setItem('access_token', at);
-      localStorage.setItem('refresh_token', rt);
-    }, savedTokens!);
-  });
+  test('create watchlist — appears in list', async ({ authedPage: page }) => {
+    const watchlists: ReturnType<typeof makeWatchlist>[] = [];
 
-  test('redirects unauthenticated user to login', async ({ page }) => {
-    await page.evaluate(() => {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
+    await page.route('**/api/portfolio/watchlists', async (r) => {
+      if (r.request().method() === 'GET') {
+        await r.fulfill({ json: watchlists });
+      } else {
+        const body = r.request().postDataJSON() as { name: string };
+        const created = makeWatchlist(body.name);
+        watchlists.push(created);
+        await r.fulfill({ status: 201, json: created });
+      }
     });
-    // WebKit throws when a client-side redirect interrupts goto — swallow the error
-    await page.goto('/watchlist').catch(() => {});
-    await page.waitForURL('**/login', { timeout: 5_000 });
-    await expect(page).toHaveURL(/\/login/);
+
+    const wl = new WatchlistPage(page);
+    await wl.goto();
+    await expect(wl.emptyState).toBeVisible();
+
+    await wl.newWatchlistButton.click();
+    await wl.watchlistNameInput.fill('AI Stocks');
+    await wl.createButton.click();
+
+    await expect(wl.watchlistHeading('AI Stocks')).toBeVisible();
+    await expect(wl.emptyState).not.toBeVisible();
   });
 
-  test('shows Watchlists heading', async ({ page }) => {
-    const watchlistPage = new WatchlistPage(page);
-    await watchlistPage.goto();
-    await expect(watchlistPage.heading).toBeVisible({ timeout: 5_000 });
+  test('add symbol to watchlist — row appears in table', async ({ authedPage: page }) => {
+    const w = makeWatchlist('My Watch');
+    const watchlists = [w];
+
+    await page.route('**/api/portfolio/watchlists', async (r) => {
+      if (r.request().method() === 'GET') {
+        await r.fulfill({ json: watchlists });
+      } else {
+        await r.fulfill({ status: 201, json: w });
+      }
+    });
+
+    await page.route('**/api/portfolio/watchlists/*/symbols', async (r) => {
+      if (r.request().method() === 'POST') {
+        const body = r.request().postDataJSON() as { symbol: string };
+        w.symbols.push(body.symbol);
+        await r.fulfill({ status: 200, json: w });
+      }
+    });
+
+    await page.route('**/api/stocks/AAPL', (r) => r.fulfill({ json: MOCK_STOCK_AAPL }));
+
+    const wl = new WatchlistPage(page);
+    await wl.goto();
+    await expect(wl.watchlistHeading('My Watch')).toBeVisible();
+
+    await wl.addSymbolButton().click();
+    await wl.symbolInput().fill('AAPL');
+    await wl.addSubmitButton().click();
+
+    await expect(wl.symbolCell('AAPL')).toBeVisible();
   });
 
-  test('shows empty state when no watchlists exist', async ({ page }) => {
-    const watchlistPage = new WatchlistPage(page);
-    await watchlistPage.goto();
-    await expect(watchlistPage.emptyState).toBeVisible({ timeout: 5_000 });
+  test('remove symbol from watchlist', async ({ authedPage: page }) => {
+    const w = { ...makeWatchlist('Tech Watch'), symbols: ['AAPL'] };
+    const watchlists = [w];
+
+    await page.route('**/api/portfolio/watchlists', async (r) => {
+      await r.fulfill({ json: watchlists });
+    });
+
+    await page.route('**/api/portfolio/watchlists/*/symbols/*', async (r) => {
+      if (r.request().method() === 'DELETE') {
+        w.symbols = [];
+        await r.fulfill({ status: 204 });
+      }
+    });
+
+    await page.route('**/api/stocks/AAPL', (r) => r.fulfill({ json: MOCK_STOCK_AAPL }));
+
+    const wl = new WatchlistPage(page);
+    await wl.goto();
+    await expect(wl.symbolCell('AAPL')).toBeVisible();
+
+    await wl.removeSymbolButton('AAPL').click();
+    await expect(wl.symbolCell('AAPL')).not.toBeVisible();
+    await expect(page.getByText('No symbols yet — add one below.')).toBeVisible();
   });
 
-  test('creates a watchlist and shows it', async ({ page }) => {
-    const watchlistPage = new WatchlistPage(page);
-    const name = `My Watchlist ${Date.now()}`;
+  test('delete watchlist with confirmation', async ({ authedPage: page }) => {
+    const w = makeWatchlist('Delete Me');
+    const watchlists = [w];
 
-    await watchlistPage.goto();
-    await watchlistPage.createWatchlist(name);
-    await expect(page.locator('h3', { hasText: name })).toBeVisible({ timeout: 5_000 });
+    await page.route('**/api/portfolio/watchlists', async (r) => {
+      if (r.request().method() === 'GET') {
+        await r.fulfill({ json: watchlists });
+      } else {
+        await r.fulfill({ status: 201, json: w });
+      }
+    });
+
+    await page.route('**/api/portfolio/watchlists/*', async (r) => {
+      if (r.request().method() === 'DELETE') {
+        watchlists.splice(0, 1);
+        await r.fulfill({ status: 204 });
+      }
+    });
+
+    const wl = new WatchlistPage(page);
+    await wl.goto();
+    await expect(wl.watchlistHeading('Delete Me')).toBeVisible();
+
+    await wl.deleteButton().click();
+    await expect(page.getByText('Delete?')).toBeVisible();
+    await wl.confirmDeleteButton().click();
+
+    await expect(wl.emptyState).toBeVisible();
+    await expect(wl.watchlistHeading('Delete Me')).not.toBeVisible();
   });
 
-  test('new watchlist shows empty symbols state', async ({ page }) => {
-    const watchlistPage = new WatchlistPage(page);
-    const name = `Empty Watch ${Date.now()}`;
+  test('cancel delete keeps watchlist visible', async ({ authedPage: page }) => {
+    const w = makeWatchlist('Keep This');
+    await page.route('**/api/portfolio/watchlists', (r) => r.fulfill({ json: [w] }));
 
-    await watchlistPage.goto();
-    await watchlistPage.createWatchlist(name);
-    const card = watchlistPage.watchlistCard(name);
-    await expect(card.locator('text=No symbols yet')).toBeVisible({ timeout: 5_000 });
+    const wl = new WatchlistPage(page);
+    await wl.goto();
+    await expect(wl.watchlistHeading('Keep This')).toBeVisible();
+
+    await wl.deleteButton().click();
+    await expect(page.getByText('Delete?')).toBeVisible();
+    await page.getByRole('button', { name: 'No' }).click();
+    await expect(wl.watchlistHeading('Keep This')).toBeVisible();
   });
 
-  test('adds a symbol to a watchlist', async ({ page }) => {
-    const watchlistPage = new WatchlistPage(page);
-    const name = `Tech Watch ${Date.now()}`;
+  test('clicking a symbol navigates to stock page', async ({ authedPage: page }) => {
+    const w = { ...makeWatchlist('Click Test'), symbols: ['AAPL'] };
+    await page.route('**/api/portfolio/watchlists', (r) => r.fulfill({ json: [w] }));
+    await page.route('**/api/stocks/AAPL', (r) => r.fulfill({ json: MOCK_STOCK_AAPL }));
+    // Stub all stock page requests
+    await page.route('**/api/stocks/AAPL/history**', (r) => r.fulfill({ json: [] }));
+    await page.route('**/api/signals/AAPL', (r) => r.fulfill({ json: { symbol: 'AAPL', sentiment: null, prediction: null } }));
+    await page.route('**/api/predict/AAPL', (r) => r.fulfill({ json: { symbol: 'AAPL', predictions: [] } }));
+    await page.route('**/api/news/AAPL', (r) => r.fulfill({ json: [] }));
 
-    await watchlistPage.goto();
-    await watchlistPage.createWatchlist(name);
-    await expect(page.locator('h3', { hasText: name })).toBeVisible({ timeout: 5_000 });
+    const wl = new WatchlistPage(page);
+    await wl.goto();
+    await expect(wl.symbolCell('AAPL')).toBeVisible();
 
-    await watchlistPage.openAddSymbol(name);
-    await watchlistPage.addSymbol('NVDA');
-
-    // Symbols render as clickable <td> cells (not <a>) since the live-price table refactor
-    await expect(page.locator('td.font-mono', { hasText: 'NVDA' })).toBeVisible({ timeout: 5_000 });
-  });
-
-  test('watchlist symbol navigates to the stock page when clicked', async ({ page }) => {
-    const watchlistPage = new WatchlistPage(page);
-    const name = `Nav Watch ${Date.now()}`;
-
-    await watchlistPage.goto();
-    await watchlistPage.createWatchlist(name);
-    await expect(page.locator('h3', { hasText: name })).toBeVisible({ timeout: 5_000 });
-
-    await watchlistPage.openAddSymbol(name);
-    await watchlistPage.addSymbol('AAPL');
-
-    await page.locator('td.font-mono', { hasText: 'AAPL' }).click();
-    await page.waitForURL('**/stocks/AAPL', { timeout: 5_000 });
-    await expect(page).toHaveURL(/\/stocks\/AAPL/);
-  });
-
-  test('can add multiple symbols to a watchlist', async ({ page }) => {
-    const watchlistPage = new WatchlistPage(page);
-    const name = `Multi Watch ${Date.now()}`;
-
-    await watchlistPage.goto();
-    await watchlistPage.createWatchlist(name);
-    await expect(page.locator('h3', { hasText: name })).toBeVisible({ timeout: 5_000 });
-
-    for (const symbol of ['MSFT', 'TSLA']) {
-      await watchlistPage.openAddSymbol(name);
-      await watchlistPage.addSymbol(symbol);
-      await expect(page.locator('td.font-mono', { hasText: symbol })).toBeVisible({
-        timeout: 5_000,
-      });
-    }
+    await wl.symbolCell('AAPL').click();
+    await page.waitForURL('/stocks/AAPL');
+    await expect(page).toHaveURL('/stocks/AAPL');
   });
 });

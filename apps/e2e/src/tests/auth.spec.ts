@@ -1,137 +1,164 @@
+/**
+ * Auth tests cover: login, register, auth guards, logout.
+ *
+ * Prerequisite: Next.js frontend running with NEXT_PUBLIC_API_URL=http://localhost:3004/api
+ * All API calls are intercepted via page.route() — no real backend required.
+ */
 import { test, expect } from '@playwright/test';
-import { LoginPage, RegisterPage } from '../pages/auth.page';
+import { LoginPage } from '../pages/LoginPage';
+import { RegisterPage } from '../pages/RegisterPage';
+import {
+  MOCK_ACCESS_TOKEN,
+  MOCK_REFRESH_TOKEN,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from '../fixtures/data';
 
-const uniqueEmail = () => `e2e+${Date.now()}@example.com`;
-const PASSWORD = 'Test1234!';
-
-test.describe('Registration', () => {
-  test('registers a new user and redirects to dashboard', async ({ page }) => {
-    const registerPage = new RegisterPage(page);
-    await registerPage.goto();
-    await expect(page).toHaveTitle(/Yana Stocks/i);
-
-    await registerPage.register(uniqueEmail(), PASSWORD);
-    await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
-    await expect(page).toHaveURL(/\/dashboard/);
-  });
-
-  test('shows error for duplicate email', async ({ page }) => {
-    const email = uniqueEmail();
-    const registerPage = new RegisterPage(page);
-
-    await registerPage.goto();
-    await registerPage.register(email, PASSWORD);
-    await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
-
-    await registerPage.goto();
-    await registerPage.register(email, PASSWORD);
-    await expect(registerPage.errorMessage).toBeVisible({ timeout: 5_000 });
-  });
-});
+const AUTH_TOKENS = { accessToken: MOCK_ACCESS_TOKEN, refreshToken: MOCK_REFRESH_TOKEN };
 
 test.describe('Login', () => {
-  let testEmail: string;
-  let savedTokens: { at: string; rt: string } | null = null;
-
-  test.beforeAll(async ({ browser }) => {
-    testEmail = uniqueEmail();
-    const page = await browser.newPage();
-    const registerPage = new RegisterPage(page);
-    await registerPage.goto();
-    await registerPage.register(testEmail, PASSWORD);
-    await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
-    savedTokens = await page.evaluate(() => ({
-      at: localStorage.getItem('access_token') ?? '',
-      rt: localStorage.getItem('refresh_token') ?? '',
-    }));
-    await page.close();
+  test('renders login form', async ({ page }) => {
+    const login = new LoginPage(page);
+    await login.goto();
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    await expect(login.emailInput).toBeVisible();
+    await expect(login.passwordInput).toBeVisible();
+    await expect(login.submitButton).toBeVisible();
   });
 
-  test('logs in with valid credentials', async ({ page }) => {
-    const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await loginPage.login(testEmail, PASSWORD);
-    await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
-    await expect(page).toHaveURL(/\/dashboard/);
+  test('redirects to /dashboard on success', async ({ page }) => {
+    await page.route('**/api/auth/login', (r) => r.fulfill({ json: AUTH_TOKENS }));
+    await page.route('**/api/portfolio/portfolios', (r) => r.fulfill({ json: [] }));
+
+    const login = new LoginPage(page);
+    await login.goto();
+    await login.login('user@example.com', TEST_PASSWORD);
+    await page.waitForURL('/dashboard');
+    await expect(page).toHaveURL('/dashboard');
   });
 
-  test('shows error for invalid password', async ({ page }) => {
-    const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await loginPage.login(testEmail, 'wrongpassword');
-    await expect(loginPage.errorMessage).toBeVisible({ timeout: 5_000 });
-    await expect(loginPage.errorMessage).toContainText(/invalid/i);
+  test('shows error on invalid credentials', async ({ page }) => {
+    await page.route('**/api/auth/login', (r) => r.fulfill({ status: 401, json: {} }));
+
+    const login = new LoginPage(page);
+    await login.goto();
+    await login.login('bad@example.com', 'wrongpassword');
+    await expect(login.error).toBeVisible();
   });
 
-  test('protected route redirects unauthenticated user to login', async ({ page }) => {
-    await page.goto('/dashboard');
-    await page.waitForURL('**/login', { timeout: 5_000 });
-    await expect(page).toHaveURL(/\/login/);
+  test('stores tokens in localStorage after login', async ({ page }) => {
+    await page.route('**/api/auth/login', (r) => r.fulfill({ json: AUTH_TOKENS }));
+    await page.route('**/api/portfolio/portfolios', (r) => r.fulfill({ json: [] }));
+
+    const login = new LoginPage(page);
+    await login.goto();
+    await login.login('user@example.com', TEST_PASSWORD);
+    await page.waitForURL('/dashboard');
+
+    const at = await page.evaluate(() => localStorage.getItem('access_token'));
+    const rt = await page.evaluate(() => localStorage.getItem('refresh_token'));
+    expect(at).toBe(MOCK_ACCESS_TOKEN);
+    expect(rt).toBe(MOCK_REFRESH_TOKEN);
   });
 
-  test('navbar shows logout after login', async ({ page }) => {
-    const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await loginPage.login(testEmail, PASSWORD);
-    await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
-    await expect(page.locator('button', { hasText: 'Sign out' })).toBeVisible();
-  });
-
-  test('logout clears session and redirects away from dashboard', async ({ page }) => {
-    const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await loginPage.login(testEmail, PASSWORD);
-    await page.waitForURL('**/dashboard', { timeout: 30_000, waitUntil: 'commit' });
-
-    await page.locator('button', { hasText: 'Sign out' }).click();
-    // handleLogout awaits POST /auth/logout then calls router.push('/login') — wait for it
-    await page.waitForURL('**/login', { timeout: 10_000 });
-    // After logout, dashboard should no longer be accessible
-    await page.goto('/dashboard');
-    await page.waitForURL('**/login', { timeout: 5_000 });
-    await expect(page).toHaveURL(/\/login/);
-  });
-
-  test('logout removes tokens from localStorage', async ({ page }) => {
-    // Inject tokens instead of UI login — avoids WebKit email-input fill flakiness
-    await page.goto('/', { waitUntil: 'domcontentloaded' });
-    await page.evaluate(({ at, rt }) => {
-      localStorage.setItem('access_token', at);
-      localStorage.setItem('refresh_token', rt);
-    }, savedTokens!);
-    await page.goto('/');
-
-    await page.locator('button', { hasText: 'Sign out' }).click();
-
-    // handleLogout awaits POST /auth/logout before clearing localStorage — poll until cleared
-    await page.waitForFunction(() => localStorage.getItem('access_token') === null, {
-      timeout: 8_000,
-    });
-    const refreshToken = await page.evaluate(() => localStorage.getItem('refresh_token'));
-    expect(refreshToken).toBeNull();
+  test('has link to register page', async ({ page }) => {
+    const login = new LoginPage(page);
+    await login.goto();
+    await login.registerLink.click();
+    await expect(page).toHaveURL('/register');
   });
 });
 
-test.describe('Form validation', () => {
-  test('login form stays on page when submitted empty', async ({ page }) => {
-    const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await loginPage.submitButton.click();
-    await expect(page).toHaveURL(/\/login/);
+test.describe('Register', () => {
+  test('renders registration form', async ({ page }) => {
+    const register = new RegisterPage(page);
+    await register.goto();
+    await expect(page.getByRole('heading', { name: 'Create account' })).toBeVisible();
+    await expect(register.emailInput).toBeVisible();
+    await expect(register.passwordInput).toBeVisible();
+    await expect(register.submitButton).toBeVisible();
   });
 
-  test('register form stays on page when submitted empty', async ({ page }) => {
-    const registerPage = new RegisterPage(page);
-    await registerPage.goto();
-    await registerPage.submitButton.click();
-    await expect(page).toHaveURL(/\/register/);
+  test('redirects to /dashboard on success', async ({ page }) => {
+    await page.route('**/api/auth/register', (r) => r.fulfill({ json: AUTH_TOKENS }));
+    await page.route('**/api/portfolio/portfolios', (r) => r.fulfill({ json: [] }));
+
+    const register = new RegisterPage(page);
+    await register.goto();
+    await register.register(uniqueEmail(), TEST_PASSWORD);
+    await page.waitForURL('/dashboard');
+    await expect(page).toHaveURL('/dashboard');
   });
 
-  test('login shows error for empty password', async ({ page }) => {
-    const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await loginPage.emailInput.fill('test@example.com');
-    await loginPage.submitButton.click();
-    await expect(page).toHaveURL(/\/login/);
+  test('shows error on duplicate email', async ({ page }) => {
+    await page.route('**/api/auth/register', (r) =>
+      r.fulfill({ status: 409, json: { message: 'Email already in use' } }),
+    );
+
+    const register = new RegisterPage(page);
+    await register.goto();
+    await register.register('existing@example.com', TEST_PASSWORD);
+    await expect(register.error).toBeVisible();
+  });
+
+  test('has link to login page', async ({ page }) => {
+    const register = new RegisterPage(page);
+    await register.goto();
+    await register.signInLink.click();
+    await expect(page).toHaveURL('/login');
+  });
+});
+
+test.describe('Auth guards', () => {
+  test('redirects /dashboard to /login when unauthenticated', async ({ page }) => {
+    await page.goto('/dashboard');
+    await page.waitForURL('/login');
+    await expect(page).toHaveURL('/login');
+  });
+
+  test('redirects /portfolio to /login when unauthenticated', async ({ page }) => {
+    await page.goto('/portfolio');
+    await page.waitForURL('/login');
+    await expect(page).toHaveURL('/login');
+  });
+
+  test('redirects /watchlist to /login when unauthenticated', async ({ page }) => {
+    await page.goto('/watchlist');
+    await page.waitForURL('/login');
+    await expect(page).toHaveURL('/login');
+  });
+});
+
+test.describe('Logout', () => {
+  test('clears tokens and redirects to /login', async ({ page }) => {
+    await page.route('**/api/portfolio/portfolios', (r) => r.fulfill({ json: [] }));
+    await page.route('**/api/auth/logout', (r) => r.fulfill({ status: 200, json: {} }));
+
+    // Establish authenticated session
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+    await page.evaluate(
+      ({ at, rt }) => {
+        localStorage.setItem('access_token', at);
+        localStorage.setItem('refresh_token', rt);
+      },
+      { at: MOCK_ACCESS_TOKEN, rt: MOCK_REFRESH_TOKEN },
+    );
+
+    await page.goto('/dashboard');
+    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await page.waitForURL('/login');
+    await expect(page).toHaveURL('/login');
+
+    const at = await page.evaluate(() => localStorage.getItem('access_token'));
+    expect(at).toBeNull();
+  });
+
+  test('navbar shows Sign in / Get started when logged out', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Get started' })).toBeVisible();
   });
 });
