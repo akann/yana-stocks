@@ -138,7 +138,9 @@ export class PricesService {
       .exec();
 
     if (!PREDEFINED_SYMBOLS.has(symbol)) {
-      const isFresh = !!(await this.redis.get(`hist:fetched:${symbol}`));
+      // Separate freshness flag per interval so a daily fetch never blocks a
+      // minute fetch and vice versa.
+      const isFresh = !!(await this.redis.get(`hist:fetched:${symbol}:${interval}`));
       if (!isFresh && interval === '1d') {
         bars = await this.fetchAndStoreDailyHistory(symbol, opts.limit, filter);
       }
@@ -203,11 +205,13 @@ export class PricesService {
     limit: number,
     filter: Record<string, unknown>,
   ): Promise<PriceBar[]> {
-    if (!this.alpacaKey || !this.alpacaSecret) return [];
-
     const noDataKey = `hist:no-data-min:${symbol}`;
     const hasNoData = await this.redis.get(noDataKey);
     if (hasNoData) return [];
+
+    if (!this.alpacaKey || !this.alpacaSecret) {
+      return this.fetchAndStoreMinuteHistoryYahoo(symbol, limit, filter, noDataKey);
+    }
 
     try {
       const end = new Date();
@@ -234,23 +238,21 @@ export class PricesService {
       );
 
       if (!resp.ok) {
-        if (resp.status === 404 || resp.status === 422) {
-          await this.redis.setex(noDataKey, 86_400, '1');
-        }
         this.logger.warn('Alpaca bars request failed for %s: HTTP %d', symbol, resp.status);
-        return [];
+        return this.fetchAndStoreMinuteHistoryYahoo(symbol, limit, filter, noDataKey);
       }
 
       const data = (await resp.json()) as { bars?: AlpacaBar[] };
       const alpacaBars = data.bars ?? [];
 
       if (alpacaBars.length === 0) {
-        await this.redis.setex(noDataKey, 86_400, '1');
-        return [];
+        // Alpaca IEX has no coverage for this symbol (e.g. TSX-listed stocks).
+        // Fall back to Yahoo Finance for intraday 1m bars.
+        return this.fetchAndStoreMinuteHistoryYahoo(symbol, limit, filter, noDataKey);
       }
 
       this.logger.log('Fetched %d minute bars from Alpaca for %s', alpacaBars.length, symbol);
-      await this.redis.setex(`hist:fetched:${symbol}`, ON_DEMAND_FETCH_TTL, '1');
+      await this.redis.setex(`hist:fetched:${symbol}:1m`, ON_DEMAND_FETCH_TTL, '1');
 
       const ops = alpacaBars.map((bar) => ({
         updateOne: {
@@ -281,6 +283,79 @@ export class PricesService {
         .exec();
     } catch (err) {
       this.logger.warn('Alpaca minute fetch failed for %s: %s', symbol, (err as Error).message);
+      return this.fetchAndStoreMinuteHistoryYahoo(symbol, limit, filter, noDataKey);
+    }
+  }
+
+  private async fetchAndStoreMinuteHistoryYahoo(
+    symbol: string,
+    limit: number,
+    filter: Record<string, unknown>,
+    noDataKey: string,
+  ): Promise<PriceBar[]> {
+    try {
+      const end = new Date();
+      const start = new Date(end);
+      start.setDate(start.getDate() - 3);
+
+      const chart = await yf.chart(symbol, {
+        period1: start,
+        period2: end,
+        interval: '1m',
+        return: 'array',
+      });
+
+      const rows = chart.quotes.flatMap((q) => {
+        if (
+          q.open === null ||
+          q.high === null ||
+          q.low === null ||
+          q.close === null ||
+          q.volume === null
+        )
+          return [];
+        return [
+          { date: q.date, open: q.open, high: q.high, low: q.low, close: q.close, volume: q.volume },
+        ];
+      });
+
+      if (rows.length === 0) {
+        await this.redis.setex(noDataKey, 86_400, '1');
+        return [];
+      }
+
+      this.logger.log('Fetched %d minute bars from Yahoo Finance for %s', rows.length, symbol);
+      await this.redis.setex(`hist:fetched:${symbol}:1m`, ON_DEMAND_FETCH_TTL, '1');
+
+      const ops = rows.map((row) => ({
+        updateOne: {
+          filter: { symbol, timestamp: row.date, interval: '1m' },
+          update: {
+            $setOnInsert: {
+              symbol,
+              timestamp: row.date,
+              open: row.open,
+              high: row.high,
+              low: row.low,
+              close: row.close,
+              volume: row.volume,
+              interval: '1m',
+            },
+          },
+          upsert: true,
+        },
+      }));
+
+      await this.priceBarsModel.bulkWrite(ops, { ordered: false });
+
+      return this.priceBarsModel
+        .find(filter)
+        .sort({ timestamp: -1 })
+        .limit(limit)
+        .lean<PriceBar[]>()
+        .exec();
+    } catch (err) {
+      this.logger.warn('Yahoo Finance minute fetch failed for %s: %s', symbol, (err as Error).message);
       await this.redis.setex(noDataKey, 3_600, '1');
       return [];
     }
@@ -335,7 +410,7 @@ export class PricesService {
       }
 
       this.logger.log('Fetched %d daily bars from Yahoo Finance for %s', rows.length, symbol);
-      await this.redis.setex(`hist:fetched:${symbol}`, ON_DEMAND_FETCH_TTL, '1');
+      await this.redis.setex(`hist:fetched:${symbol}:1d`, ON_DEMAND_FETCH_TTL, '1');
 
       const ops = rows.map((row) => ({
         updateOne: {
