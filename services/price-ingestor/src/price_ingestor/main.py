@@ -1,4 +1,5 @@
 import logging
+import os
 import signal
 import time
 import types
@@ -49,11 +50,27 @@ def run(settings: Settings) -> None:
         time.sleep(settings.poll_interval_seconds)
 
 
+def _configure_tracing() -> None:
+    from opentelemetry import trace
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    from opentelemetry.instrumentation.pymongo import PymongoInstrumentor
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+    resource = Resource.create({"service.name": os.environ.get("OTEL_SERVICE_NAME", "price-ingestor")})
+    provider = TracerProvider(resource=resource)
+    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+    trace.set_tracer_provider(provider)
+    PymongoInstrumentor().instrument()
+
+
 def main() -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    _configure_tracing()
     run(Settings())
 
 

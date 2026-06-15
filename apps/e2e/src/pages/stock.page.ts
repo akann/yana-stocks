@@ -23,7 +23,10 @@ export class StockPage {
     });
     this.sentimentHeadline = page.locator('p.text-gray-300');
     this.newsPanel = page.locator('h3', { hasText: 'Recent News' });
-    this.newsArticleList = page.locator('h3', { hasText: 'Recent News' }).locator('..').locator('ul');
+    this.newsArticleList = page
+      .locator('h3', { hasText: 'Recent News' })
+      .locator('..')
+      .locator('ul');
   }
 
   predictionCard(horizon: string): Locator {

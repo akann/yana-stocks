@@ -14,6 +14,10 @@ dependencies = [
     "minio>=7.2.0",
     "pydantic>=2.10.0",
     "pydantic-settings>=2.7.0",
+    "opentelemetry-sdk>=1.42.1",
+    "opentelemetry-exporter-otlp-proto-http>=1.42.1",
+    "opentelemetry-instrumentation-fastapi>=0.63b1",
+    "opentelemetry-instrumentation-pymongo>=0.63b1",
 ]
 
 [dependency-groups]
@@ -56,7 +60,7 @@ warn_unused_ignores = true
 disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["prophet.*", "confluent_kafka.*", "pymongo.*", "bson.*", "minio.*", "pandas.*"]
+module = ["prophet.*", "confluent_kafka.*", "pymongo.*", "bson.*", "minio.*", "pandas.*", "opentelemetry.*"]
 ignore_missing_imports = true
 disallow_untyped_defs = false
 

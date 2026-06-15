@@ -27,7 +27,10 @@
     "kafkajs": "^2.2.4",
     "mongodb": "^6.0.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "@opentelemetry/sdk-node": "^0.219.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.77.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.219.0"
   },
   "devDependencies": {
     "@nestjs/testing": "^11.1.26",

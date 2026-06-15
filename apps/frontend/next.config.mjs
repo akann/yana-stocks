@@ -3,6 +3,7 @@ const config = {
   output: 'standalone',
   experimental: {
     turbo: {},
+    instrumentationHook: true,
   },
 };
 

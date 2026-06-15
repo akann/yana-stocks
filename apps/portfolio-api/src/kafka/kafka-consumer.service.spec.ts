@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import type { ProcessedPriceMessage, PredictionSignal, SentimentSignal } from '@yana-stocks/shared-types';
+import type {
+  ProcessedPriceMessage,
+  PredictionSignal,
+  SentimentSignal,
+} from '@yana-stocks/shared-types';
 import { RedisService } from '../redis/redis.service';
 import { KafkaConsumerService } from './kafka-consumer.service';
 
@@ -11,15 +15,19 @@ jest.mock('kafkajs', () => {
     on: jest.fn(),
     connect: jest.fn().mockResolvedValue(undefined),
     subscribe: jest.fn().mockResolvedValue(undefined),
-    run: jest.fn().mockImplementation(({ eachMessage }: { eachMessage: (args: unknown) => Promise<void> }) => {
-      eachMessageHandler.fn = eachMessage;
-      return Promise.resolve();
-    }),
+    run: jest
+      .fn()
+      .mockImplementation(({ eachMessage }: { eachMessage: (args: unknown) => Promise<void> }) => {
+        eachMessageHandler.fn = eachMessage;
+        return Promise.resolve();
+      }),
     disconnect: jest.fn().mockResolvedValue(undefined),
     events: { CRASH: 'consumer.crash' },
   };
   return {
-    Kafka: jest.fn().mockImplementation(() => ({ consumer: jest.fn().mockReturnValue(mockConsumer) })),
+    Kafka: jest
+      .fn()
+      .mockImplementation(() => ({ consumer: jest.fn().mockReturnValue(mockConsumer) })),
     eachMessageHandler,
   };
 });
@@ -85,15 +93,18 @@ describe('KafkaConsumerService — message handlers', () => {
 
       await handlePrice(baseMsg);
 
-      expect(redis.set).toHaveBeenCalledWith(
-        'papi:price:AAPL',
-        expect.any(String),
-        86400,
-      );
+      expect(redis.set).toHaveBeenCalledWith('papi:price:AAPL', expect.any(String), 86400);
     });
 
     it('computes change and changePercent against the previous cached price', async () => {
-      const prev = JSON.stringify({ price: 175, prevPrice: 170, change: 5, changePercent: 2.94, volume: 1_000_000, timestamp: 't' });
+      const prev = JSON.stringify({
+        price: 175,
+        prevPrice: 170,
+        change: 5,
+        changePercent: 2.94,
+        volume: 1_000_000,
+        timestamp: 't',
+      });
       redis.get.mockResolvedValue(prev);
 
       await handlePrice(baseMsg);

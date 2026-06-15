@@ -7,7 +7,10 @@ jest.mock('yahoo-finance2', () => {
   const quote = jest.fn();
   return {
     __esModule: true,
-    default: Object.assign(jest.fn(() => ({ chart, quote })), { _chart: chart, _quote: quote }),
+    default: Object.assign(
+      jest.fn(() => ({ chart, quote })),
+      { _chart: chart, _quote: quote },
+    ),
   };
 });
 
@@ -53,12 +56,26 @@ const rawMsg: RawPriceMessage = {
 // Yahoo Finance chart() response shapes
 const yfDailyChart = {
   quotes: [
-    { date: new Date('2024-01-02T00:00:00Z'), open: 150, high: 155, low: 148, close: 152, volume: 1_000_000 },
+    {
+      date: new Date('2024-01-02T00:00:00Z'),
+      open: 150,
+      high: 155,
+      low: 148,
+      close: 152,
+      volume: 1_000_000,
+    },
   ],
 };
 const yfMinuteChart = {
   quotes: [
-    { date: new Date('2024-01-02T14:30:00Z'), open: 150, high: 151, low: 149.5, close: 150.5, volume: 10_000 },
+    {
+      date: new Date('2024-01-02T14:30:00Z'),
+      open: 150,
+      high: 151,
+      low: 149.5,
+      close: 150.5,
+      volume: 10_000,
+    },
   ],
 };
 const emptyChart = { quotes: [] };
@@ -324,7 +341,9 @@ describe('PricesService', () => {
 
         expect(global.fetch).toHaveBeenCalledWith(
           expect.stringContaining('data.alpaca.markets'),
-          expect.objectContaining({ headers: expect.objectContaining({ 'APCA-API-KEY-ID': KEY }) as unknown }),
+          expect.objectContaining({
+            headers: expect.objectContaining({ 'APCA-API-KEY-ID': KEY }) as unknown,
+          }),
         );
         expect(model.bulkWrite).toHaveBeenCalled();
         expect(redisSetex).toHaveBeenCalledWith('hist:fetched:UBER:1m', 900, '1');
@@ -354,7 +373,9 @@ describe('PricesService', () => {
 
       it('falls back to Yahoo Finance when Alpaca fetch throws', async () => {
         const { service } = await buildModule(KEY, SECRET);
-        (global as typeof globalThis & { fetch: jest.Mock }).fetch.mockRejectedValue(new Error('timeout'));
+        (global as typeof globalThis & { fetch: jest.Mock }).fetch.mockRejectedValue(
+          new Error('timeout'),
+        );
         MockYahooFinance._chart.mockResolvedValue(emptyChart);
 
         await service.getHistory('SHOP', { limit: 60, interval: '1m' });
@@ -373,7 +394,11 @@ describe('PricesService', () => {
         await service.getHistory('SHOP', { limit: 21, interval: '1d' });
 
         expect(redisSetex).toHaveBeenCalledWith('hist:fetched:SHOP:1d', 900, '1');
-        expect(redisSetex).not.toHaveBeenCalledWith('hist:fetched:SHOP:1m', expect.anything(), expect.anything());
+        expect(redisSetex).not.toHaveBeenCalledWith(
+          'hist:fetched:SHOP:1m',
+          expect.anything(),
+          expect.anything(),
+        );
       });
 
       it('skips fetch when hist:no-data:<symbol> is set', async () => {

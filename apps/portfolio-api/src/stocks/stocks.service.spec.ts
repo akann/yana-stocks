@@ -92,9 +92,7 @@ describe('StocksService', () => {
       const result = await service.getStock('AAPL');
 
       expect(result.price).toBe(180);
-      expect(httpService.get).toHaveBeenCalledWith(
-        expect.stringContaining('/prices/AAPL/quote'),
-      );
+      expect(httpService.get).toHaveBeenCalledWith(expect.stringContaining('/prices/AAPL/quote'));
       expect(redis.set).toHaveBeenCalledWith(
         'papi:price:AAPL',
         JSON.stringify(mockPriceCacheEntry),
@@ -183,9 +181,30 @@ describe('StocksService', () => {
 
     it('builds gainers and losers from scan/mget when cache is cold', async () => {
       const entries: PriceCacheEntry[] = [
-        { price: 200, prevPrice: 190, change: 10, changePercent: 5.26, volume: 1_000_000, timestamp: 't' },
-        { price: 100, prevPrice: 110, change: -10, changePercent: -9.09, volume: 500_000, timestamp: 't' },
-        { price: 150, prevPrice: 148, change: 2, changePercent: 1.35, volume: 750_000, timestamp: 't' },
+        {
+          price: 200,
+          prevPrice: 190,
+          change: 10,
+          changePercent: 5.26,
+          volume: 1_000_000,
+          timestamp: 't',
+        },
+        {
+          price: 100,
+          prevPrice: 110,
+          change: -10,
+          changePercent: -9.09,
+          volume: 500_000,
+          timestamp: 't',
+        },
+        {
+          price: 150,
+          prevPrice: 148,
+          change: 2,
+          changePercent: 1.35,
+          volume: 750_000,
+          timestamp: 't',
+        },
       ];
       const keys = ['papi:price:AAPL', 'papi:price:TSLA', 'papi:price:MSFT'];
 

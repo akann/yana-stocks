@@ -72,9 +72,9 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
     queryKey: ['history', symbol, activeRange.limit, activeRange.interval],
     queryFn: () =>
       api
-        .get<OHLCVBar[]>(
-          `/stocks/${symbol}/history?limit=${activeRange.limit}&interval=${activeRange.interval}`,
-        )
+        .get<
+          OHLCVBar[]
+        >(`/stocks/${symbol}/history?limit=${activeRange.limit}&interval=${activeRange.interval}`)
         .then((r) => r.data),
     refetchInterval: activeRange.interval === '1d' ? 3_600_000 : 30_000,
     staleTime: activeRange.interval === '1d' ? 300_000 : 10_000,

@@ -21,7 +21,16 @@ const QUOTE_CACHE_TTL = 900; // 15 minutes — matches ON_DEMAND_FETCH_TTL
 const ON_DEMAND_FETCH_TTL = 900; // 15 minutes
 
 const PREDEFINED_SYMBOLS = new Set([
-  'AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'NVDA', 'META', 'JPM', 'V', 'JNJ',
+  'AAPL',
+  'GOOGL',
+  'MSFT',
+  'AMZN',
+  'TSLA',
+  'NVDA',
+  'META',
+  'JPM',
+  'V',
+  'JNJ',
 ]);
 
 export interface QuoteEntry {
@@ -315,7 +324,14 @@ export class PricesService {
         )
           return [];
         return [
-          { date: q.date, open: q.open, high: q.high, low: q.low, close: q.close, volume: q.volume },
+          {
+            date: q.date,
+            open: q.open,
+            high: q.high,
+            low: q.low,
+            close: q.close,
+            volume: q.volume,
+          },
         ];
       });
 
@@ -355,7 +371,11 @@ export class PricesService {
         .lean<PriceBar[]>()
         .exec();
     } catch (err) {
-      this.logger.warn('Yahoo Finance minute fetch failed for %s: %s', symbol, (err as Error).message);
+      this.logger.warn(
+        'Yahoo Finance minute fetch failed for %s: %s',
+        symbol,
+        (err as Error).message,
+      );
       await this.redis.setex(noDataKey, 3_600, '1');
       return [];
     }

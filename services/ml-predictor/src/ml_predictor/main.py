@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
@@ -53,11 +54,29 @@ def predict(symbol: str) -> dict[str, Any]:
     return {"symbol": symbol.upper(), "predictions": preds}
 
 
+def _configure_tracing() -> None:
+    from opentelemetry import trace
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+    from opentelemetry.instrumentation.pymongo import PymongoInstrumentor
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+    resource = Resource.create({"service.name": os.environ.get("OTEL_SERVICE_NAME", "ml-predictor")})
+    provider = TracerProvider(resource=resource)
+    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+    trace.set_tracer_provider(provider)
+    PymongoInstrumentor().instrument()
+    FastAPIInstrumentor.instrument_app(app)
+
+
 def main() -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    _configure_tracing()
     uvicorn.run(app, host="0.0.0.0", port=_settings.port)
 
 

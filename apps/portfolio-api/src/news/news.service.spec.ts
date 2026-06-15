@@ -5,7 +5,9 @@ import { NewsService } from './news.service';
 const mockToArray = jest.fn();
 const mockLimit = jest.fn().mockReturnThis();
 const mockSort = jest.fn().mockReturnThis();
-const mockFind = jest.fn().mockReturnValue({ sort: mockSort, limit: mockLimit, toArray: mockToArray });
+const mockFind = jest
+  .fn()
+  .mockReturnValue({ sort: mockSort, limit: mockLimit, toArray: mockToArray });
 const mockCollection = jest.fn().mockReturnValue({ find: mockFind });
 const mockDb = jest.fn().mockReturnValue({ collection: mockCollection });
 const mockConnect = jest.fn().mockResolvedValue(undefined);

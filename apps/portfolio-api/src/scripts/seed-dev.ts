@@ -88,9 +88,7 @@ function generateDailyBars(stock: StockSeed): OHLCVBar[] {
   let prev = startPrice;
 
   for (let i = 0; i < TRADING_DAYS; i++) {
-    const timestamp = new Date(
-      endTime.getTime() - (TRADING_DAYS - 1 - i) * MS_PER_TRADING_DAY,
-    );
+    const timestamp = new Date(endTime.getTime() - (TRADING_DAYS - 1 - i) * MS_PER_TRADING_DAY);
     const drift = (endPrice - prev) / (TRADING_DAYS - i);
     const noise = (Math.random() - 0.5) * stock.price * 0.012;
     const close = Math.max(0.01, parseFloat((prev + drift + noise).toFixed(2)));
@@ -1039,16 +1037,7 @@ async function seed(): Promise<void> {
     );
     await col.deleteMany({
       source: {
-        $in: [
-          'Reuters',
-          'Bloomberg',
-          'CNBC',
-          'WSJ',
-          'TechCrunch',
-          'FT',
-          'Guardian',
-          'MacRumors',
-        ],
+        $in: ['Reuters', 'Bloomberg', 'CNBC', 'WSJ', 'TechCrunch', 'FT', 'Guardian', 'MacRumors'],
       },
     });
     await col.insertMany(articles);

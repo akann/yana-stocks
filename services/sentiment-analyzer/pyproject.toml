@@ -11,6 +11,9 @@ dependencies = [
     "pydantic>=2.10.0",
     "pydantic-settings>=2.7.0",
     "httpx>=0.28.0",
+    "opentelemetry-sdk>=1.42.1",
+    "opentelemetry-exporter-otlp-proto-http>=1.42.1",
+    "opentelemetry-instrumentation-pymongo>=0.63b1",
 ]
 
 [project.scripts]
@@ -52,7 +55,7 @@ warn_unused_ignores = true
 disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["transformers.*", "confluent_kafka.*", "pymongo.*", "bson.*"]
+module = ["transformers.*", "confluent_kafka.*", "pymongo.*", "bson.*", "opentelemetry.*"]
 ignore_missing_imports = true
 disallow_untyped_defs = false
 

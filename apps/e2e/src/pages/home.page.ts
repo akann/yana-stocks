@@ -18,7 +18,10 @@ export class HomePage {
     this.losersSection = page.locator('h3', { hasText: 'Top Losers' });
     this.stockBrowserSection = page.locator('h2', { hasText: 'All Stocks' });
     this.stockBrowserSearch = page.locator('input[placeholder*="Search by symbol"]');
-    this.stockBrowserTable = page.locator('h2', { hasText: 'All Stocks' }).locator('../..').locator('table');
+    this.stockBrowserTable = page
+      .locator('h2', { hasText: 'All Stocks' })
+      .locator('../..')
+      .locator('table');
   }
 
   firstGainerLink(): Locator {
