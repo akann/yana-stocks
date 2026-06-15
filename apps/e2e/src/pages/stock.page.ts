@@ -7,6 +7,8 @@ export class StockPage {
   readonly predictionsPanel: Locator;
   readonly sentimentLabel: Locator;
   readonly sentimentHeadline: Locator;
+  readonly newsPanel: Locator;
+  readonly newsArticleList: Locator;
 
   constructor(page: Page) {
     this.page = page;
@@ -20,10 +22,16 @@ export class StockPage {
       hasText: /^(positive|negative|neutral)$/i,
     });
     this.sentimentHeadline = page.locator('p.text-gray-300');
+    this.newsPanel = page.locator('h3', { hasText: 'Recent News' });
+    this.newsArticleList = page.locator('h3', { hasText: 'Recent News' }).locator('..').locator('ul');
   }
 
   predictionCard(horizon: string): Locator {
     return this.page.locator('div.bg-gray-800.rounded-lg').filter({ hasText: horizon });
+  }
+
+  newsArticle(index: number): Locator {
+    return this.newsArticleList.locator('li').nth(index);
   }
 
   async goto(symbol: string) {

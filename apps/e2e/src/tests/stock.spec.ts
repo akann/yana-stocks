@@ -136,7 +136,7 @@ test.describe('Stock data content', () => {
     const stockPage = new StockPage(page);
     await stockPage.goto('NVDA'); // seeded positive
     await expect(stockPage.sentimentPanel).toBeVisible({ timeout: 10_000 });
-    const label = page.locator('span.bg-green-900');
+    const label = page.locator('span.bg-green-900').first();
     await expect(label).toBeVisible({ timeout: 10_000 });
     await expect(label).toContainText(/positive/i);
   });
@@ -145,8 +145,71 @@ test.describe('Stock data content', () => {
     const stockPage = new StockPage(page);
     await stockPage.goto('JNJ'); // seeded negative
     await expect(stockPage.sentimentPanel).toBeVisible({ timeout: 10_000 });
-    const label = page.locator('span.bg-red-900');
+    const label = page.locator('span.bg-red-900').first();
     await expect(label).toBeVisible({ timeout: 10_000 });
     await expect(label).toContainText(/negative/i);
+  });
+
+  // NewsPanel tests — AAPL/NVDA/SMCI/MRNA all have 3 seeded articles each
+  test('news panel renders for seeded symbol', async ({ page }) => {
+    const stockPage = new StockPage(page);
+    await stockPage.goto('AAPL');
+    await expect(stockPage.newsPanel).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('news panel shows at least one article with a link', async ({ page }) => {
+    const stockPage = new StockPage(page);
+    await stockPage.goto('NVDA');
+    await expect(stockPage.newsPanel).toBeVisible({ timeout: 10_000 });
+    const firstArticle = stockPage.newsArticle(0);
+    await expect(firstArticle).toBeVisible({ timeout: 10_000 });
+    await expect(firstArticle.locator('a')).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('news articles show sentiment badges', async ({ page }) => {
+    const stockPage = new StockPage(page);
+    await stockPage.goto('NVDA');
+    await expect(stockPage.newsPanel).toBeVisible({ timeout: 10_000 });
+    const firstArticle = stockPage.newsArticle(0);
+    await expect(firstArticle).toBeVisible({ timeout: 10_000 });
+    const badge = firstArticle.locator('span').filter({ hasText: /positive|negative|neutral/i });
+    await expect(badge).toBeVisible({ timeout: 5_000 });
+  });
+
+  // New high-magnitude mover tests enabled by the expanded seed data
+  test('top gainer SMCI shows green positive change percentage', async ({ page }) => {
+    const stockPage = new StockPage(page);
+    await stockPage.goto('SMCI');
+    await expect(page.locator('span.text-3xl.font-bold')).toBeVisible({ timeout: 10_000 });
+    const changeSpan = page.locator('span.text-base.font-semibold.text-green-400');
+    await expect(changeSpan).toBeVisible({ timeout: 5_000 });
+    await expect(changeSpan).toContainText('+');
+  });
+
+  test('top loser MRNA shows red negative change percentage', async ({ page }) => {
+    const stockPage = new StockPage(page);
+    await stockPage.goto('MRNA');
+    await expect(page.locator('span.text-3xl.font-bold')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('span.text-base.font-semibold.text-red-400')).toBeVisible({
+      timeout: 5_000,
+    });
+  });
+
+  test('SMCI news shows positive sentiment badge', async ({ page }) => {
+    const stockPage = new StockPage(page);
+    await stockPage.goto('SMCI');
+    await expect(stockPage.newsPanel).toBeVisible({ timeout: 10_000 });
+    const firstArticle = stockPage.newsArticle(0);
+    await expect(firstArticle).toBeVisible({ timeout: 10_000 });
+    await expect(firstArticle.locator('span.bg-green-900')).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('MRNA news shows negative sentiment badge', async ({ page }) => {
+    const stockPage = new StockPage(page);
+    await stockPage.goto('MRNA');
+    await expect(stockPage.newsPanel).toBeVisible({ timeout: 10_000 });
+    const firstArticle = stockPage.newsArticle(0);
+    await expect(firstArticle).toBeVisible({ timeout: 10_000 });
+    await expect(firstArticle.locator('span.bg-red-900')).toBeVisible({ timeout: 5_000 });
   });
 });
