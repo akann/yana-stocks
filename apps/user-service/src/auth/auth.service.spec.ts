@@ -61,7 +61,7 @@ describe('AuthService', () => {
       const result = await service.register({ email: 'test@example.com', name: 'Test User' });
 
       expect(authentik.createUser).toHaveBeenCalledWith('test@example.com', 'Test User');
-      expect(authentik.triggerEmailVerification).toHaveBeenCalledWith('authentik-uuid-1');
+      expect(authentik.triggerEmailVerification).toHaveBeenCalledWith('test@example.com', 'authentik-uuid-1');
       expect(result).toHaveProperty('message');
     });
 
