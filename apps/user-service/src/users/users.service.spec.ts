@@ -1,30 +1,23 @@
-import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from './users.service';
 
-jest.mock('bcrypt', () => ({
-  hash: jest.fn(),
-  compare: jest.fn(),
-}));
-
-const mockUser = {
-  id: 'user-1',
+const mockProfile = {
+  id: 'profile-1',
+  authentikId: 'ak-uuid-1',
   email: 'test@example.com',
   name: 'Test User',
-  password: '$2b$12$hashedpassword',
   createdAt: new Date(),
   updatedAt: new Date(),
 };
 
 describe('UsersService', () => {
   let service: UsersService;
-  let prisma: { user: { findUnique: jest.Mock; create: jest.Mock } };
+  let prisma: { userProfile: { findUnique: jest.Mock; create: jest.Mock } };
 
   beforeEach(async () => {
     prisma = {
-      user: {
+      userProfile: {
         findUnique: jest.fn(),
         create: jest.fn(),
       },
@@ -37,64 +30,49 @@ describe('UsersService', () => {
     service = module.get(UsersService);
   });
 
-  describe('findByEmail', () => {
-    it('delegates to prisma.user.findUnique with email', async () => {
-      prisma.user.findUnique.mockResolvedValue(mockUser);
-      const result = await service.findByEmail('test@example.com');
-      expect(result).toBe(mockUser);
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
+  describe('findByAuthentikId', () => {
+    it('returns profile when found', async () => {
+      prisma.userProfile.findUnique.mockResolvedValue(mockProfile);
+      const result = await service.findByAuthentikId('ak-uuid-1');
+      expect(result).toBe(mockProfile);
+      expect(prisma.userProfile.findUnique).toHaveBeenCalledWith({ where: { authentikId: 'ak-uuid-1' } });
     });
 
-    it('returns null when user does not exist', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
-      expect(await service.findByEmail('nobody@example.com')).toBeNull();
-    });
-  });
-
-  describe('findById', () => {
-    it('delegates to prisma.user.findUnique with id', async () => {
-      prisma.user.findUnique.mockResolvedValue(mockUser);
-      const result = await service.findById('user-1');
-      expect(result).toBe(mockUser);
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { id: 'user-1' } });
+    it('returns null when not found', async () => {
+      prisma.userProfile.findUnique.mockResolvedValue(null);
+      expect(await service.findByAuthentikId('unknown')).toBeNull();
     });
   });
 
-  describe('create', () => {
-    it('hashes the password and creates the user', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
-      (bcrypt.hash as jest.Mock).mockResolvedValue('$2b$12$hashed');
-      prisma.user.create.mockResolvedValue(mockUser);
+  describe('findOrCreateByAuthentikId', () => {
+    it('returns existing profile without creating', async () => {
+      prisma.userProfile.findUnique.mockResolvedValue(mockProfile);
+      const result = await service.findOrCreateByAuthentikId('ak-uuid-1', 'test@example.com', 'Test User');
+      expect(result).toBe(mockProfile);
+      expect(prisma.userProfile.create).not.toHaveBeenCalled();
+    });
 
-      const result = await service.create('test@example.com', 'Test User', 'plainpassword');
+    it('creates and returns a new profile when not found', async () => {
+      prisma.userProfile.findUnique.mockResolvedValue(null);
+      prisma.userProfile.create.mockResolvedValue(mockProfile);
 
-      expect(bcrypt.hash).toHaveBeenCalledWith('plainpassword', 12);
-      expect(prisma.user.create).toHaveBeenCalledWith({
-        data: { email: 'test@example.com', name: 'Test User', password: '$2b$12$hashed' },
+      const result = await service.findOrCreateByAuthentikId('ak-uuid-1', 'test@example.com', 'Test User');
+
+      expect(prisma.userProfile.create).toHaveBeenCalledWith({
+        data: { authentikId: 'ak-uuid-1', email: 'test@example.com', name: 'Test User' },
       });
-      expect(result).toBe(mockUser);
+      expect(result).toBe(mockProfile);
     });
 
-    it('throws ConflictException when email is already registered', async () => {
-      prisma.user.findUnique.mockResolvedValue(mockUser);
+    it('creates profile with null name when name is absent', async () => {
+      prisma.userProfile.findUnique.mockResolvedValue(null);
+      prisma.userProfile.create.mockResolvedValue({ ...mockProfile, name: null });
 
-      await expect(service.create('test@example.com', 'Dupe', 'pass')).rejects.toThrow(
-        ConflictException,
-      );
-      expect(prisma.user.create).not.toHaveBeenCalled();
-    });
-  });
+      await service.findOrCreateByAuthentikId('ak-uuid-2', 'noname@example.com', null);
 
-  describe('validatePassword', () => {
-    it('returns true when passwords match', async () => {
-      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      expect(await service.validatePassword('$2b$12$hashed', 'plainpassword')).toBe(true);
-      expect(bcrypt.compare).toHaveBeenCalledWith('plainpassword', '$2b$12$hashed');
-    });
-
-    it('returns false when passwords do not match', async () => {
-      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
-      expect(await service.validatePassword('$2b$12$hashed', 'wrong')).toBe(false);
+      expect(prisma.userProfile.create).toHaveBeenCalledWith({
+        data: { authentikId: 'ak-uuid-2', email: 'noname@example.com', name: null },
+      });
     });
   });
 });

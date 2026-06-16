@@ -1,37 +1,20 @@
-import { ConflictException, Injectable } from '@nestjs/common';
-import bcrypt from 'bcrypt';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-
-export interface UserRecord {
-  id: string;
-  email: string;
-  name: string;
-  password: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
 
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findByEmail(email: string): Promise<UserRecord | null> {
-    return this.prisma.user.findUnique({ where: { email } });
+  findByAuthentikId(authentikId: string) {
+    return this.prisma.userProfile.findUnique({ where: { authentikId } });
   }
 
-  findById(id: string): Promise<UserRecord | null> {
-    return this.prisma.user.findUnique({ where: { id } });
-  }
+  async findOrCreateByAuthentikId(authentikId: string, email: string, name: string | null) {
+    const existing = await this.findByAuthentikId(authentikId);
+    if (existing) return existing;
 
-  async create(email: string, name: string, password: string): Promise<UserRecord> {
-    const existing = await this.findByEmail(email);
-    if (existing) throw new ConflictException('Email already registered');
-
-    const hashed = await bcrypt.hash(password, 12);
-    return this.prisma.user.create({ data: { email, name, password: hashed } });
-  }
-
-  validatePassword(hashedPassword: string, plainPassword: string): Promise<boolean> {
-    return bcrypt.compare(plainPassword, hashedPassword);
+    return this.prisma.userProfile.create({
+      data: { authentikId, email, name },
+    });
   }
 }

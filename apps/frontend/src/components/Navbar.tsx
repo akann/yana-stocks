@@ -2,23 +2,10 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 
 export function Navbar(): React.JSX.Element {
   const { isAuthenticated, logout } = useAuth();
-  const router = useRouter();
-
-  async function handleLogout() {
-    try {
-      await api.post('/auth/logout');
-    } catch {
-      // ignore
-    }
-    logout();
-    router.push('/login');
-  }
 
   return (
     <nav className="bg-surface-800 border-b border-gray-700 px-4 py-3">
@@ -49,7 +36,7 @@ export function Navbar(): React.JSX.Element {
         <div className="flex items-center gap-3 text-sm">
           {isAuthenticated ? (
             <button
-              onClick={handleLogout}
+              onClick={logout}
               className="text-gray-400 hover:text-white transition-colors"
             >
               Sign out

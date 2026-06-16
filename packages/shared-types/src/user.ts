@@ -1,19 +1,19 @@
-export interface User {
+export interface UserProfile {
   id: string;
+  authentikId: string;
   email: string;
-  name: string;
+  name: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export interface AuthTokens {
-  accessToken: string;
-  refreshToken: string;
-}
-
+/** Claims present in JWTs issued by Authentik for the yana-stocks application. */
 export interface JwtPayload {
-  sub: string;
+  sub: string;       // Authentik user UUID (sub_mode: user_id)
   email: string;
-  iat?: number;
-  exp?: number;
+  name?: string;
+  iss: string;       // https://authentik.yanatech.co.uk/application/o/yana-stocks/
+  aud: string | string[];
+  iat: number;
+  exp: number;
 }

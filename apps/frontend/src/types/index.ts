@@ -1,11 +1,8 @@
-export interface User {
+export interface UserProfile {
   id: string;
+  authentikId: string;
   email: string;
-}
-
-export interface AuthTokens {
-  accessToken: string;
-  refreshToken: string;
+  name: string | null;
 }
 
 export interface PortfolioStock {

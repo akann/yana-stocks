@@ -1,11 +1,15 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { LoginDto, RefreshTokenDto, RegisterDto } from '@yana-stocks/shared-dto';
-import type { User } from '@yana-stocks/shared-types';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, UnauthorizedException } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
+import { RegisterDto } from '@yana-stocks/shared-dto';
+import type { JwtPayload } from '@yana-stocks/shared-types';
 import { AuthService } from './auth.service';
-import { GetUser } from './decorators/user.decorator';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { LocalAuthGuard } from './guards/local-auth.guard';
+
+function decodeJwtPayload(token: string): JwtPayload {
+  const part = token.split('.')[1];
+  if (!part) throw new UnauthorizedException('Malformed token');
+  return JSON.parse(Buffer.from(part, 'base64url').toString('utf8')) as JwtPayload;
+}
 
 @ApiTags('auth')
 @Controller('auth')
@@ -14,41 +18,18 @@ export class AuthController {
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Register a new user' })
+  @ApiOperation({ summary: 'Register a new user — creates inactive Authentik account and sends verification email' })
   register(@Body() dto: RegisterDto) {
     return this.auth.register(dto);
   }
 
-  @Post('login')
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(LocalAuthGuard)
-  @ApiOperation({ summary: 'Login with email and password' })
-  @ApiBody({ type: LoginDto })
-  login(@GetUser() user: User) {
-    return this.auth.login(user);
-  }
-
-  @Post('refresh')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Rotate refresh token and get a new access token' })
-  refresh(@Body() dto: RefreshTokenDto) {
-    return this.auth.refreshTokens(dto.refreshToken);
-  }
-
-  @Post('logout')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Logout and invalidate the refresh token' })
-  logout(@Body() dto: RefreshTokenDto): Promise<void> {
-    return this.auth.logout(dto.refreshToken);
-  }
-
   @Get('me')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get the current authenticated user' })
-  me(@GetUser() user: User) {
-    return user;
+  @ApiOperation({ summary: 'Return the current user profile (JWT validated upstream by Kong); lazy-creates profile row on first call' })
+  me(@Req() req: Request) {
+    const bearer = req.headers['authorization'];
+    if (!bearer?.startsWith('Bearer ')) throw new UnauthorizedException();
+    const claims = decodeJwtPayload(bearer.slice(7));
+    if (!claims.sub) throw new UnauthorizedException();
+    return this.auth.findOrCreateProfile(claims);
   }
 }
