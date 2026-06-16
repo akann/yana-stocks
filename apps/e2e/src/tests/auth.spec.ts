@@ -101,6 +101,12 @@ test.describe('Auth guards', () => {
 test.describe('Logout', () => {
   test('clears session tokens on logout', async ({ page }) => {
     await page.route('**/api/portfolio/portfolios', (r) => r.fulfill({ json: [] }));
+    // Intercept the Authentik end_session navigation and redirect back to /login,
+    // simulating the OIDC post-logout redirect. Works cross-browser (waitForRequest
+    // is unreliable in WebKit for cross-origin window.location.href navigations).
+    await page.route(/authentik\.yanatech\.co\.uk/, (r) =>
+      r.fulfill({ status: 302, headers: { Location: 'http://localhost:3000/login' } }),
+    );
 
     // Inject authenticated session into sessionStorage
     await page.goto('/');
@@ -116,14 +122,10 @@ test.describe('Logout', () => {
     await page.goto('/dashboard');
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
 
-    // logout() clears sessionStorage then navigates to Authentik end_session.
-    // Capturing the request proves tokens were cleared and the OIDC logout flow fired.
-    const [request] = await Promise.all([
-      page.waitForRequest((req) => req.url().includes('end-session')),
-      page.getByRole('button', { name: 'Sign out' }).click(),
-    ]);
-    expect(request.url()).toContain('/application/o/yana-stocks/end-session/');
-    expect(request.url()).toContain('client_id=yana-stocks');
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    // Post-logout: Authentik redirects back to /login; user should see sign-in link
+    await page.waitForURL('/login');
+    await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
   });
 
   test('navbar shows Sign in / Get started when logged out', async ({ page }) => {
