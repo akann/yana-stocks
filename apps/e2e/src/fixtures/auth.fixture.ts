@@ -7,19 +7,17 @@ type AuthFixtures = {
 
 /**
  * Extends the base Playwright test with an `authedPage` fixture.
- * The page has access_token + refresh_token pre-injected into localStorage,
- * matching what AuthContext reads on mount. Each test using this fixture must
- * still navigate to the page it wants to test.
+ * Tokens are written into sessionStorage (matching AuthContext reads on mount).
+ * Each test using this fixture must navigate to the page it wants to test.
  */
 export const test = base.extend<AuthFixtures>({
   authedPage: async ({ page }, use) => {
-    // Navigate to the app's origin so localStorage writes land on the right scope.
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
     await page.evaluate(
       ({ at, rt }) => {
-        localStorage.setItem('access_token', at);
-        localStorage.setItem('refresh_token', rt);
+        sessionStorage.setItem('access_token', at);
+        sessionStorage.setItem('refresh_token', rt);
       },
       { at: MOCK_ACCESS_TOKEN, rt: MOCK_REFRESH_TOKEN },
     );

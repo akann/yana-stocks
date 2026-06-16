@@ -1,67 +1,35 @@
 /**
- * Auth tests cover: login, register, auth guards, logout.
+ * Auth tests cover: login (PKCE redirect), register, auth guards, logout.
  *
- * Prerequisite: Next.js frontend running with NEXT_PUBLIC_API_URL=http://localhost:3004/api
- * All API calls are intercepted via page.route() — no real backend required.
+ * The login flow now redirects to Authentik — tests verify the redirect intent
+ * and the resulting UI states rather than completing the full PKCE exchange.
+ * API calls that hit the backend are intercepted via page.route().
  */
 import { test, expect } from '@playwright/test';
 import { LoginPage } from '../pages/LoginPage';
 import { RegisterPage } from '../pages/RegisterPage';
-import {
-  MOCK_ACCESS_TOKEN,
-  MOCK_REFRESH_TOKEN,
-  TEST_PASSWORD,
-  uniqueEmail,
-} from '../fixtures/data';
-
-const AUTH_TOKENS = { accessToken: MOCK_ACCESS_TOKEN, refreshToken: MOCK_REFRESH_TOKEN };
+import { MOCK_ACCESS_TOKEN, MOCK_REFRESH_TOKEN, uniqueEmail } from '../fixtures/data';
 
 test.describe('Login', () => {
-  test('renders login form', async ({ page }) => {
+  test('renders login page with Authentik button', async ({ page }) => {
     const login = new LoginPage(page);
     await login.goto();
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
-    await expect(login.emailInput).toBeVisible();
-    await expect(login.passwordInput).toBeVisible();
-    await expect(login.submitButton).toBeVisible();
+    await expect(login.continueButton).toBeVisible();
   });
 
-  test('redirects to /dashboard on success', async ({ page }) => {
-    await page.route('**/api/auth/login', (r) => r.fulfill({ json: AUTH_TOKENS }));
-    await page.route('**/api/portfolio/portfolios', (r) => r.fulfill({ json: [] }));
-
+  test('clicking login button initiates Authentik PKCE redirect', async ({ page }) => {
     const login = new LoginPage(page);
     await login.goto();
-    await login.login('user@example.com', TEST_PASSWORD);
-    await page.waitForURL('/dashboard');
-    await expect(page).toHaveURL('/dashboard');
-  });
 
-  test('shows error on invalid credentials', async ({ page }) => {
-    await page.route('**/api/auth/login', (r) => r.fulfill({ status: 401, json: {} }));
-
-    const login = new LoginPage(page);
-    await login.goto();
-    await login.login('bad@example.com', 'wrongpassword');
-    // Wait for the submit button to re-enable (setLoading(false) in finally block)
-    // before asserting the error, avoiding a race on slow mobile renderers.
-    await expect(login.submitButton).toBeEnabled();
-    await expect(login.error).toBeVisible();
-  });
-
-  test('stores tokens in localStorage after login', async ({ page }) => {
-    await page.route('**/api/auth/login', (r) => r.fulfill({ json: AUTH_TOKENS }));
-    await page.route('**/api/portfolio/portfolios', (r) => r.fulfill({ json: [] }));
-
-    const login = new LoginPage(page);
-    await login.goto();
-    await login.login('user@example.com', TEST_PASSWORD);
-    await page.waitForURL('/dashboard');
-
-    const at = await page.evaluate(() => localStorage.getItem('access_token'));
-    const rt = await page.evaluate(() => localStorage.getItem('refresh_token'));
-    expect(at).toBe(MOCK_ACCESS_TOKEN);
-    expect(rt).toBe(MOCK_REFRESH_TOKEN);
+    // Intercept the navigation to Authentik and abort it (we just want to verify the intent)
+    const [request] = await Promise.all([
+      page.waitForRequest((req) => req.url().includes('authentik.yanatech.co.uk')),
+      login.continueButton.click(),
+    ]);
+    expect(request.url()).toContain('/application/o/authorize/');
+    expect(request.url()).toContain('code_challenge_method=S256');
+    expect(request.url()).toContain('client_id=yana-stocks');
   });
 
   test('has link to register page', async ({ page }) => {
@@ -73,34 +41,32 @@ test.describe('Login', () => {
 });
 
 test.describe('Register', () => {
-  test('renders registration form', async ({ page }) => {
+  test('renders registration form without password field', async ({ page }) => {
     const register = new RegisterPage(page);
     await register.goto();
     await expect(page.getByRole('heading', { name: 'Create account' })).toBeVisible();
     await expect(register.emailInput).toBeVisible();
-    await expect(register.passwordInput).toBeVisible();
     await expect(register.submitButton).toBeVisible();
+    await expect(page.locator('input[type="password"]')).toHaveCount(0);
   });
 
-  test('redirects to /dashboard on success', async ({ page }) => {
-    await page.route('**/api/auth/register', (r) => r.fulfill({ json: AUTH_TOKENS }));
-    await page.route('**/api/portfolio/portfolios', (r) => r.fulfill({ json: [] }));
+  test('shows check-your-inbox after successful registration', async ({ page }) => {
+    await page.route('**/api/auth/register', (r) => r.fulfill({ status: 201, json: { message: 'Check your email' } }));
 
     const register = new RegisterPage(page);
     await register.goto();
-    await register.register(uniqueEmail(), TEST_PASSWORD);
-    await page.waitForURL('/dashboard');
-    await expect(page).toHaveURL('/dashboard');
+    await register.register(uniqueEmail());
+    await expect(page.getByRole('heading', { name: 'Check your inbox' })).toBeVisible();
   });
 
   test('shows error on duplicate email', async ({ page }) => {
     await page.route('**/api/auth/register', (r) =>
-      r.fulfill({ status: 409, json: { message: 'Email already in use' } }),
+      r.fulfill({ status: 409, json: { message: 'Email already registered' } }),
     );
 
     const register = new RegisterPage(page);
     await register.goto();
-    await register.register('existing@example.com', TEST_PASSWORD);
+    await register.register('existing@example.com');
     await expect(register.error).toBeVisible();
   });
 
@@ -133,17 +99,18 @@ test.describe('Auth guards', () => {
 });
 
 test.describe('Logout', () => {
-  test('clears tokens and redirects to /login', async ({ page }) => {
+  test('clears session tokens on logout', async ({ page }) => {
     await page.route('**/api/portfolio/portfolios', (r) => r.fulfill({ json: [] }));
-    await page.route('**/api/auth/logout', (r) => r.fulfill({ status: 200, json: {} }));
+    // Intercept Authentik end_session navigation so the test page doesn't navigate away
+    await page.route('**/authentik.yanatech.co.uk/**', (r) => r.abort());
 
-    // Establish authenticated session
+    // Inject authenticated session into sessionStorage
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
     await page.evaluate(
       ({ at, rt }) => {
-        localStorage.setItem('access_token', at);
-        localStorage.setItem('refresh_token', rt);
+        sessionStorage.setItem('access_token', at);
+        sessionStorage.setItem('refresh_token', rt);
       },
       { at: MOCK_ACCESS_TOKEN, rt: MOCK_REFRESH_TOKEN },
     );
@@ -152,11 +119,12 @@ test.describe('Logout', () => {
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Sign out' }).click();
-    await page.waitForURL('/login');
-    await expect(page).toHaveURL('/login');
 
-    const at = await page.evaluate(() => localStorage.getItem('access_token'));
+    // sessionStorage tokens cleared before navigation
+    const at = await page.evaluate(() => sessionStorage.getItem('access_token'));
+    const rt = await page.evaluate(() => sessionStorage.getItem('refresh_token'));
     expect(at).toBeNull();
+    expect(rt).toBeNull();
   });
 
   test('navbar shows Sign in / Get started when logged out', async ({ page }) => {
