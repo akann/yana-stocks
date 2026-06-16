@@ -29,6 +29,8 @@ async function bootstrap() {
     app.enableCors({ origin: corsOrigin, credentials: true });
   }
 
+  app.setGlobalPrefix('api');
+
   const port = process.env['PORT'] ?? 3000;
   await app.listen(port);
 }
