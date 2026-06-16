@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
-export default function CallbackPage(): React.JSX.Element {
+function CallbackInner(): React.JSX.Element {
   const { handleCallback } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
@@ -53,5 +53,19 @@ export default function CallbackPage(): React.JSX.Element {
     <div className="min-h-[60vh] flex items-center justify-center">
       <p className="text-gray-400 text-sm">Signing you in…</p>
     </div>
+  );
+}
+
+export default function CallbackPage(): React.JSX.Element {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <p className="text-gray-400 text-sm">Signing you in…</p>
+        </div>
+      }
+    >
+      <CallbackInner />
+    </Suspense>
   );
 }
