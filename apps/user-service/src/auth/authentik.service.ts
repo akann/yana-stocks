@@ -61,6 +61,7 @@ export class AuthentikService {
     const res = await fetch(`${this.baseUrl}/api/v3/core/users/${userPk}/recovery/`, {
       method: 'POST',
       headers: this.headers,
+      body: JSON.stringify({ email: true }),
     });
 
     if (!res.ok) {
@@ -70,8 +71,6 @@ export class AuthentikService {
       return;
     }
 
-    // In dev you can inspect the link here; in production Authentik sends the email
-    // via its configured email backend when the recovery flow has an email stage.
     const { link } = await res.json() as { link: string };
     this.logger.debug('Recovery link for %s: %s', userPk, link);
   }
