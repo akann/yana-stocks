@@ -14,7 +14,7 @@ export class AuthService {
   async register(dto: RegisterDto): Promise<{ message: string }> {
     const name = dto.name ?? dto.email.split('@')[0]!;
     const authentikUser = await this.authentik.createUser(dto.email, name);
-    await this.authentik.triggerEmailVerification(authentikUser.pk);
+    await this.authentik.triggerEmailVerification(authentikUser.email, authentikUser.pk);
     return { message: 'Verification email sent. Please check your inbox to activate your account.' };
   }
 
