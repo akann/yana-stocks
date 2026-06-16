@@ -43,6 +43,9 @@ test.describe('Login', () => {
     const login = new LoginPage(page);
     await login.goto();
     await login.login('bad@example.com', 'wrongpassword');
+    // Wait for the submit button to re-enable (setLoading(false) in finally block)
+    // before asserting the error, avoiding a race on slow mobile renderers.
+    await expect(login.submitButton).toBeEnabled();
     await expect(login.error).toBeVisible();
   });
 

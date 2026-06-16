@@ -9,7 +9,8 @@ export class WatchlistPage {
 
   constructor(private readonly page: Page) {
     this.heading = page.getByRole('heading', { name: 'Watchlists', level: 1 });
-    this.newWatchlistButton = page.getByRole('button', { name: '+ New Watchlist' });
+    // Use .first() — the header button appears before the identical empty-state button.
+    this.newWatchlistButton = page.getByRole('button', { name: '+ New Watchlist' }).first();
     this.watchlistNameInput = page.getByPlaceholder('e.g. AI Stocks');
     this.createButton = page.getByRole('button', { name: /^create$/i });
     this.emptyState = page.getByText('No watchlists yet');

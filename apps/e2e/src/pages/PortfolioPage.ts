@@ -9,7 +9,8 @@ export class PortfolioPage {
 
   constructor(private readonly page: Page) {
     this.heading = page.getByRole('heading', { name: 'Portfolios', level: 1 });
-    this.newPortfolioButton = page.getByRole('button', { name: '+ New Portfolio' });
+    // Use .first() — the header button appears before the identical empty-state button.
+    this.newPortfolioButton = page.getByRole('button', { name: '+ New Portfolio' }).first();
     this.portfolioNameInput = page.getByPlaceholder('e.g. Tech Growth');
     this.createButton = page.getByRole('button', { name: /^create$/i });
     this.emptyState = page.getByText('No portfolios yet');

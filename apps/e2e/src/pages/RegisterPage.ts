@@ -12,7 +12,8 @@ export class RegisterPage {
     this.passwordInput = page.locator('input[type="password"]');
     this.submitButton = page.getByRole('button', { name: /create account/i });
     this.error = page.getByText('Registration failed');
-    this.signInLink = page.getByRole('link', { name: 'Sign in' });
+    // Scoped to the form paragraph to avoid matching the Navbar's "Sign in" link.
+    this.signInLink = page.getByText('Already have an account?').getByRole('link', { name: 'Sign in' });
   }
 
   async goto() {

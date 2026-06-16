@@ -79,11 +79,10 @@ test.describe('Home page', () => {
   test('symbol search uppercases the input', async ({ page }) => {
     stubHomePage(page);
     stubStockPage(page, 'MSFT');
-    await page.route('**/api/stocks/MSFT', (r) => r.fulfill({ json: { ...MOCK_STOCK_AAPL, symbol: 'MSFT' } }));
     const home = new HomePage(page);
     await home.goto();
     await home.searchSymbol('msft');
-    await page.waitForURL('/stocks/MSFT');
+    await page.waitForURL('**/stocks/MSFT');
     await expect(page).toHaveURL('/stocks/MSFT');
   });
 });
