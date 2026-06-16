@@ -1,8 +1,8 @@
 export interface UserProfile {
   id: string;
-  authentikId: string;
   email: string;
   name: string | null;
+  isVerified: boolean;
 }
 
 export interface PortfolioStock {

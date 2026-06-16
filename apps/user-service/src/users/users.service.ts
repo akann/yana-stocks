@@ -5,16 +5,32 @@ import { PrismaService } from '../prisma/prisma.service';
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findByAuthentikId(authentikId: string) {
-    return this.prisma.userProfile.findUnique({ where: { authentikId } });
+  findByEmail(email: string) {
+    return this.prisma.userProfile.findUnique({ where: { email } });
   }
 
-  async findOrCreateByAuthentikId(authentikId: string, email: string, name: string | null) {
-    const existing = await this.findByAuthentikId(authentikId);
-    if (existing) return existing;
+  findById(id: string) {
+    return this.prisma.userProfile.findUnique({ where: { id } });
+  }
 
-    return this.prisma.userProfile.create({
-      data: { authentikId, email, name },
+  findByVerificationToken(token: string) {
+    return this.prisma.userProfile.findUnique({ where: { verificationToken: token } });
+  }
+
+  create(data: {
+    email: string;
+    name: string | null;
+    passwordHash: string;
+    verificationToken: string;
+    verificationTokenExpiry: Date;
+  }) {
+    return this.prisma.userProfile.create({ data: { ...data, isVerified: false } });
+  }
+
+  verifyEmail(id: string) {
+    return this.prisma.userProfile.update({
+      where: { id },
+      data: { isVerified: true, verificationToken: null, verificationTokenExpiry: null },
     });
   }
 }

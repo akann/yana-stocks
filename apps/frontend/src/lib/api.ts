@@ -1,10 +1,9 @@
 import axios from 'axios';
 
-const AUTHENTIK_URL = process.env.NEXT_PUBLIC_AUTHENTIK_URL ?? 'https://authentik.yanatech.co.uk';
-const CLIENT_ID = process.env.NEXT_PUBLIC_AUTHENTIK_CLIENT_ID ?? 'yana-stocks';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3004/api';
 
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3004/api',
+  baseURL: API_BASE,
 });
 
 let isRefreshing = false;
@@ -53,26 +52,20 @@ api.interceptors.response.use(
     }
 
     try {
-      const body = new URLSearchParams({
-        grant_type: 'refresh_token',
-        client_id: CLIENT_ID,
-        refresh_token: refreshToken,
-      });
-
-      const res = await fetch(`${AUTHENTIK_URL}/application/o/token/`, {
+      const res = await fetch(`${API_BASE}/auth/refresh`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
       });
 
       if (!res.ok) throw new Error('Refresh failed');
 
-      const data = await res.json() as { access_token: string; refresh_token?: string };
-      sessionStorage.setItem('access_token', data.access_token);
-      if (data.refresh_token) sessionStorage.setItem('refresh_token', data.refresh_token);
+      const data = await res.json() as { accessToken: string; refreshToken: string };
+      sessionStorage.setItem('access_token', data.accessToken);
+      sessionStorage.setItem('refresh_token', data.refreshToken);
 
-      processQueue(null, data.access_token);
-      if (original) original.headers['Authorization'] = `Bearer ${data.access_token}`;
+      processQueue(null, data.accessToken);
+      if (original) original.headers['Authorization'] = `Bearer ${data.accessToken}`;
       return api(original!);
     } catch (err) {
       processQueue(err, null);

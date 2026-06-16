@@ -1,47 +1,96 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
+import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
-import { AuthentikService } from './authentik.service';
+import { EmailService } from './email.service';
 import { UsersService } from '../users/users.service';
-import type { JwtPayload } from '@yana-stocks/shared-types';
 
-const mockProfile = {
-  id: 'profile-uuid',
-  authentikId: 'authentik-uuid-1',
+const now = new Date();
+const future = new Date(now.getTime() + 60 * 60 * 1000);
+const past = new Date(now.getTime() - 60 * 60 * 1000);
+
+const mockUser = {
+  id: 'user-uuid-1',
   email: 'test@example.com',
   name: 'Test User',
-  createdAt: new Date(),
-  updatedAt: new Date(),
+  passwordHash: '$2b$12$hashedpassword',
+  isVerified: true,
+  verificationToken: null,
+  verificationTokenExpiry: null,
+  createdAt: now,
+  updatedAt: now,
+};
+
+const mockRedis = {
+  set: jest.fn().mockResolvedValue('OK'),
+  get: jest.fn(),
+  del: jest.fn().mockResolvedValue(1),
+};
+
+const mockConfig = {
+  getOrThrow: jest.fn((key: string) => {
+    const values: Record<string, string> = {
+      'jwt.secret': 'test-secret',
+      'jwt.expiresIn': '15m',
+      'app.frontendUrl': 'http://localhost:3000',
+    };
+    return values[key] ?? '';
+  }),
 };
 
 describe('AuthService', () => {
   let service: AuthService;
-  let authentik: jest.Mocked<AuthentikService>;
   let users: jest.Mocked<UsersService>;
+  let email: jest.Mocked<EmailService>;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         {
-          provide: AuthentikService,
-          useValue: {
-            createUser: jest.fn(),
-            triggerEmailVerification: jest.fn().mockResolvedValue(undefined),
-          } satisfies Partial<AuthentikService>,
-        },
-        {
           provide: UsersService,
           useValue: {
-            findOrCreateByAuthentikId: jest.fn(),
+            findByEmail: jest.fn(),
+            findById: jest.fn(),
+            findByVerificationToken: jest.fn(),
+            create: jest.fn(),
+            verifyEmail: jest.fn(),
           } satisfies Partial<UsersService>,
+        },
+        {
+          provide: EmailService,
+          useValue: {
+            sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+          } satisfies Partial<EmailService>,
+        },
+        {
+          provide: JwtService,
+          useValue: {
+            sign: jest.fn().mockReturnValue('mock.access.token'),
+          },
+        },
+        {
+          provide: 'REDIS',
+          useValue: mockRedis,
+        },
+        {
+          provide: ConfigService,
+          useValue: mockConfig,
         },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    authentik = module.get(AuthentikService);
     users = module.get(UsersService);
+    email = module.get(EmailService);
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRedis.set.mockResolvedValue('OK');
+    mockRedis.del.mockResolvedValue(1);
   });
 
   it('should be defined', () => {
@@ -49,76 +98,130 @@ describe('AuthService', () => {
   });
 
   describe('register', () => {
-    it('creates an Authentik user and triggers email verification', async () => {
-      authentik.createUser.mockResolvedValue({
-        pk: 'authentik-uuid-1',
-        username: 'test@example.com',
-        email: 'test@example.com',
-        name: 'Test User',
-        is_active: false,
-      });
+    it('creates user and sends verification email', async () => {
+      users.findByEmail.mockResolvedValue(null);
+      users.create.mockResolvedValue(mockUser);
 
-      const result = await service.register({ email: 'test@example.com', name: 'Test User' });
+      const result = await service.register({ email: 'test@example.com', name: 'Test User', password: 'password123' });
 
-      expect(authentik.createUser).toHaveBeenCalledWith('test@example.com', 'Test User');
-      expect(authentik.triggerEmailVerification).toHaveBeenCalledWith('test@example.com', 'authentik-uuid-1');
+      expect(users.findByEmail).toHaveBeenCalledWith('test@example.com');
+      expect(users.create).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'test@example.com', name: 'Test User' }),
+      );
+      expect(email.sendVerificationEmail).toHaveBeenCalledWith('test@example.com', expect.stringContaining('/verify?token='));
       expect(result).toHaveProperty('message');
     });
 
     it('derives name from email when name is omitted', async () => {
-      authentik.createUser.mockResolvedValue({
-        pk: 'uuid-2',
-        username: 'alice@example.com',
-        email: 'alice@example.com',
-        name: 'alice',
-        is_active: false,
-      });
+      users.findByEmail.mockResolvedValue(null);
+      users.create.mockResolvedValue(mockUser);
 
-      await service.register({ email: 'alice@example.com' });
-      expect(authentik.createUser).toHaveBeenCalledWith('alice@example.com', 'alice');
+      await service.register({ email: 'alice@example.com', password: 'password123' });
+      expect(users.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'alice' }));
     });
 
-    it('propagates ConflictException from AuthentikService', async () => {
-      authentik.createUser.mockRejectedValue(new ConflictException('Email already registered'));
-      await expect(service.register({ email: 'dup@example.com' })).rejects.toThrow(ConflictException);
+    it('throws ConflictException when email already exists', async () => {
+      users.findByEmail.mockResolvedValue(mockUser);
+      await expect(service.register({ email: 'test@example.com', password: 'password123' })).rejects.toThrow(ConflictException);
     });
   });
 
-  describe('findOrCreateProfile', () => {
-    it('delegates to UsersService with sub, email, and name from claims', async () => {
-      users.findOrCreateByAuthentikId.mockResolvedValue(mockProfile);
+  describe('verifyEmail', () => {
+    it('activates account with valid token', async () => {
+      users.findByVerificationToken.mockResolvedValue({
+        ...mockUser,
+        isVerified: false,
+        verificationToken: 'valid-token',
+        verificationTokenExpiry: future,
+      });
+      users.verifyEmail.mockResolvedValue({ ...mockUser, isVerified: true });
 
-      const claims: JwtPayload = {
-        sub: 'authentik-uuid-1',
-        email: 'test@example.com',
-        name: 'Test User',
-        iss: 'https://authentik.yanatech.co.uk/application/o/yana-stocks/',
-        aud: 'yana-stocks',
-        iat: 0,
-        exp: 9999999999,
-      };
-
-      const result = await service.findOrCreateProfile(claims);
-      expect(users.findOrCreateByAuthentikId).toHaveBeenCalledWith(
-        'authentik-uuid-1',
-        'test@example.com',
-        'Test User',
-      );
-      expect(result).toBe(mockProfile);
+      const result = await service.verifyEmail({ token: 'valid-token' });
+      expect(users.verifyEmail).toHaveBeenCalledWith('user-uuid-1');
+      expect(result).toHaveProperty('message');
     });
 
-    it('passes null for name when claim is absent', async () => {
-      users.findOrCreateByAuthentikId.mockResolvedValue(mockProfile);
-      const claims: JwtPayload = {
-        sub: 'uuid',
-        email: 'x@example.com',
-        iss: 'https://authentik.yanatech.co.uk/application/o/yana-stocks/',
-        aud: 'yana-stocks',
-        iat: 0,
-        exp: 9999999999,
-      };
-      await service.findOrCreateProfile(claims);
-      expect(users.findOrCreateByAuthentikId).toHaveBeenCalledWith('uuid', 'x@example.com', null);
+    it('throws ForbiddenException for expired token', async () => {
+      users.findByVerificationToken.mockResolvedValue({
+        ...mockUser,
+        verificationToken: 'expired-token',
+        verificationTokenExpiry: past,
+      });
+      await expect(service.verifyEmail({ token: 'expired-token' })).rejects.toThrow(ForbiddenException);
+    });
+
+    it('throws ForbiddenException for unknown token', async () => {
+      users.findByVerificationToken.mockResolvedValue(null);
+      await expect(service.verifyEmail({ token: 'bad-token' })).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('login', () => {
+    it('returns tokens for valid verified credentials', async () => {
+      const hash = await bcrypt.hash('password123', 1);
+      users.findByEmail.mockResolvedValue({ ...mockUser, passwordHash: hash });
+      mockRedis.set.mockResolvedValue('OK');
+
+      const result = await service.login({ email: 'test@example.com', password: 'password123' });
+      expect(result).toHaveProperty('accessToken');
+      expect(result).toHaveProperty('refreshToken');
+    });
+
+    it('throws UnauthorizedException for wrong password', async () => {
+      const hash = await bcrypt.hash('correct', 1);
+      users.findByEmail.mockResolvedValue({ ...mockUser, passwordHash: hash });
+      await expect(service.login({ email: 'test@example.com', password: 'wrong' })).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('throws UnauthorizedException for unknown email', async () => {
+      users.findByEmail.mockResolvedValue(null);
+      await expect(service.login({ email: 'unknown@example.com', password: 'pass' })).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('throws ForbiddenException for unverified account', async () => {
+      const hash = await bcrypt.hash('password123', 1);
+      users.findByEmail.mockResolvedValue({ ...mockUser, isVerified: false, passwordHash: hash });
+      await expect(service.login({ email: 'test@example.com', password: 'password123' })).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('refresh', () => {
+    it('rotates refresh token and returns new pair', async () => {
+      mockRedis.get.mockResolvedValue('user-uuid-1');
+      users.findById.mockResolvedValue(mockUser);
+
+      const result = await service.refresh('old-refresh-token');
+      expect(mockRedis.del).toHaveBeenCalledWith('refresh:old-refresh-token');
+      expect(result).toHaveProperty('accessToken');
+      expect(result).toHaveProperty('refreshToken');
+    });
+
+    it('throws UnauthorizedException for invalid refresh token', async () => {
+      mockRedis.get.mockResolvedValue(null);
+      await expect(service.refresh('bad-token')).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('logout', () => {
+    it('deletes refresh token from Redis', async () => {
+      const result = await service.logout('my-refresh-token');
+      expect(mockRedis.del).toHaveBeenCalledWith('refresh:my-refresh-token');
+      expect(result).toHaveProperty('message');
+    });
+  });
+
+  describe('getProfile', () => {
+    it('returns user profile without sensitive fields', async () => {
+      users.findById.mockResolvedValue(mockUser);
+      const profile = await service.getProfile({ sub: 'user-uuid-1', email: 'test@example.com', iat: 0, exp: 9999 });
+      expect(profile).not.toHaveProperty('passwordHash');
+      expect(profile).not.toHaveProperty('verificationToken');
+      expect(profile.email).toBe('test@example.com');
+    });
+
+    it('throws UnauthorizedException when user not found', async () => {
+      users.findById.mockResolvedValue(null);
+      await expect(service.getProfile({ sub: 'gone', email: 'x@x.com', iat: 0, exp: 9999 })).rejects.toThrow(UnauthorizedException);
     });
   });
 });

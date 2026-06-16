@@ -1,26 +1,69 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
 export function LoginForm(): React.JSX.Element {
-  const { initiateLogin } = useAuth();
+  const { login } = useAuth();
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await login(email, password);
+      router.replace('/dashboard');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
-      <div className="w-full max-w-sm text-center space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-white mb-2">Sign in</h1>
-          <p className="text-gray-400 text-sm">Use your yana-stocks account</p>
-        </div>
-        <button
-          onClick={() => void initiateLogin()}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-medium transition-colors"
-        >
-          Continue with Authentik
-        </button>
-        <p className="text-center text-sm text-gray-500">
+      <div className="w-full max-w-sm">
+        <h1 className="text-2xl font-bold text-white mb-6 text-center">Sign in</h1>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              required
+            />
+          </div>
+          {error && <p className="text-red-400 text-sm">{error}</p>}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-lg font-medium transition-colors"
+          >
+            {loading ? 'Signing in…' : 'Sign in'}
+          </button>
+        </form>
+        <p className="text-center text-sm text-gray-500 mt-4">
           No account?{' '}
           <Link href="/register" className="text-blue-400 hover:text-blue-300">
             Register

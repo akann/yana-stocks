@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, UnauthorizedException } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
-import { RegisterDto } from '@yana-stocks/shared-dto';
+import { LoginDto, RefreshDto, RegisterDto, VerifyEmailDto } from '@yana-stocks/shared-dto';
 import type { JwtPayload } from '@yana-stocks/shared-types';
 import { AuthService } from './auth.service';
 
@@ -18,18 +18,46 @@ export class AuthController {
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Register a new user — creates inactive Authentik account and sends verification email' })
+  @ApiOperation({ summary: 'Register with email, name, and password — sends verification email' })
   register(@Body() dto: RegisterDto) {
     return this.auth.register(dto);
   }
 
+  @Post('verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify email address using token from email link' })
+  verify(@Body() dto: VerifyEmailDto) {
+    return this.auth.verifyEmail(dto);
+  }
+
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login with email and password — returns access and refresh tokens' })
+  login(@Body() dto: LoginDto) {
+    return this.auth.login(dto);
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Rotate refresh token and issue new access token' })
+  refresh(@Body() dto: RefreshDto) {
+    return this.auth.refresh(dto.refreshToken);
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Invalidate refresh token' })
+  logout(@Body() dto: RefreshDto) {
+    return this.auth.logout(dto.refreshToken);
+  }
+
   @Get('me')
-  @ApiOperation({ summary: 'Return the current user profile (JWT validated upstream by Kong); lazy-creates profile row on first call' })
+  @ApiOperation({ summary: 'Return the current user profile (JWT validated upstream by Kong)' })
   me(@Req() req: Request) {
     const bearer = req.headers['authorization'];
     if (!bearer?.startsWith('Bearer ')) throw new UnauthorizedException();
     const claims = decodeJwtPayload(bearer.slice(7));
     if (!claims.sub) throw new UnauthorizedException();
-    return this.auth.findOrCreateProfile(claims);
+    return this.auth.getProfile(claims);
   }
 }

@@ -2,11 +2,8 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { generateVerifier, deriveChallenge, generateState, saveVerifier, loadVerifier, clearVerifier } from '@/lib/pkce';
 
-const AUTHENTIK_URL = process.env.NEXT_PUBLIC_AUTHENTIK_URL ?? 'https://authentik.yanatech.co.uk';
-const CLIENT_ID = process.env.NEXT_PUBLIC_AUTHENTIK_CLIENT_ID ?? 'yana-stocks';
-const REDIRECT_URI = process.env.NEXT_PUBLIC_REDIRECT_URI ?? (typeof window !== 'undefined' ? `${window.location.origin}/callback` : '');
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api';
 
 const ACCESS_TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
@@ -15,9 +12,9 @@ interface AuthContextValue {
   accessToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  initiateLogin: () => Promise<void>;
-  handleCallback: (code: string, state: string) => Promise<void>;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -32,70 +29,63 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     setIsLoading(false);
   }, []);
 
-  async function initiateLogin(): Promise<void> {
-    const verifier = generateVerifier();
-    const state = generateState();
-    const challenge = await deriveChallenge(verifier);
-    saveVerifier(verifier, state);
-
-    const params = new URLSearchParams({
-      response_type: 'code',
-      client_id: CLIENT_ID,
-      redirect_uri: REDIRECT_URI,
-      scope: 'openid profile email offline_access',
-      state,
-      code_challenge: challenge,
-      code_challenge_method: 'S256',
-    });
-
-    window.location.href = `${AUTHENTIK_URL}/application/o/authorize/?${params.toString()}`;
-  }
-
-  async function handleCallback(code: string, returnedState: string): Promise<void> {
-    const saved = loadVerifier();
-    if (!saved || saved.state !== returnedState) {
-      throw new Error('State mismatch — possible CSRF');
-    }
-    clearVerifier();
-
-    const body = new URLSearchParams({
-      grant_type: 'authorization_code',
-      client_id: CLIENT_ID,
-      redirect_uri: REDIRECT_URI,
-      code,
-      code_verifier: saved.verifier,
-    });
-
-    const res = await fetch(`${AUTHENTIK_URL}/application/o/token/`, {
+  async function login(email: string, password: string): Promise<void> {
+    const res = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: body.toString(),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
     });
 
     if (!res.ok) {
-      throw new Error('Token exchange failed');
+      const body = await res.json().catch(() => ({})) as { message?: string };
+      throw new Error(body.message ?? 'Login failed');
     }
 
-    const tokens = await res.json() as { access_token: string; refresh_token?: string };
-    sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.access_token);
-    if (tokens.refresh_token) sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
-    setAccessToken(tokens.access_token);
+    const tokens = await res.json() as { accessToken: string; refreshToken: string };
+    sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
+    sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+    setAccessToken(tokens.accessToken);
   }
 
-  function logout(): void {
-    const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+  async function logout(): Promise<void> {
+    const refreshToken = sessionStorage.getItem(REFRESH_TOKEN_KEY);
+    if (refreshToken) {
+      await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      }).catch(() => undefined);
+    }
     sessionStorage.removeItem(ACCESS_TOKEN_KEY);
     sessionStorage.removeItem(REFRESH_TOKEN_KEY);
     setAccessToken(null);
+  }
 
-    // Redirect to Authentik end_session endpoint to clear the SSO session
-    const params = new URLSearchParams({ client_id: CLIENT_ID });
-    if (token) params.set('id_token_hint', token);
-    window.location.href = `${AUTHENTIK_URL}/application/o/yana-stocks/end-session/?${params.toString()}`;
+  async function refresh(): Promise<void> {
+    const refreshToken = sessionStorage.getItem(REFRESH_TOKEN_KEY);
+    if (!refreshToken) throw new Error('No refresh token');
+
+    const res = await fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!res.ok) {
+      sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+      sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+      setAccessToken(null);
+      throw new Error('Session expired');
+    }
+
+    const tokens = await res.json() as { accessToken: string; refreshToken: string };
+    sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
+    sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+    setAccessToken(tokens.accessToken);
   }
 
   return (
-    <AuthContext.Provider value={{ accessToken, isAuthenticated: !!accessToken, isLoading, initiateLogin, handleCallback, logout }}>
+    <AuthContext.Provider value={{ accessToken, isAuthenticated: !!accessToken, isLoading, login, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );

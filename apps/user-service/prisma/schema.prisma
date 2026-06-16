@@ -8,12 +8,15 @@ datasource db {
 }
 
 model UserProfile {
-  id          String   @id @default(uuid())
-  authentikId String   @unique
-  email       String   @unique
-  name        String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                      String    @id @default(uuid())
+  email                   String    @unique
+  name                    String?
+  passwordHash            String
+  isVerified              Boolean   @default(false)
+  verificationToken       String?   @unique
+  verificationTokenExpiry DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   @@map("user_profiles")
 }

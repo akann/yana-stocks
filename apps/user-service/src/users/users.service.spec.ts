@@ -2,24 +2,29 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from './users.service';
 
-const mockProfile = {
+const now = new Date();
+const mockUser = {
   id: 'profile-1',
-  authentikId: 'ak-uuid-1',
   email: 'test@example.com',
   name: 'Test User',
-  createdAt: new Date(),
-  updatedAt: new Date(),
+  passwordHash: '$2b$12$hash',
+  isVerified: false,
+  verificationToken: 'token-abc',
+  verificationTokenExpiry: new Date(now.getTime() + 60000),
+  createdAt: now,
+  updatedAt: now,
 };
 
 describe('UsersService', () => {
   let service: UsersService;
-  let prisma: { userProfile: { findUnique: jest.Mock; create: jest.Mock } };
+  let prisma: { userProfile: { findUnique: jest.Mock; create: jest.Mock; update: jest.Mock } };
 
   beforeEach(async () => {
     prisma = {
       userProfile: {
         findUnique: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
       },
     };
 
@@ -30,48 +35,61 @@ describe('UsersService', () => {
     service = module.get(UsersService);
   });
 
-  describe('findByAuthentikId', () => {
-    it('returns profile when found', async () => {
-      prisma.userProfile.findUnique.mockResolvedValue(mockProfile);
-      const result = await service.findByAuthentikId('ak-uuid-1');
-      expect(result).toBe(mockProfile);
-      expect(prisma.userProfile.findUnique).toHaveBeenCalledWith({ where: { authentikId: 'ak-uuid-1' } });
+  describe('findByEmail', () => {
+    it('returns user when found', async () => {
+      prisma.userProfile.findUnique.mockResolvedValue(mockUser);
+      const result = await service.findByEmail('test@example.com');
+      expect(result).toBe(mockUser);
+      expect(prisma.userProfile.findUnique).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
     });
 
     it('returns null when not found', async () => {
       prisma.userProfile.findUnique.mockResolvedValue(null);
-      expect(await service.findByAuthentikId('unknown')).toBeNull();
+      expect(await service.findByEmail('unknown@example.com')).toBeNull();
     });
   });
 
-  describe('findOrCreateByAuthentikId', () => {
-    it('returns existing profile without creating', async () => {
-      prisma.userProfile.findUnique.mockResolvedValue(mockProfile);
-      const result = await service.findOrCreateByAuthentikId('ak-uuid-1', 'test@example.com', 'Test User');
-      expect(result).toBe(mockProfile);
-      expect(prisma.userProfile.create).not.toHaveBeenCalled();
+  describe('findById', () => {
+    it('returns user by id', async () => {
+      prisma.userProfile.findUnique.mockResolvedValue(mockUser);
+      const result = await service.findById('profile-1');
+      expect(result).toBe(mockUser);
     });
+  });
 
-    it('creates and returns a new profile when not found', async () => {
-      prisma.userProfile.findUnique.mockResolvedValue(null);
-      prisma.userProfile.create.mockResolvedValue(mockProfile);
+  describe('findByVerificationToken', () => {
+    it('returns user by verification token', async () => {
+      prisma.userProfile.findUnique.mockResolvedValue(mockUser);
+      const result = await service.findByVerificationToken('token-abc');
+      expect(result).toBe(mockUser);
+    });
+  });
 
-      const result = await service.findOrCreateByAuthentikId('ak-uuid-1', 'test@example.com', 'Test User');
-
+  describe('create', () => {
+    it('creates a user with the given data', async () => {
+      prisma.userProfile.create.mockResolvedValue(mockUser);
+      const data = {
+        email: 'test@example.com',
+        name: 'Test User',
+        passwordHash: '$2b$12$hash',
+        verificationToken: 'token-abc',
+        verificationTokenExpiry: now,
+      };
+      const result = await service.create(data);
+      expect(result).toBe(mockUser);
       expect(prisma.userProfile.create).toHaveBeenCalledWith({
-        data: { authentikId: 'ak-uuid-1', email: 'test@example.com', name: 'Test User' },
+        data: { ...data, isVerified: false },
       });
-      expect(result).toBe(mockProfile);
     });
+  });
 
-    it('creates profile with null name when name is absent', async () => {
-      prisma.userProfile.findUnique.mockResolvedValue(null);
-      prisma.userProfile.create.mockResolvedValue({ ...mockProfile, name: null });
-
-      await service.findOrCreateByAuthentikId('ak-uuid-2', 'noname@example.com', null);
-
-      expect(prisma.userProfile.create).toHaveBeenCalledWith({
-        data: { authentikId: 'ak-uuid-2', email: 'noname@example.com', name: null },
+  describe('verifyEmail', () => {
+    it('sets isVerified=true and clears token fields', async () => {
+      prisma.userProfile.update.mockResolvedValue({ ...mockUser, isVerified: true, verificationToken: null });
+      await service.verifyEmail('profile-1');
+      expect(prisma.userProfile.update).toHaveBeenCalledWith({
+        where: { id: 'profile-1' },
+        data: { isVerified: true, verificationToken: null, verificationTokenExpiry: null },
       });
     });
   });
