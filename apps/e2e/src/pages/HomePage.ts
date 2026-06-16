@@ -18,7 +18,11 @@ export class HomePage {
   }
 
   async searchSymbol(symbol: string) {
-    await this.symbolInput.fill(symbol);
+    // pressSequentially fires individual key events, guaranteeing React's onChange
+    // processes each character before the submit click — fill() can race with
+    // React state commits on WebKit.
+    await this.symbolInput.clear();
+    await this.symbolInput.pressSequentially(symbol);
     await this.searchButton.click();
   }
 }
