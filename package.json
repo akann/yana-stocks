@@ -16,7 +16,6 @@
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:reset": "docker compose down -v && docker compose up -d",
-    "docker:create-dbs": "docker compose exec postgres psql -U postgres -c \"CREATE DATABASE auth_service;\" || true",
     "seed": "pnpm --filter @yana-stocks/portfolio-api seed"
   },
   "devDependencies": {
