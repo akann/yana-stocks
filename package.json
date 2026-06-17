@@ -16,13 +16,19 @@
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:reset": "docker compose down -v && docker compose up -d",
-    "seed": "pnpm --filter @yana-stocks/portfolio-api seed"
+    "seed": "pnpm --filter @yana-stocks/portfolio-api seed",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@yana-stocks/prettier-config": "workspace:*",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.7",
     "prettier": "^3.8.4",
     "turbo": "^2.9.18",
     "typescript": "^5.9.3"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,json,md,css}": "prettier --write"
   },
   "prettier": "@yana-stocks/prettier-config",
   "engines": {

@@ -10,6 +10,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:int": "jest --config jest.int.config.js --runInBand",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
     "lint": "eslint src/",
     "type-check": "tsc --noEmit"
   },

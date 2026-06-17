@@ -29,7 +29,14 @@
       "cache": false
     },
     "lint": {
-      "dependsOn": ["^build"]
+      "dependsOn": ["^build"],
+      "cache": false
+    },
+    "format": {
+      "cache": false
+    },
+    "format:check": {
+      "cache": false
     },
     "type-check": {
       "dependsOn": ["^build"]

@@ -5,8 +5,43 @@ import { Navbar } from '@/components/Navbar';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'yana stocks',
-  description: 'Real-time stock market data, portfolio management, and ML-powered predictions',
+  metadataBase: new URL('https://stocks.yanatech.co.uk'),
+  title: {
+    default: 'YanaStocks by Akan Nkweini — Real-Time Stock Market Data & ML Predictions',
+    template: '%s | YanaStocks',
+  },
+  description:
+    'YanaStocks by Akan Nkweini — live US stock prices, FinBERT sentiment analysis, ML-powered price predictions, and personal portfolio management. Track AAPL, GOOGL, MSFT, TSLA, NVDA and more.',
+  keywords: [
+    'YanaStocks',
+    'Akan Nkweini',
+    'stock market dashboard',
+    'real-time stock prices',
+    'portfolio management',
+    'ML price predictions',
+    'sentiment analysis',
+    'FinBERT',
+    'AAPL',
+    'GOOGL',
+    'MSFT',
+    'TSLA',
+    'NVDA',
+  ],
+  authors: [{ name: 'Akan Nkweini', url: 'https://yanatech.co.uk' }],
+  creator: 'Akan Nkweini',
+  openGraph: {
+    type: 'website',
+    siteName: 'YanaStocks',
+    locale: 'en_GB',
+  },
+  twitter: {
+    card: 'summary_large_image',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true },
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }): React.JSX.Element {
