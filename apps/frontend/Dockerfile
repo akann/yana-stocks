@@ -1,5 +1,5 @@
-FROM node:22-alpine AS base
-RUN apk upgrade --no-cache && corepack enable pnpm
+FROM node:24-alpine AS base
+RUN apk upgrade --no-cache && corepack enable && corepack prepare pnpm@11.6.0 --activate
 
 FROM base AS deps
 WORKDIR /app
