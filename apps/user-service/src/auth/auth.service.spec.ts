@@ -44,6 +44,7 @@ describe('AuthService', () => {
   let service: AuthService;
   let users: jest.Mocked<UsersService>;
   let email: jest.Mocked<EmailService>;
+  let jwtSign: jest.Mock;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -85,6 +86,7 @@ describe('AuthService', () => {
     service = module.get<AuthService>(AuthService);
     users = module.get(UsersService);
     email = module.get(EmailService);
+    jwtSign = module.get<JwtService>(JwtService).sign as jest.Mock;
   });
 
   beforeEach(() => {
@@ -167,6 +169,17 @@ describe('AuthService', () => {
       expect(result).toHaveProperty('refreshToken');
     });
 
+    it('includes iss: yana-stocks in JWT payload for Kong validation', async () => {
+      const hash = await bcrypt.hash('password123', 1);
+      users.findByEmail.mockResolvedValue({ ...mockUser, passwordHash: hash });
+
+      await service.login({ email: 'test@example.com', password: 'password123' });
+
+      expect(jwtSign).toHaveBeenCalledWith(
+        expect.objectContaining({ iss: 'yana-stocks', sub: 'user-uuid-1', email: 'test@example.com' }),
+      );
+    });
+
     it('throws UnauthorizedException for wrong password', async () => {
       const hash = await bcrypt.hash('correct', 1);
       users.findByEmail.mockResolvedValue({ ...mockUser, passwordHash: hash });
@@ -194,6 +207,17 @@ describe('AuthService', () => {
       expect(mockRedis.del).toHaveBeenCalledWith('refresh:old-refresh-token');
       expect(result).toHaveProperty('accessToken');
       expect(result).toHaveProperty('refreshToken');
+    });
+
+    it('includes iss: yana-stocks in JWT payload on token rotation', async () => {
+      mockRedis.get.mockResolvedValue('user-uuid-1');
+      users.findById.mockResolvedValue(mockUser);
+
+      await service.refresh('old-refresh-token');
+
+      expect(jwtSign).toHaveBeenCalledWith(
+        expect.objectContaining({ iss: 'yana-stocks', sub: 'user-uuid-1' }),
+      );
     });
 
     it('throws UnauthorizedException for invalid refresh token', async () => {
