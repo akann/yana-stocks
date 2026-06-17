@@ -15,8 +15,9 @@ Turborepo + pnpm workspaces.
 yana-stocks/
 ├── apps/
 │   ├── frontend/              # Next.js 14 (App Router)
+│   ├── auth-service/          # Go (Chi) — JWT auth, email verification, refresh tokens
+│   ├── profile-service/       # NestJS — non-PII display data (MongoDB)
 │   ├── price-processor/       # NestJS
-│   ├── user-service/          # NestJS
 │   ├── portfolio-service/     # NestJS
 │   ├── portfolio-api/         # NestJS
 │   └── e2e/                   # Playwright
@@ -40,10 +41,19 @@ yana-stocks/
 
 ## Tech Stack
 
+### auth-service (Go)
+
+- Router: Chi
+- DB driver: pgx (PostgreSQL)
+- Migrations: golang-migrate (runs at startup)
+- JWT: HS256, `iss: 'yana-stocks'`, 15min access token
+- Refresh tokens: opaque, Redis, 7d TTL, rotated on use
+- Kafka: Sarama — publishes `users.registered` event on registration
+- Email: SMTP2GO (STARTTLS port 2525)
+
 ### NestJS Services
 
 - Framework: NestJS (latest)
-- PostgreSQL ORM: Prisma (`user-service` only)
 - MongoDB ORM: Mongoose via `@nestjs/mongoose`
 - Redis: ioredis
 - Kafka: KafkaJS via `@nestjs/microservices`
@@ -111,29 +121,33 @@ yana-stocks/
 - **Pattern:** Argo Rollouts canary (10%→50%→100% on new model version)
 - **REST:** `/api/predict/:symbol`
 
-### 5. user-service (NestJS)
+### 5. auth-service (Go)
 
-- **Purpose:** User registration, email verification, login, JWT auth, refresh
-  tokens
-- **PostgreSQL (CNPG):** `UserProfile` table (email, passwordHash, isVerified,
-  verificationToken)
+- **Purpose:** User registration, email verification, login, JWT issuance, refresh token rotation
+- **PostgreSQL (CNPG):** `auth-service-pg` cluster — `users` table (id, email, passwordHash, isVerified, verificationToken)
 - **Redis:** Refresh token store (key `refresh:<token>` → userId, 7d TTL)
-- **JWT:** HS256 access token 15min (stateless), opaque refresh token 7 days
-  (Redis, revocable)
-- **Refresh token rotation:** New refresh token issued on every use; old one
-  deleted
-- **`iss` claim:** All JWTs include `iss: 'yana-stocks'` — Kong matches this to
-  the HS256 credential
-- **Global prefix:** `app.setGlobalPrefix('api')` — all routes served at
-  `/api/auth/*`
+- **JWT:** HS256 access token 15min (stateless), opaque refresh token 7 days (Redis, revocable)
+- **Refresh token rotation:** New refresh token on every use; old one deleted
+- **`iss` claim:** All JWTs include `iss: 'yana-stocks'` — Kong matches this to the HS256 credential
+- **Dev port:** 3004; prod port: 3000
 - **Endpoints:**
-  - `POST /api/auth/register` — creates user, sends verification email
+  - `POST /api/auth/register` — creates user, sends verification email, publishes `users.registered` Kafka event
   - `POST /api/auth/verify` — activates account via token from email
   - `POST /api/auth/login` — returns `{ accessToken, refreshToken }`
   - `POST /api/auth/refresh` — rotates refresh token
   - `POST /api/auth/logout` — deletes refresh token from Redis
-  - `GET /api/auth/me` — decodes Bearer token (no signature check — Kong
-    validates upstream)
+  - `GET /api/auth/me` — decodes Bearer token (no signature check — Kong validates upstream)
+
+### 5b. profile-service (NestJS)
+
+- **Purpose:** Non-PII user display data — displayName, avatar, bio, preferences
+- **MongoDB:** `profiles` collection (userId, displayName, avatarUrl, bio, preferences)
+- **Kafka consumer:** `users.registered` — creates initial profile on new registration
+- **Dev port:** 3007; prod port: 3000
+- **Endpoints:**
+  - `GET /api/profile/me` — current user's profile (requires JWT)
+  - `PUT /api/profile/me` — update profile (requires JWT)
+  - `GET /api/profile/:userId` — public profile by userId
 
 ### 6. portfolio-service (NestJS)
 
@@ -187,6 +201,7 @@ yana-stocks/
 
 | Topic                       | API version         | Partitions | Retention | Producer           | Consumer(s)                 |
 | --------------------------- | ------------------- | ---------- | --------- | ------------------ | --------------------------- |
+| `users.registered`          | kafka.strimzi.io/v1 | 3          | 7d        | auth-service       | profile-service             |
 | `stocks.prices.raw`         | kafka.strimzi.io/v1 | 3          | 24h       | price-ingestor     | price-processor             |
 | `stocks.prices.processed`   | kafka.strimzi.io/v1 | 3          | 7d        | price-processor    | ml-predictor, portfolio-api |
 | `stocks.signals.sentiment`  | kafka.strimzi.io/v1 | 3          | 7d        | sentiment-analyzer | portfolio-api               |
@@ -199,15 +214,16 @@ yana-stocks/
 
 ```shell
 POST /api/auth/register
-  → user-service creates user (passwordHash via bcrypt), sends verification email (SMTP2GO)
+  → auth-service creates user (passwordHash via bcrypt), sends verification email (SMTP2GO)
+  → publishes users.registered event to Kafka → profile-service creates initial profile
   → returns { message }
 
 POST /api/auth/verify
-  → user-service activates account, clears verificationToken
+  → auth-service activates account, clears verificationToken
   → returns { message }
 
 POST /api/auth/login
-  → user-service validates email+password, checks isVerified
+  → auth-service validates email+password, checks isVerified
   → returns { accessToken (HS256 JWT 15min, iss:'yana-stocks'), refreshToken (opaque 7d) }
   → refreshToken stored in Redis as refresh:<token> → userId
 
@@ -221,7 +237,7 @@ POST /api/auth/logout
 
 Kong JWT plugin (key_claim_name: iss):
   → reads iss claim from JWT
-  → looks up KongConsumer credential with key: "yana-stocks"
+  → looks up KongConsumer (auth-service) credential with key: "yana-stocks"
   → verifies HS256 signature using JWT_SECRET from Infisical
 ```
 
@@ -229,27 +245,33 @@ Kong JWT plugin (key_claim_name: iss):
 
 ```shell
 # Public auth routes (cors plugin only)
-/api/auth/register  → user-service:3000  (Exact)
-/api/auth/verify    → user-service:3000  (Exact)
-/api/auth/login     → user-service:3000  (Exact)
-/api/auth/refresh   → user-service:3000  (Exact)
-/api/auth/logout    → user-service:3000  (Exact)
+/api/auth/register  → auth-service:3000    (Exact)
+/api/auth/verify    → auth-service:3000    (Exact)
+/api/auth/login     → auth-service:3000    (Exact)
+/api/auth/refresh   → auth-service:3000    (Exact)
+/api/auth/logout    → auth-service:3000    (Exact)
 
 # JWT-protected auth route
-/api/auth/me        → user-service:3000  (Exact, jwt-auth+cors)
+/api/auth/me        → auth-service:3000    (Exact, jwt-auth+cors)
+
+# JWT-protected profile routes
+/api/profile/*      → profile-service:3000 (Prefix, jwt-auth+cors)
 
 # Public API routes
-/api/market/*       → portfolio-api:3000  (Prefix, cors only — shown on unauthenticated homepage)
+/api/market/*       → portfolio-api:3000   (Prefix, cors only — shown on unauthenticated homepage)
 
 # JWT-protected API routes
-/api/stocks/*       → portfolio-api:3000  (Prefix, jwt-auth+cors)
-/api/signals/*      → portfolio-api:3000  (Prefix, jwt-auth+cors)
-/api/portfolio/*    → portfolio-api:3000  (Prefix, jwt-auth+cors — portfolio-api proxies to portfolio-service)
-/api/news/*         → portfolio-api:3000  (Prefix, jwt-auth+cors)
-/api/predict/*      → ml-predictor:8000   (Prefix, jwt-auth+cors)
+/api/stocks/*       → portfolio-api:3000   (Prefix, jwt-auth+cors)
+/api/signals/*      → portfolio-api:3000   (Prefix, jwt-auth+cors)
+/api/portfolio/*    → portfolio-api:3000   (Prefix, jwt-auth+cors — portfolio-api proxies to portfolio-service)
+/api/news/*         → portfolio-api:3000   (Prefix, jwt-auth+cors)
+/api/predict/*      → ml-predictor:8000    (Prefix, jwt-auth+cors)
 
 # Frontend (nginx, not Kong)
 /*                  → frontend:3000
+
+# In dev (no Kong): portfolio-api proxies /api/auth/* → auth-service:3004
+#                                          /api/profile/* → profile-service:3007
 ```
 
 ## Shared Packages
@@ -313,17 +335,22 @@ apps/yana-stocks/
 ├── argocd-app-yana-stocks.yaml    # app-of-apps
 ├── kong/                          # JWT plugin, CORS plugin, KongConsumer, ingress routes
 │   ├── external-secret.yaml       # pulls JWT_SECRET → HS256 credential (key: "yana-stocks")
-│   ├── kongconsumer.yaml          # consumer: user-service
+│   ├── kongconsumer.yaml          # consumer: auth-service (username: auth-service)
 │   ├── kongplugin-jwt.yaml        # key_claim_name: iss
 │   ├── kongplugin-cors.yaml
-│   ├── ingress-auth.yaml          # all /api/auth/* routes
+│   ├── ingress-auth.yaml          # all /api/auth/* routes → auth-service
+│   ├── ingress-profile.yaml       # /api/profile/* routes → profile-service
 │   └── ingress-api.yaml           # /api/stocks|market|signals|portfolio|news|predict
-├── user-service/
-│   ├── cnpg-cluster.yaml          # user-service-pg in yana-stocks namespace
-│   ├── external-secret.yaml       # JWT_SECRET, JWT_REFRESH_SECRET, REDIS_URL, FRONTEND_URL, SMTP_*
-│   ├── deployment.yaml            # envFrom: user-service-secret; init: prisma migrate deploy
+├── auth-service/
+│   ├── cnpg-cluster.yaml          # auth-service-pg CNPG cluster in yana-stocks namespace
+│   ├── external-secret.yaml       # JWT_SECRET, REDIS_URL, DATABASE_URL, SMTP_*, FRONTEND_URL
+│   ├── deployment.yaml            # migrations run at startup (golang-migrate)
 │   ├── service.yaml
-│   └── network-policy.yaml        # ingress from kong namespace on :3000
+│   └── kafka-topic.yaml           # users.registered KafkaTopic
+├── profile-service/
+│   ├── external-secret.yaml       # MONGODB_URI, KAFKA_BROKERS
+│   ├── deployment.yaml
+│   └── service.yaml
 ├── price-ingestor/                # KEDA ScaledObject
 ├── price-processor/
 ├── sentiment-analyzer/            # KEDA ScaledObject
@@ -374,21 +401,22 @@ services:
 
 ## Local Dev Quick-Start
 
+Requires Go ≥ 1.22 installed (Mac: `brew install go`).
+
 ```bash
 # 1. Start infrastructure
 docker compose up -d   # postgres:5432, redis:6379, mongodb:27017, kafka:19092, minio:9000
 
 # 2. Start services (each in its own terminal)
-pnpm --filter @yana-stocks/user-service dev       # :3004
+pnpm --filter @yana-stocks/auth-service dev       # :3004 (go run ./cmd/server — runs migrations)
+pnpm --filter @yana-stocks/profile-service dev    # :3007
 pnpm --filter @yana-stocks/portfolio-service dev  # :3005
 pnpm --filter @yana-stocks/portfolio-api dev      # :3006
 pnpm --filter @yana-stocks/frontend dev           # :3000
 
-# 3. Seed test user (password: password123)
-pnpm --filter @yana-stocks/user-service db:seed
-
-# 4. Run tests
-pnpm --filter @yana-stocks/user-service test      # unit
+# 3. Run tests
+pnpm --filter @yana-stocks/auth-service test      # go test ./...
+pnpm --filter @yana-stocks/profile-service test   # jest
 pnpm --filter e2e test:e2e                        # e2e (starts frontend automatically)
 ```
 
@@ -396,15 +424,16 @@ pnpm --filter e2e test:e2e                        # e2e (starts frontend automat
 
 1. Monorepo scaffold (turbo.json, pnpm-workspace.yaml, docker-compose)
 2. Shared packages (shared-types, kafka-client, typescript-config)
-3. `user-service` — auth foundation
-4. `price-ingestor` — data feed
-5. `price-processor` — storage
-6. `portfolio-service` — portfolios
-7. `portfolio-api` — aggregator
-8. `sentiment-analyzer` — NLP
-9. `ml-predictor` — predictions
-10. `frontend` — dashboard
-11. `e2e` — Playwright tests
+3. `auth-service` (Go) — auth foundation (JWT, registration, email verification)
+4. `profile-service` (NestJS) — user display data (consumes users.registered)
+5. `price-ingestor` — data feed
+6. `price-processor` — storage
+7. `portfolio-service` — portfolios
+8. `portfolio-api` — aggregator + dev proxy for auth/profile
+9. `sentiment-analyzer` — NLP
+10. `ml-predictor` — predictions
+11. `frontend` — dashboard
+12. `e2e` — Playwright tests
 
 ## Code Style
 
@@ -422,16 +451,13 @@ pnpm --filter e2e test:e2e                        # e2e (starts frontend automat
 Each service reads from `.env` locally and from Kubernetes secrets in production
 (via ESO from Infisical).
 
-### user-service
+### auth-service
 
 ```shell
-DATABASE_URL=postgresql://...   # Prisma (CNPG in prod)
-REDIS_URL=redis://...
+DATABASE_URL=postgresql://postgres:password@localhost:5432/yana_stocks?sslmode=disable
+REDIS_URL=redis://localhost:6379
 JWT_SECRET=...
-JWT_EXPIRES_IN=15m
-JWT_REFRESH_SECRET=...          # not currently used (opaque refresh tokens in Redis)
-JWT_REFRESH_EXPIRES_IN=7d
-KAFKA_BROKERS=...
+KAFKA_BROKERS=localhost:19092
 FRONTEND_URL=http://localhost:3000        # base for /verify?token= links in emails
 SMTP_HOST=mail-eu.smtp2go.com
 SMTP_PORT=2525                            # SMTP2GO STARTTLS (egress allowed in netpol)
@@ -439,6 +465,14 @@ SMTP_USERNAME=yanatech.co.uk
 SMTP_PASSWORD=...
 SMTP_FROM=info@yanatech.co.uk
 PORT=3004                                 # dev only; prod uses 3000
+```
+
+### profile-service
+
+```shell
+MONGODB_URI=mongodb://localhost:27017/yana_stocks
+KAFKA_BROKERS=localhost:19092
+PORT=3007                                 # dev only; prod uses 3000
 ```
 
 ### price-processor
@@ -460,10 +494,11 @@ PORT=3005                                      # dev only; prod uses 3000
 ### portfolio-api
 
 ```shell
-REDIS_URL=redis://...
-KAFKA_BROKERS=...
-USER_SERVICE_URL=http://user-service:3000      # dev: http://localhost:3004
-PORTFOLIO_SERVICE_URL=http://portfolio-service:3000  # dev: http://localhost:3005
+REDIS_URL=redis://localhost:6379
+KAFKA_BROKERS=localhost:19092
+AUTH_SERVICE_URL=http://localhost:3004         # prod: http://auth-service:3000
+PROFILE_SERVICE_URL=http://localhost:3007      # prod: http://profile-service:3000
+PORTFOLIO_SERVICE_URL=http://localhost:3005    # prod: http://portfolio-service:3000
 PRICE_PROCESSOR_URL=http://price-processor:3000
 ML_PREDICTOR_URL=http://ml-predictor:8000
 PORT=3006                                      # dev only; prod uses 3000
@@ -504,8 +539,11 @@ MINIO_BUCKET=yana-stocks-models
 ```shell
 NEXT_PUBLIC_API_URL=https://api-gateway.yanatech.co.uk/api
 # In dev: unset — Next.js rewrites in next.config.mjs proxy /api/* to local services
-# user-service:  /api/auth/*     → http://localhost:3004/api/auth/*
-# portfolio-api: /api/portfolio|stocks|signals|market|news|predict/* → http://localhost:3006/api/*
+# auth-service:    /api/auth/*     → AUTH_SERVICE_URL (default http://localhost:3004)
+# profile-service: /api/profile/*  → PROFILE_SERVICE_URL (default http://localhost:3007)
+# portfolio-api:   /api/portfolio|stocks|signals|market|news|predict/* → http://localhost:3006
+AUTH_SERVICE_URL=http://localhost:3004    # consumed by Next.js rewrites in dev
+PROFILE_SERVICE_URL=http://localhost:3007
 ```
 
 ---
@@ -532,16 +570,25 @@ Following CLAUDE.md, scaffold the Turborepo monorepo. Create:
 11. docker-compose.yml — Redpanda (Kafka), MongoDB 8, Redis 8, PostgreSQL 16, MinIO
 ```
 
-### Prompt 2 — user-service
+### Prompt 2 — auth-service + profile-service
 
 ```text
-Following CLAUDE.md, scaffold apps/user-service as a NestJS app with:
-- Prisma for PostgreSQL (User model, RefreshToken model)
-- JWT access token (15min) + refresh token (7 days, stored in Redis)
+Following CLAUDE.md, scaffold apps/auth-service as a Go service with:
+- Chi router, pgx driver, golang-migrate (runs at startup)
+- JWT HS256 access token (15min, iss:'yana-stocks') + opaque refresh token (7d, Redis)
 - Refresh token rotation on every use
-- Endpoints: POST /auth/register, POST /auth/login, POST /auth/refresh, POST /auth/logout, GET /auth/me
-- Guards: JwtAuthGuard, RefreshTokenGuard
-- Swagger decorators on all controllers
+- Kafka producer: publishes users.registered event on successful registration
+- Endpoints: POST /api/auth/register, POST /api/auth/verify, POST /api/auth/login,
+             POST /api/auth/refresh, POST /api/auth/logout, GET /api/auth/me
+- Email verification via SMTP2GO (port 2525)
+- Dockerfile (multi-stage Go build)
+- .env.example
+- package.json with "dev": "go run ./cmd/server" so turbo dev works
+
+Then scaffold apps/profile-service as a NestJS app with:
+- Mongoose for MongoDB (Profile schema: userId, displayName, avatarUrl, bio, preferences)
+- Kafka consumer: users.registered → creates initial profile
+- Endpoints: GET /api/profile/me, PUT /api/profile/me, GET /api/profile/:userId
 - Dockerfile (multi-stage)
 - .env.example
 ```
@@ -591,7 +638,8 @@ Following CLAUDE.md, scaffold apps/portfolio-service as a NestJS app with:
 ```text
 Following CLAUDE.md, scaffold apps/portfolio-api as a NestJS aggregator with:
 - ioredis for response caching (TTL 10s)
-- HTTP clients to user-service, portfolio-service, price-processor, ml-predictor
+- HTTP clients to auth-service, profile-service, portfolio-service, price-processor, ml-predictor
+- In dev (no Kong): proxy /api/auth/* → auth-service, /api/profile/* → profile-service
 - Endpoints: GET /stocks/:symbol, GET /stocks/:symbol/history, GET /signals/:symbol, GET /market/movers
 - JWT guard on all endpoints
 - Swagger decorators
