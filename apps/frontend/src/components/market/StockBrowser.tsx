@@ -87,7 +87,7 @@ export function StockBrowser(): React.JSX.Element {
             ) : isError ? (
               <tr>
                 <td colSpan={3} className="py-8 text-center text-red-400 text-sm">
-                  Could not load stocks — make sure portfolio-api is running on port 3004
+                  Could not load stocks — make sure portfolio-api is running on port 3006
                 </td>
               </tr>
             ) : data?.data.length ? (

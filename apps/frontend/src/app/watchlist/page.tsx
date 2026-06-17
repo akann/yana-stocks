@@ -152,7 +152,7 @@ export default function WatchlistPage(): React.JSX.Element {
         </div>
       ) : isError ? (
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center text-sm text-gray-500">
-          Could not load watchlists — make sure portfolio-service is running on port 3003.
+          Could not load watchlists — make sure portfolio-service is running on port 3005.
         </div>
       ) : watchlists && watchlists.length > 0 ? (
         <div className="space-y-5">
