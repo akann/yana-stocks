@@ -35,7 +35,7 @@ func Load() *Config {
 	refreshExpiry, _ := time.ParseDuration(getEnv("JWT_REFRESH_EXPIRES_IN", "168h"))
 
 	return &Config{
-		Port:                getEnv("PORT", "8080"),
+		Port:                getEnv("PORT", "3004"),
 		DatabaseURL:         mustEnv("DATABASE_URL"),
 		RedisURL:            getEnv("REDIS_URL", "redis://localhost:6379"),
 		JWTSecret:           mustEnv("JWT_SECRET"),
