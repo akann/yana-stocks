@@ -33,7 +33,7 @@ function VerifyInner(): React.JSX.Element {
           setStatus('success');
           setMessage('Email verified! You can now sign in.');
         } else {
-          const body = await res.json().catch(() => ({})) as { message?: string };
+          const body = (await res.json().catch(() => ({}))) as { message?: string };
           setStatus('error');
           setMessage(body.message ?? 'Verification failed. The link may have expired.');
         }

@@ -113,20 +113,27 @@ yana-stocks/
 
 ### 5. user-service (NestJS)
 
-- **Purpose:** User registration, email verification, login, JWT auth, refresh tokens
-- **PostgreSQL (CNPG):** `UserProfile` table (email, passwordHash, isVerified, verificationToken)
+- **Purpose:** User registration, email verification, login, JWT auth, refresh
+  tokens
+- **PostgreSQL (CNPG):** `UserProfile` table (email, passwordHash, isVerified,
+  verificationToken)
 - **Redis:** Refresh token store (key `refresh:<token>` → userId, 7d TTL)
-- **JWT:** HS256 access token 15min (stateless), opaque refresh token 7 days (Redis, revocable)
-- **Refresh token rotation:** New refresh token issued on every use; old one deleted
-- **`iss` claim:** All JWTs include `iss: 'yana-stocks'` — Kong matches this to the HS256 credential
-- **Global prefix:** `app.setGlobalPrefix('api')` — all routes served at `/api/auth/*`
+- **JWT:** HS256 access token 15min (stateless), opaque refresh token 7 days
+  (Redis, revocable)
+- **Refresh token rotation:** New refresh token issued on every use; old one
+  deleted
+- **`iss` claim:** All JWTs include `iss: 'yana-stocks'` — Kong matches this to
+  the HS256 credential
+- **Global prefix:** `app.setGlobalPrefix('api')` — all routes served at
+  `/api/auth/*`
 - **Endpoints:**
   - `POST /api/auth/register` — creates user, sends verification email
   - `POST /api/auth/verify` — activates account via token from email
   - `POST /api/auth/login` — returns `{ accessToken, refreshToken }`
   - `POST /api/auth/refresh` — rotates refresh token
   - `POST /api/auth/logout` — deletes refresh token from Redis
-  - `GET /api/auth/me` — decodes Bearer token (no signature check — Kong validates upstream)
+  - `GET /api/auth/me` — decodes Bearer token (no signature check — Kong
+    validates upstream)
 
 ### 6. portfolio-service (NestJS)
 
@@ -162,15 +169,19 @@ yana-stocks/
   - `/portfolio` — portfolio management (auth required)
   - `/watchlist` — watchlist (auth required)
 - **URL:** `https://stocks.yanatech.co.uk`
-- **Dev proxy:** `next.config.mjs` rewrites `/api/*` to local services (see frontend env vars)
+- **Dev proxy:** `next.config.mjs` rewrites `/api/*` to local services (see
+  frontend env vars)
 
 ### 9. e2e (Playwright)
 
 - **Purpose:** End-to-end tests
-- **Coverage:** Auth flows (register/verify/login/logout), portfolio CRUD, stock data display
-- **Config:** Chromium + iPhone 14 (mobile); `webServer` config auto-starts Next.js dev server
+- **Coverage:** Auth flows (register/verify/login/logout), portfolio CRUD, stock
+  data display
+- **Config:** Chromium + iPhone 14 (mobile); `webServer` config auto-starts
+  Next.js dev server
 - **Pattern:** Page Object Model; API layer mocked per-test via `page.route()`
-- **Run:** `pnpm --filter e2e test:e2e` (installs browsers with `playwright install` on first run)
+- **Run:** `pnpm --filter e2e test:e2e` (installs browsers with
+  `playwright install` on first run)
 
 ## Kafka Topics
 
@@ -265,9 +276,9 @@ Validation DTOs shared between services:
 
 ```typescript
 // auth
-RegisterDto, LoginDto, VerifyEmailDto, RefreshDto
+(RegisterDto, LoginDto, VerifyEmailDto, RefreshDto);
 // portfolio
-CreatePortfolioDto, AddStockDto
+(CreatePortfolioDto, AddStockDto);
 ```
 
 ### packages/kafka-client

@@ -104,13 +104,20 @@ describe('AuthService', () => {
       users.findByEmail.mockResolvedValue(null);
       users.create.mockResolvedValue(mockUser);
 
-      const result = await service.register({ email: 'test@example.com', name: 'Test User', password: 'password123' });
+      const result = await service.register({
+        email: 'test@example.com',
+        name: 'Test User',
+        password: 'password123',
+      });
 
       expect(users.findByEmail).toHaveBeenCalledWith('test@example.com');
       expect(users.create).toHaveBeenCalledWith(
         expect.objectContaining({ email: 'test@example.com', name: 'Test User' }),
       );
-      expect(email.sendVerificationEmail).toHaveBeenCalledWith('test@example.com', expect.stringContaining('/verify?token='));
+      expect(email.sendVerificationEmail).toHaveBeenCalledWith(
+        'test@example.com',
+        expect.stringContaining('/verify?token='),
+      );
       expect(result).toHaveProperty('message');
     });
 
@@ -124,7 +131,9 @@ describe('AuthService', () => {
 
     it('throws ConflictException when email already exists', async () => {
       users.findByEmail.mockResolvedValue(mockUser);
-      await expect(service.register({ email: 'test@example.com', password: 'password123' })).rejects.toThrow(ConflictException);
+      await expect(
+        service.register({ email: 'test@example.com', password: 'password123' }),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
@@ -149,7 +158,9 @@ describe('AuthService', () => {
         verificationToken: 'expired-token',
         verificationTokenExpiry: past,
       });
-      await expect(service.verifyEmail({ token: 'expired-token' })).rejects.toThrow(ForbiddenException);
+      await expect(service.verifyEmail({ token: 'expired-token' })).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('throws ForbiddenException for unknown token', async () => {
@@ -176,25 +187,35 @@ describe('AuthService', () => {
       await service.login({ email: 'test@example.com', password: 'password123' });
 
       expect(jwtSign).toHaveBeenCalledWith(
-        expect.objectContaining({ iss: 'yana-stocks', sub: 'user-uuid-1', email: 'test@example.com' }),
+        expect.objectContaining({
+          iss: 'yana-stocks',
+          sub: 'user-uuid-1',
+          email: 'test@example.com',
+        }),
       );
     });
 
     it('throws UnauthorizedException for wrong password', async () => {
       const hash = await bcrypt.hash('correct', 1);
       users.findByEmail.mockResolvedValue({ ...mockUser, passwordHash: hash });
-      await expect(service.login({ email: 'test@example.com', password: 'wrong' })).rejects.toThrow(UnauthorizedException);
+      await expect(service.login({ email: 'test@example.com', password: 'wrong' })).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('throws UnauthorizedException for unknown email', async () => {
       users.findByEmail.mockResolvedValue(null);
-      await expect(service.login({ email: 'unknown@example.com', password: 'pass' })).rejects.toThrow(UnauthorizedException);
+      await expect(
+        service.login({ email: 'unknown@example.com', password: 'pass' }),
+      ).rejects.toThrow(UnauthorizedException);
     });
 
     it('throws ForbiddenException for unverified account', async () => {
       const hash = await bcrypt.hash('password123', 1);
       users.findByEmail.mockResolvedValue({ ...mockUser, isVerified: false, passwordHash: hash });
-      await expect(service.login({ email: 'test@example.com', password: 'password123' })).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.login({ email: 'test@example.com', password: 'password123' }),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -237,7 +258,12 @@ describe('AuthService', () => {
   describe('getProfile', () => {
     it('returns user profile without sensitive fields', async () => {
       users.findById.mockResolvedValue(mockUser);
-      const profile = await service.getProfile({ sub: 'user-uuid-1', email: 'test@example.com', iat: 0, exp: 9999 });
+      const profile = await service.getProfile({
+        sub: 'user-uuid-1',
+        email: 'test@example.com',
+        iat: 0,
+        exp: 9999,
+      });
       expect(profile).not.toHaveProperty('passwordHash');
       expect(profile).not.toHaveProperty('verificationToken');
       expect(profile.email).toBe('test@example.com');
@@ -245,7 +271,9 @@ describe('AuthService', () => {
 
     it('throws UnauthorizedException when user not found', async () => {
       users.findById.mockResolvedValue(null);
-      await expect(service.getProfile({ sub: 'gone', email: 'x@x.com', iat: 0, exp: 9999 })).rejects.toThrow(UnauthorizedException);
+      await expect(
+        service.getProfile({ sub: 'gone', email: 'x@x.com', iat: 0, exp: 9999 }),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 });

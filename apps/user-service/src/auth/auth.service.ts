@@ -1,4 +1,10 @@
-import { ConflictException, ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -30,19 +36,29 @@ export class AuthService {
     const verificationToken = randomBytes(32).toString('hex');
     const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    await this.users.create({ email: dto.email, name, passwordHash, verificationToken, verificationTokenExpiry });
+    await this.users.create({
+      email: dto.email,
+      name,
+      passwordHash,
+      verificationToken,
+      verificationTokenExpiry,
+    });
 
     const frontendUrl = this.config.getOrThrow<string>('app.frontendUrl');
     const verificationUrl = `${frontendUrl}/verify?token=${verificationToken}`;
     await this.email.sendVerificationEmail(dto.email, verificationUrl);
 
-    return { message: 'Verification email sent. Please check your inbox to activate your account.' };
+    return {
+      message: 'Verification email sent. Please check your inbox to activate your account.',
+    };
   }
 
   async verifyEmail(dto: VerifyEmailDto): Promise<{ message: string }> {
     const user = await this.users.findByVerificationToken(dto.token);
-    if (!user || !user.verificationTokenExpiry) throw new ForbiddenException('Invalid or expired token');
-    if (user.verificationTokenExpiry < new Date()) throw new ForbiddenException('Verification token expired');
+    if (!user || !user.verificationTokenExpiry)
+      throw new ForbiddenException('Invalid or expired token');
+    if (user.verificationTokenExpiry < new Date())
+      throw new ForbiddenException('Verification token expired');
 
     await this.users.verifyEmail(user.id);
     return { message: 'Email verified. You can now sign in.' };
@@ -55,7 +71,8 @@ export class AuthService {
     const passwordMatch = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordMatch) throw new UnauthorizedException('Invalid credentials');
 
-    if (!user.isVerified) throw new ForbiddenException('Please verify your email before signing in');
+    if (!user.isVerified)
+      throw new ForbiddenException('Please verify your email before signing in');
 
     return this.issueTokens(user.id, user.email, user.name ?? undefined);
   }
@@ -79,12 +96,22 @@ export class AuthService {
   async getProfile(claims: JwtPayload) {
     const user = await this.users.findById(claims.sub);
     if (!user) throw new UnauthorizedException('User not found');
-    const { passwordHash: _ph, verificationToken: _vt, verificationTokenExpiry: _vte, ...profile } = user;
+    const {
+      passwordHash: _ph,
+      verificationToken: _vt,
+      verificationTokenExpiry: _vte,
+      ...profile
+    } = user;
     return profile;
   }
 
   private async issueTokens(userId: string, email: string, name?: string) {
-    const payload: Omit<JwtPayload, 'iat' | 'exp'> = { sub: userId, email, iss: 'yana-stocks', ...(name ? { name } : {}) };
+    const payload: Omit<JwtPayload, 'iat' | 'exp'> = {
+      sub: userId,
+      email,
+      iss: 'yana-stocks',
+      ...(name ? { name } : {}),
+    };
     const accessToken = this.jwt.sign(payload);
 
     const refreshToken = randomBytes(40).toString('hex');

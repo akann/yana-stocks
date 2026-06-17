@@ -8,7 +8,7 @@ export interface UserProfile {
 }
 
 export interface JwtPayload {
-  sub: string;    // UserProfile.id (UUID)
+  sub: string; // UserProfile.id (UUID)
   email: string;
   name?: string;
   iss?: string;

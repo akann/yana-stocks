@@ -27,8 +27,7 @@ import { EmailService } from './email.service';
     {
       provide: 'REDIS',
       inject: [ConfigService],
-      useFactory: (config: ConfigService) =>
-        new Redis(config.getOrThrow<string>('redis.url')),
+      useFactory: (config: ConfigService) => new Redis(config.getOrThrow<string>('redis.url')),
     },
   ],
 })

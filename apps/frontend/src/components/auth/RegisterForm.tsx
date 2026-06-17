@@ -18,10 +18,7 @@ export function RegisterForm(): React.JSX.Element {
     setLoading(true);
     try {
       const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api';
-      await axios.post(
-        `${apiBase}/auth/register`,
-        { email, name: name || undefined, password },
-      );
+      await axios.post(`${apiBase}/auth/register`, { email, name: name || undefined, password });
       setDone(true);
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 409) {
@@ -41,8 +38,8 @@ export function RegisterForm(): React.JSX.Element {
           <div className="text-4xl">📧</div>
           <h1 className="text-2xl font-bold text-white">Check your inbox</h1>
           <p className="text-gray-400 text-sm">
-            We sent a verification link to <span className="text-white">{email}</span>.
-            Click it to activate your account, then{' '}
+            We sent a verification link to <span className="text-white">{email}</span>. Click it to
+            activate your account, then{' '}
             <Link href="/login" className="text-blue-400 hover:text-blue-300">
               sign in
             </Link>

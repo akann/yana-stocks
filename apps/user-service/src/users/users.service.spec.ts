@@ -40,7 +40,9 @@ describe('UsersService', () => {
       prisma.userProfile.findUnique.mockResolvedValue(mockUser);
       const result = await service.findByEmail('test@example.com');
       expect(result).toBe(mockUser);
-      expect(prisma.userProfile.findUnique).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
+      expect(prisma.userProfile.findUnique).toHaveBeenCalledWith({
+        where: { email: 'test@example.com' },
+      });
     });
 
     it('returns null when not found', async () => {
@@ -85,7 +87,11 @@ describe('UsersService', () => {
 
   describe('verifyEmail', () => {
     it('sets isVerified=true and clears token fields', async () => {
-      prisma.userProfile.update.mockResolvedValue({ ...mockUser, isVerified: true, verificationToken: null });
+      prisma.userProfile.update.mockResolvedValue({
+        ...mockUser,
+        isVerified: true,
+        verificationToken: null,
+      });
       await service.verifyEmail('profile-1');
       expect(prisma.userProfile.update).toHaveBeenCalledWith({
         where: { id: 'profile-1' },

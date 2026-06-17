@@ -14,7 +14,9 @@ export class RegisterPage {
     this.passwordInput = page.locator('input[type="password"]');
     this.submitButton = page.getByRole('button', { name: /create account/i });
     this.error = page.getByText(/registration failed|email already registered/i);
-    this.signInLink = page.getByText('Already have an account?').getByRole('link', { name: 'Sign in' });
+    this.signInLink = page
+      .getByText('Already have an account?')
+      .getByRole('link', { name: 'Sign in' });
   }
 
   async goto() {

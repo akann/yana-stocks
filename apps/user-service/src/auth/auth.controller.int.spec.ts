@@ -42,7 +42,9 @@ describe('AuthController (integration)', () => {
       .compile();
 
     app = moduleRef.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
     app.setGlobalPrefix('api', { exclude: ['health'] });
     await app.init();
 
@@ -68,9 +70,8 @@ describe('AuthController (integration)', () => {
   }
 
   async function login(email: string, password = 'password123'): Promise<LoginResponse> {
-    return (
-      await request(server).post('/api/auth/login').send({ email, password }).expect(200)
-    ).body as LoginResponse;
+    return (await request(server).post('/api/auth/login').send({ email, password }).expect(200))
+      .body as LoginResponse;
   }
 
   describe('POST /api/auth/register', () => {
@@ -87,12 +88,21 @@ describe('AuthController (integration)', () => {
     });
 
     it('returns 409 for duplicate email', async () => {
-      await request(server).post('/api/auth/register').send({ email: 'dup@example.com', password: 'password123' }).expect(201);
-      await request(server).post('/api/auth/register').send({ email: 'dup@example.com', password: 'other123' }).expect(409);
+      await request(server)
+        .post('/api/auth/register')
+        .send({ email: 'dup@example.com', password: 'password123' })
+        .expect(201);
+      await request(server)
+        .post('/api/auth/register')
+        .send({ email: 'dup@example.com', password: 'other123' })
+        .expect(409);
     });
 
     it('returns 400 for invalid payload', async () => {
-      await request(server).post('/api/auth/register').send({ email: 'not-an-email', password: 'pass' }).expect(400);
+      await request(server)
+        .post('/api/auth/register')
+        .send({ email: 'not-an-email', password: 'pass' })
+        .expect(400);
     });
   });
 
@@ -123,10 +133,16 @@ describe('AuthController (integration)', () => {
     });
 
     it('returns 401 for wrong password', async () => {
-      await request(server).post('/api/auth/register').send({ email: 'wrong@example.com', password: 'password123' }).expect(201);
+      await request(server)
+        .post('/api/auth/register')
+        .send({ email: 'wrong@example.com', password: 'password123' })
+        .expect(201);
       const token = new URL(capturedVerificationUrl!).searchParams.get('token')!;
       await request(server).post('/api/auth/verify').send({ token }).expect(200);
-      await request(server).post('/api/auth/login').send({ email: 'wrong@example.com', password: 'wrongpass' }).expect(401);
+      await request(server)
+        .post('/api/auth/login')
+        .send({ email: 'wrong@example.com', password: 'wrongpass' })
+        .expect(401);
     });
   });
 
@@ -163,10 +179,7 @@ describe('AuthController (integration)', () => {
       const { refreshToken } = await login('refresh@example.com');
 
       const refreshRes = (
-        await request(server)
-          .post('/api/auth/refresh')
-          .send({ refreshToken })
-          .expect(200)
+        await request(server).post('/api/auth/refresh').send({ refreshToken }).expect(200)
       ).body as LoginResponse;
 
       expect(refreshRes).toHaveProperty('accessToken');
@@ -183,7 +196,10 @@ describe('AuthController (integration)', () => {
     });
 
     it('returns 401 for an unknown refresh token', async () => {
-      await request(server).post('/api/auth/refresh').send({ refreshToken: 'bad-token' }).expect(401);
+      await request(server)
+        .post('/api/auth/refresh')
+        .send({ refreshToken: 'bad-token' })
+        .expect(401);
     });
   });
 

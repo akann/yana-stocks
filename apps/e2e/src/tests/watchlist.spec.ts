@@ -155,8 +155,12 @@ test.describe('Watchlist page', () => {
     await page.route('**/api/stocks/AAPL', (r) => r.fulfill({ json: MOCK_STOCK_AAPL }));
     // Stub all stock page requests
     await page.route('**/api/stocks/AAPL/history**', (r) => r.fulfill({ json: [] }));
-    await page.route('**/api/signals/AAPL', (r) => r.fulfill({ json: { symbol: 'AAPL', sentiment: null, prediction: null } }));
-    await page.route('**/api/predict/AAPL', (r) => r.fulfill({ json: { symbol: 'AAPL', predictions: [] } }));
+    await page.route('**/api/signals/AAPL', (r) =>
+      r.fulfill({ json: { symbol: 'AAPL', sentiment: null, prediction: null } }),
+    );
+    await page.route('**/api/predict/AAPL', (r) =>
+      r.fulfill({ json: { symbol: 'AAPL', predictions: [] } }),
+    );
     await page.route('**/api/news/AAPL', (r) => r.fulfill({ json: [] }));
 
     const wl = new WatchlistPage(page);

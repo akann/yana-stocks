@@ -6,7 +6,12 @@
 import { test, expect } from '@playwright/test';
 import { LoginPage } from '../pages/LoginPage';
 import { RegisterPage } from '../pages/RegisterPage';
-import { MOCK_ACCESS_TOKEN, MOCK_REFRESH_TOKEN, TEST_PASSWORD, uniqueEmail } from '../fixtures/data';
+import {
+  MOCK_ACCESS_TOKEN,
+  MOCK_REFRESH_TOKEN,
+  TEST_PASSWORD,
+  uniqueEmail,
+} from '../fixtures/data';
 
 test.describe('Login', () => {
   test('renders login page with email and password fields', async ({ page }) => {
@@ -154,7 +159,9 @@ test.describe('Auth guards', () => {
 test.describe('Logout', () => {
   test('clears session and redirects to login', async ({ page }) => {
     await page.route('**/api/portfolio/portfolios', (r) => r.fulfill({ json: [] }));
-    await page.route('**/api/auth/logout', (r) => r.fulfill({ json: { message: 'Logged out successfully' } }));
+    await page.route('**/api/auth/logout', (r) =>
+      r.fulfill({ json: { message: 'Logged out successfully' } }),
+    );
 
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');

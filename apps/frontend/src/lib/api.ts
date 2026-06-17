@@ -60,7 +60,7 @@ api.interceptors.response.use(
 
       if (!res.ok) throw new Error('Refresh failed');
 
-      const data = await res.json() as { accessToken: string; refreshToken: string };
+      const data = (await res.json()) as { accessToken: string; refreshToken: string };
       sessionStorage.setItem('access_token', data.accessToken);
       sessionStorage.setItem('refresh_token', data.refreshToken);
 

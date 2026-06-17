@@ -35,10 +35,7 @@ export function Navbar(): React.JSX.Element {
         </div>
         <div className="flex items-center gap-3 text-sm">
           {isAuthenticated ? (
-            <button
-              onClick={logout}
-              className="text-gray-400 hover:text-white transition-colors"
-            >
+            <button onClick={logout} className="text-gray-400 hover:text-white transition-colors">
               Sign out
             </button>
           ) : (

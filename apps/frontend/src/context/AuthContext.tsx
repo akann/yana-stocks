@@ -37,11 +37,11 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     });
 
     if (!res.ok) {
-      const body = await res.json().catch(() => ({})) as { message?: string };
+      const body = (await res.json().catch(() => ({}))) as { message?: string };
       throw new Error(body.message ?? 'Login failed');
     }
 
-    const tokens = await res.json() as { accessToken: string; refreshToken: string };
+    const tokens = (await res.json()) as { accessToken: string; refreshToken: string };
     sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
     sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
     setAccessToken(tokens.accessToken);
@@ -78,14 +78,16 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       throw new Error('Session expired');
     }
 
-    const tokens = await res.json() as { accessToken: string; refreshToken: string };
+    const tokens = (await res.json()) as { accessToken: string; refreshToken: string };
     sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
     sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
     setAccessToken(tokens.accessToken);
   }
 
   return (
-    <AuthContext.Provider value={{ accessToken, isAuthenticated: !!accessToken, isLoading, login, logout, refresh }}>
+    <AuthContext.Provider
+      value={{ accessToken, isAuthenticated: !!accessToken, isLoading, login, logout, refresh }}
+    >
       {children}
     </AuthContext.Provider>
   );

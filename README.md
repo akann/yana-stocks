@@ -4,7 +4,8 @@ Production-grade microservices platform for real-time stock market data,
 portfolio management, sentiment analysis, and ML-based price prediction. Runs on
 a self-hosted Kubernetes cluster managed via ArgoCD GitOps.
 
-> **Live app:** [stocks.yanatech.co.uk](https://stocks.yanatech.co.uk) · **K8s manifests:** [github.com/akann/k8s-apps](https://github.com/akann/k8s-apps)
+> **Live app:** [stocks.yanatech.co.uk](https://stocks.yanatech.co.uk) · **K8s
+> manifests:** [github.com/akann/k8s-apps](https://github.com/akann/k8s-apps)
 
 ## Architecture
 
@@ -129,23 +130,26 @@ POST /auth/logout    →  delete refresh token from Redis
 GET  /auth/me        →  current user (requires JWT)
 ```
 
-Kong JWT plugin reads the `iss` claim, matches it to the `yana-stocks` HS256 credential, and verifies the signature. All `/api/*` routes require JWT except the auth endpoints above and `/api/market/*`.
+Kong JWT plugin reads the `iss` claim, matches it to the `yana-stocks` HS256
+credential, and verifies the signature. All `/api/*` routes require JWT except
+the auth endpoints above and `/api/market/*`.
 
 ## API Gateway Routes (Kong)
 
-| Path                                                                            | Service              | Auth   |
-| ------------------------------------------------------------------------------- | -------------------- | ------ |
-| `/api/auth/register`, `/api/auth/verify`, `/api/auth/login`, `/api/auth/refresh`, `/api/auth/logout` | user-service:3000 | None |
-| `/api/auth/me`                                                                  | user-service:3000    | JWT    |
-| `/api/market/*`                                                                 | portfolio-api:3000   | None   |
-| `/api/stocks/*`                                                                 | portfolio-api:3000   | JWT    |
-| `/api/signals/*`                                                                | portfolio-api:3000   | JWT    |
-| `/api/portfolio/*`                                                              | portfolio-api:3000   | JWT    |
-| `/api/news/*`                                                                   | portfolio-api:3000   | JWT    |
-| `/api/predict/*`                                                                | ml-predictor:8000    | JWT    |
-| `/*`                                                                            | frontend:3000        | Public |
+| Path                                                                                                 | Service            | Auth   |
+| ---------------------------------------------------------------------------------------------------- | ------------------ | ------ |
+| `/api/auth/register`, `/api/auth/verify`, `/api/auth/login`, `/api/auth/refresh`, `/api/auth/logout` | user-service:3000  | None   |
+| `/api/auth/me`                                                                                       | user-service:3000  | JWT    |
+| `/api/market/*`                                                                                      | portfolio-api:3000 | None   |
+| `/api/stocks/*`                                                                                      | portfolio-api:3000 | JWT    |
+| `/api/signals/*`                                                                                     | portfolio-api:3000 | JWT    |
+| `/api/portfolio/*`                                                                                   | portfolio-api:3000 | JWT    |
+| `/api/news/*`                                                                                        | portfolio-api:3000 | JWT    |
+| `/api/predict/*`                                                                                     | ml-predictor:8000  | JWT    |
+| `/*`                                                                                                 | frontend:3000      | Public |
 
-`/api/portfolio/*` is handled by `portfolio-api`, which internally proxies to `portfolio-service`.
+`/api/portfolio/*` is handled by `portfolio-api`, which internally proxies to
+`portfolio-service`.
 
 ## Testing
 
