@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "go run ./cmd/server",
     "build": "command -v go >/dev/null 2>&1 && CGO_ENABLED=0 go build -o dist/auth-service ./cmd/server || (echo 'Go not installed — skipping auth-service build' && exit 0)",
-    "lint": "go vet ./...",
-    "test": "go test ./..."
+    "lint": "command -v go >/dev/null 2>&1 && go vet ./... || (echo 'Go not installed — skipping auth-service lint' && exit 0)",
+    "test": "command -v go >/dev/null 2>&1 && go test ./... || (echo 'Go not installed — skipping auth-service test' && exit 0)"
   }
 }

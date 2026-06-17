@@ -35,17 +35,17 @@ packages/
 
 ## Tech Stack
 
-| Layer           | Technology                                                                        |
-| --------------- | --------------------------------------------------------------------------------- |
-| Monorepo        | Turborepo + pnpm workspaces                                                       |
-| auth-service    | Go (Chi router, pgx, golang-migrate, HS256 JWT)                                   |
-| NestJS services | NestJS, Mongoose, ioredis, KafkaJS, Passport/JWT                                  |
-| Frontend        | Next.js 14 App Router, TailwindCSS, TanStack Query, Recharts                      |
-| Python services | Python 3.12, FastAPI, HuggingFace Transformers, Facebook Prophet, confluent-kafka |
+| Layer           | Technology                                                                          |
+| --------------- | ----------------------------------------------------------------------------------- |
+| Monorepo        | Turborepo + pnpm workspaces                                                         |
+| auth-service    | Go (Chi router, pgx, golang-migrate, HS256 JWT)                                     |
+| NestJS services | NestJS, Mongoose, ioredis, KafkaJS, Passport/JWT                                    |
+| Frontend        | Next.js 14 App Router, TailwindCSS, TanStack Query, Recharts                        |
+| Python services | Python 3.12, FastAPI, HuggingFace Transformers, Facebook Prophet, confluent-kafka   |
 | Databases       | PostgreSQL 16 (auth), MongoDB 8 (OHLCV/portfolios/profiles), Redis 8 (cache/tokens) |
-| Messaging       | Kafka (Redpanda locally, Strimzi in production)                                   |
-| ML storage      | MinIO (`yana-stocks-models` bucket)                                               |
-| Data source     | Alpaca Markets free tier (paper trading)                                          |
+| Messaging       | Kafka (Redpanda locally, Strimzi in production)                                     |
+| ML storage      | MinIO (`yana-stocks-models` bucket)                                                 |
+| Data source     | Alpaca Markets free tier (paper trading)                                            |
 
 ## Prerequisites
 
@@ -82,7 +82,8 @@ cp apps/profile-service/.env.example apps/profile-service/.env
 cp apps/portfolio-api/.env.example apps/portfolio-api/.env
 ```
 
-auth-service runs database migrations automatically at startup via golang-migrate.
+auth-service runs database migrations automatically at startup via
+golang-migrate.
 
 ### 4. Start services
 
@@ -122,7 +123,8 @@ pnpm --filter price-processor dev
 
 ## Auth Flow
 
-auth-service (Go) owns all authentication. profile-service (NestJS) owns display data.
+auth-service (Go) owns all authentication. profile-service (NestJS) owns display
+data.
 
 ```
 POST /api/auth/register  →  auth-service: create user, send verification email (SMTP2GO)
@@ -143,18 +145,18 @@ the auth endpoints above and `/api/market/*`.
 
 ## API Gateway Routes (Kong)
 
-| Path                                                                                                 | Service             | Auth   |
-| ---------------------------------------------------------------------------------------------------- | ------------------- | ------ |
-| `/api/auth/register`, `/api/auth/verify`, `/api/auth/login`, `/api/auth/refresh`, `/api/auth/logout` | auth-service:3000   | None   |
-| `/api/auth/me`                                                                                       | auth-service:3000   | JWT    |
-| `/api/profile/me`, `/api/profile/:userId`                                                            | profile-service:3000 | JWT   |
-| `/api/market/*`                                                                                      | portfolio-api:3000  | None   |
-| `/api/stocks/*`                                                                                      | portfolio-api:3000  | JWT    |
-| `/api/signals/*`                                                                                     | portfolio-api:3000  | JWT    |
-| `/api/portfolio/*`                                                                                   | portfolio-api:3000  | JWT    |
-| `/api/news/*`                                                                                        | portfolio-api:3000  | JWT    |
-| `/api/predict/*`                                                                                     | ml-predictor:8000   | JWT    |
-| `/*`                                                                                                 | frontend:3000       | Public |
+| Path                                                                                                 | Service              | Auth   |
+| ---------------------------------------------------------------------------------------------------- | -------------------- | ------ |
+| `/api/auth/register`, `/api/auth/verify`, `/api/auth/login`, `/api/auth/refresh`, `/api/auth/logout` | auth-service:3000    | None   |
+| `/api/auth/me`                                                                                       | auth-service:3000    | JWT    |
+| `/api/profile/me`, `/api/profile/:userId`                                                            | profile-service:3000 | JWT    |
+| `/api/market/*`                                                                                      | portfolio-api:3000   | None   |
+| `/api/stocks/*`                                                                                      | portfolio-api:3000   | JWT    |
+| `/api/signals/*`                                                                                     | portfolio-api:3000   | JWT    |
+| `/api/portfolio/*`                                                                                   | portfolio-api:3000   | JWT    |
+| `/api/news/*`                                                                                        | portfolio-api:3000   | JWT    |
+| `/api/predict/*`                                                                                     | ml-predictor:8000    | JWT    |
+| `/*`                                                                                                 | frontend:3000        | Public |
 
 `/api/portfolio/*` is handled by `portfolio-api`, which internally proxies to
 `portfolio-service`. In dev (no Kong), portfolio-api also proxies `/api/auth/*`
@@ -204,5 +206,6 @@ Notable patterns:
   consumer lag
 - **Argo Rollouts canary** — `ml-predictor` promotes 10% → 50% → 100% on new
   model versions
-- **CNPG** — CloudNativePG cluster `auth-service-pg` for PostgreSQL (auth-service)
+- **CNPG** — CloudNativePG cluster `auth-service-pg` for PostgreSQL
+  (auth-service)
 - **ESO** — ExternalSecrets pulls from Infisical project `k8s-homelab`

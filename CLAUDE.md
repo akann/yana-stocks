@@ -123,26 +123,34 @@ yana-stocks/
 
 ### 5. auth-service (Go)
 
-- **Purpose:** User registration, email verification, login, JWT issuance, refresh token rotation
-- **PostgreSQL (CNPG):** `auth-service-pg` cluster — `users` table (id, email, passwordHash, isVerified, verificationToken)
+- **Purpose:** User registration, email verification, login, JWT issuance,
+  refresh token rotation
+- **PostgreSQL (CNPG):** `auth-service-pg` cluster — `users` table (id, email,
+  passwordHash, isVerified, verificationToken)
 - **Redis:** Refresh token store (key `refresh:<token>` → userId, 7d TTL)
-- **JWT:** HS256 access token 15min (stateless), opaque refresh token 7 days (Redis, revocable)
+- **JWT:** HS256 access token 15min (stateless), opaque refresh token 7 days
+  (Redis, revocable)
 - **Refresh token rotation:** New refresh token on every use; old one deleted
-- **`iss` claim:** All JWTs include `iss: 'yana-stocks'` — Kong matches this to the HS256 credential
+- **`iss` claim:** All JWTs include `iss: 'yana-stocks'` — Kong matches this to
+  the HS256 credential
 - **Dev port:** 3004; prod port: 3000
 - **Endpoints:**
-  - `POST /api/auth/register` — creates user, sends verification email, publishes `users.registered` Kafka event
+  - `POST /api/auth/register` — creates user, sends verification email,
+    publishes `users.registered` Kafka event
   - `POST /api/auth/verify` — activates account via token from email
   - `POST /api/auth/login` — returns `{ accessToken, refreshToken }`
   - `POST /api/auth/refresh` — rotates refresh token
   - `POST /api/auth/logout` — deletes refresh token from Redis
-  - `GET /api/auth/me` — decodes Bearer token (no signature check — Kong validates upstream)
+  - `GET /api/auth/me` — decodes Bearer token (no signature check — Kong
+    validates upstream)
 
 ### 5b. profile-service (NestJS)
 
 - **Purpose:** Non-PII user display data — displayName, avatar, bio, preferences
-- **MongoDB:** `profiles` collection (userId, displayName, avatarUrl, bio, preferences)
-- **Kafka consumer:** `users.registered` — creates initial profile on new registration
+- **MongoDB:** `profiles` collection (userId, displayName, avatarUrl, bio,
+  preferences)
+- **Kafka consumer:** `users.registered` — creates initial profile on new
+  registration
 - **Dev port:** 3007; prod port: 3000
 - **Endpoints:**
   - `GET /api/profile/me` — current user's profile (requires JWT)
