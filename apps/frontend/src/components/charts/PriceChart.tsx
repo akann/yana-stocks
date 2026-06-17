@@ -12,7 +12,6 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from 'recharts';
-import type { TooltipProps } from 'recharts';
 import { api } from '@/lib/api';
 import type { OHLCVBar } from '@/types';
 
@@ -36,9 +35,15 @@ interface ChartPoint {
   volume: number;
 }
 
-function OHLCVTooltip({ active, payload, label }: TooltipProps<number, string>) {
+interface TooltipPayload {
+  active?: boolean;
+  payload?: Array<{ payload: ChartPoint }>;
+  label?: string;
+}
+
+function OHLCVTooltip({ active, payload, label }: TooltipPayload) {
   if (!active || !payload?.length) return null;
-  const d = payload[0]?.payload as ChartPoint | undefined;
+  const d = payload[0]?.payload;
   if (!d) return null;
   return (
     <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs shadow-lg">
