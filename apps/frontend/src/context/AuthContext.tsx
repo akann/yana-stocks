@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api';
@@ -8,26 +8,90 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api';
 const ACCESS_TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 
+export interface AuthUser {
+  userId: string;
+  email: string;
+}
+
+export interface UserPreferences {
+  theme: 'light' | 'dark';
+  defaultCurrency: string;
+  emailNotifications: boolean;
+}
+
+export interface UserProfile {
+  displayName: string;
+  avatar: string;
+  bio: string;
+  preferences: UserPreferences;
+}
+
+export interface UpdateProfileInput {
+  displayName?: string;
+  avatar?: string;
+  bio?: string;
+  preferences?: Partial<UserPreferences>;
+}
+
 interface AuthContextValue {
   accessToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  user: AuthUser | null;
+  profile: UserProfile | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  updateProfile: (dto: UpdateProfileInput) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function authHeaders(token: string) {
+  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+}
+
+async function fetchIdentity(token: string): Promise<AuthUser | null> {
+  try {
+    const res = await fetch(`${API_URL}/auth/me`, { headers: authHeaders(token) });
+    if (!res.ok) return null;
+    return (await res.json()) as AuthUser;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchProfile(token: string): Promise<UserProfile | null> {
+  try {
+    const res = await fetch(`${API_URL}/profile/me`, { headers: authHeaders(token) });
+    if (!res.ok) return null;
+    return (await res.json()) as UserProfile;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }): React.JSX.Element {
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const loadUserData = useCallback(async (token: string): Promise<void> => {
+    const [identity, prof] = await Promise.all([fetchIdentity(token), fetchProfile(token)]);
+    setUser(identity);
+    setProfile(prof);
+  }, []);
 
   useEffect(() => {
     const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
-    if (token) setAccessToken(token);
-    setIsLoading(false);
-  }, []);
+    if (token) {
+      setAccessToken(token);
+      void loadUserData(token).finally(() => setIsLoading(false));
+    } else {
+      setIsLoading(false);
+    }
+  }, [loadUserData]);
 
   async function login(email: string, password: string): Promise<void> {
     const res = await fetch(`${API_URL}/auth/login`, {
@@ -45,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
     sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
     setAccessToken(tokens.accessToken);
+    await loadUserData(tokens.accessToken);
   }
 
   async function logout(): Promise<void> {
@@ -59,6 +124,8 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     sessionStorage.removeItem(ACCESS_TOKEN_KEY);
     sessionStorage.removeItem(REFRESH_TOKEN_KEY);
     setAccessToken(null);
+    setUser(null);
+    setProfile(null);
   }
 
   async function refresh(): Promise<void> {
@@ -75,6 +142,8 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       sessionStorage.removeItem(ACCESS_TOKEN_KEY);
       sessionStorage.removeItem(REFRESH_TOKEN_KEY);
       setAccessToken(null);
+      setUser(null);
+      setProfile(null);
       throw new Error('Session expired');
     }
 
@@ -84,9 +153,30 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     setAccessToken(tokens.accessToken);
   }
 
+  async function updateProfile(dto: UpdateProfileInput): Promise<void> {
+    if (!accessToken) throw new Error('Not authenticated');
+    const res = await fetch(`${API_URL}/profile/me`, {
+      method: 'PUT',
+      headers: authHeaders(accessToken),
+      body: JSON.stringify(dto),
+    });
+    if (!res.ok) throw new Error('Failed to update profile');
+    setProfile((await res.json()) as UserProfile);
+  }
+
   return (
     <AuthContext.Provider
-      value={{ accessToken, isAuthenticated: !!accessToken, isLoading, login, logout, refresh }}
+      value={{
+        accessToken,
+        isAuthenticated: !!accessToken,
+        isLoading,
+        user,
+        profile,
+        login,
+        logout,
+        refresh,
+        updateProfile,
+      }}
     >
       {children}
     </AuthContext.Provider>

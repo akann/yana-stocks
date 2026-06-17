@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 
 export function Navbar(): React.JSX.Element {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, profile } = useAuth();
 
   return (
     <nav className="bg-surface-800 border-b border-gray-700 px-4 py-3">
@@ -35,9 +35,14 @@ export function Navbar(): React.JSX.Element {
         </div>
         <div className="flex items-center gap-3 text-sm">
           {isAuthenticated ? (
-            <button onClick={logout} className="text-gray-400 hover:text-white transition-colors">
-              Sign out
-            </button>
+            <div className="flex items-center gap-3">
+              {profile?.displayName && (
+                <span className="text-gray-400 text-sm">{profile.displayName}</span>
+              )}
+              <button onClick={logout} className="text-gray-400 hover:text-white transition-colors">
+                Sign out
+              </button>
+            </div>
           ) : (
             <>
               <Link href="/login" className="text-gray-400 hover:text-white transition-colors">
