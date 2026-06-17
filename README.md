@@ -4,6 +4,8 @@ Production-grade microservices platform for real-time stock market data,
 portfolio management, sentiment analysis, and ML-based price prediction. Runs on
 a self-hosted Kubernetes cluster managed via ArgoCD GitOps.
 
+> **Live app:** [stocks.yanatech.co.uk](https://stocks.yanatech.co.uk) · **K8s manifests:** [github.com/akann/k8s-apps](https://github.com/akann/k8s-apps)
+
 ## Architecture
 
 ```
