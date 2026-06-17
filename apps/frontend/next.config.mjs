@@ -8,10 +8,12 @@ const config = {
   // In production Kong handles /api/* routing. In dev, proxy to local services.
   async rewrites() {
     if (process.env.NODE_ENV === 'production') return [];
-    const userServiceUrl = process.env.USER_SERVICE_URL ?? 'http://localhost:3004';
+    const authServiceUrl = process.env.AUTH_SERVICE_URL ?? 'http://localhost:8080';
     const portfolioApiUrl = process.env.PORTFOLIO_API_URL ?? 'http://localhost:3006';
+    const profileServiceUrl = process.env.PROFILE_SERVICE_URL ?? 'http://localhost:3007';
     return [
-      { source: '/api/auth/:path*', destination: `${userServiceUrl}/api/auth/:path*` },
+      { source: '/api/auth/:path*', destination: `${authServiceUrl}/api/auth/:path*` },
+      { source: '/api/profile/:path*', destination: `${profileServiceUrl}/api/profile/:path*` },
       { source: '/api/portfolio/:path*', destination: `${portfolioApiUrl}/api/portfolio/:path*` },
       { source: '/api/stocks/:path*', destination: `${portfolioApiUrl}/api/stocks/:path*` },
       { source: '/api/signals/:path*', destination: `${portfolioApiUrl}/api/signals/:path*` },

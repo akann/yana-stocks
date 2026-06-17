@@ -1,0 +1,9 @@
+{
+  "name": "@yana-stocks/auth-service",
+  "private": true,
+  "scripts": {
+    "dev": "go run ./cmd/server",
+    "build": "CGO_ENABLED=0 GOOS=linux go build -o dist/auth-service ./cmd/server",
+    "test": "go test ./..."
+  }
+}

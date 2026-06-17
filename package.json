@@ -16,6 +16,7 @@
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:reset": "docker compose down -v && docker compose up -d",
+    "docker:create-dbs": "docker compose exec postgres psql -U postgres -c \"CREATE DATABASE auth_service;\" || true",
     "seed": "pnpm --filter @yana-stocks/portfolio-api seed"
   },
   "devDependencies": {
@@ -26,7 +27,7 @@
   },
   "prettier": "@yana-stocks/prettier-config",
   "engines": {
-    "node": ">=22.0.0",
+    "node": ">=24.0.0",
     "pnpm": ">=11.0.0"
   },
   "packageManager": "pnpm@11.6.0+sha512.9a36518224080c6fe5165afdcfe79bfa118c29be703f3f462b1e32efe1e98e47e8750b148e08286250aad4113cc7993ca413c4e2cd447752708c2ee5751bc95f",
