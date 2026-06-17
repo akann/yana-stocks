@@ -38,10 +38,11 @@ packages/
 | Layer           | Technology                                                                        |
 | --------------- | --------------------------------------------------------------------------------- |
 | Monorepo        | Turborepo + pnpm workspaces                                                       |
-| NestJS services | NestJS, Prisma (user-service), Mongoose, ioredis, KafkaJS, Passport/JWT           |
+| auth-service    | Go (Chi router, pgx, golang-migrate, HS256 JWT)                                   |
+| NestJS services | NestJS, Mongoose, ioredis, KafkaJS, Passport/JWT                                  |
 | Frontend        | Next.js 14 App Router, TailwindCSS, TanStack Query, Recharts                      |
 | Python services | Python 3.12, FastAPI, HuggingFace Transformers, Facebook Prophet, confluent-kafka |
-| Databases       | PostgreSQL 16 (users), MongoDB 8 (OHLCV/portfolios), Redis 8 (cache/tokens)       |
+| Databases       | PostgreSQL 16 (auth), MongoDB 8 (OHLCV/portfolios/profiles), Redis 8 (cache/tokens) |
 | Messaging       | Kafka (Redpanda locally, Strimzi in production)                                   |
 | ML storage      | MinIO (`yana-stocks-models` bucket)                                               |
 | Data source     | Alpaca Markets free tier (paper trading)                                          |

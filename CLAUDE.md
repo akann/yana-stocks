@@ -710,7 +710,7 @@ Following CLAUDE.md, create k8s/ manifests for all services:
 - price-ingestor: keda-scaledobject.yaml (Kafka consumer lag trigger)
 - sentiment-analyzer: keda-scaledobject.yaml
 - ml-predictor: rollout.yaml (Argo Rollouts canary), analysis-template.yaml
-- user-service: cnpg-cluster.yaml (yana-stocks-postgres)
+- auth-service: cnpg-cluster.yaml (auth-service-pg)
 - frontend: ingress.yaml (stocks.yanatech.co.uk)
 - Kong routes: ingress manifests with ingressClassName: kong for all /api/* routes
 - ArgoCD app-of-apps: argocd-app-yana-stocks.yaml
