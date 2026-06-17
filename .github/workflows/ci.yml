@@ -52,9 +52,6 @@ jobs:
               - '.github/workflows/**'
             auth-service:
               - 'apps/auth-service/**'
-            user-service:
-              - 'apps/user-service/**'
-              - 'packages/**'
             price-processor:
               - 'apps/price-processor/**'
               - 'packages/**'
@@ -101,7 +98,6 @@ jobs:
 
           maybe_add "frontend"           "."                           "apps/frontend/Dockerfile"
           maybe_add "auth-service"       "apps/auth-service"           "apps/auth-service/Dockerfile"
-          maybe_add "user-service"       "."                           "apps/user-service/Dockerfile"
           maybe_add "price-processor"    "."                           "apps/price-processor/Dockerfile"
           maybe_add "profile-service"    "."                           "apps/profile-service/Dockerfile"
           maybe_add "portfolio-service"  "."                           "apps/portfolio-service/Dockerfile"
@@ -162,8 +158,9 @@ jobs:
         # Run once; if it fails on the build-approval check, approve then retry.
         run: pnpm install --frozen-lockfile || (pnpm approve-builds --all && pnpm install --frozen-lockfile)
 
-      - name: Generate Prisma client
-        run: pnpm --filter @yana-stocks/user-service db:generate
+      - name: Build and vet auth-service
+        working-directory: apps/auth-service
+        run: go build ./... && go vet ./...
 
       - name: Set Turborepo filter
         id: turbo-filter
@@ -247,20 +244,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile || (pnpm approve-builds --all && pnpm install --frozen-lockfile)
 
-      - name: Generate Prisma client
-        run: pnpm --filter @yana-stocks/user-service db:generate
-
       - name: Write .env.test files
         run: |
-          printf '%s\n' \
-            'DATABASE_URL=postgresql://postgres:password@localhost:5432/yana_stocks_test' \
-            'REDIS_URL=redis://localhost:6379' \
-            'JWT_SECRET=int-test-jwt-secret' \
-            'JWT_EXPIRES_IN=15m' \
-            'JWT_REFRESH_SECRET=int-test-refresh-secret' \
-            'JWT_REFRESH_EXPIRES_IN=7d' \
-            > apps/user-service/.env.test
-
           printf '%s\n' \
             'MONGODB_URI=mongodb://admin:password@localhost:27017/price_processor_test?authSource=admin' \
             'REDIS_URL=redis://localhost:6379' \
@@ -366,9 +351,6 @@ jobs:
         run: pnpm --filter @yana-stocks/e2e exec playwright install-deps chromium webkit
         if: steps.playwright-cache.outputs.cache-hit == 'true'
 
-      - name: Generate Prisma client
-        run: pnpm --filter @yana-stocks/user-service db:generate
-
       - name: Write frontend .env.local
         run: |
           printf '%s\n' \
@@ -380,25 +362,8 @@ jobs:
       - name: Build all apps
         run: pnpm turbo run build
 
-      - name: Migrate database
-        run: pnpm --filter @yana-stocks/user-service db:migrate:deploy
-        env:
-          DATABASE_URL: postgresql://postgres:password@localhost:5432/yana_stocks
-
       - name: Write service .env files
         run: |
-          printf '%s\n' \
-            'PORT=3001' \
-            'DATABASE_URL=postgresql://postgres:password@localhost:5432/yana_stocks' \
-            'REDIS_URL=redis://localhost:6379' \
-            'JWT_SECRET=e2e-jwt-secret' \
-            'JWT_EXPIRES_IN=15m' \
-            'JWT_REFRESH_SECRET=e2e-jwt-refresh-secret' \
-            'JWT_REFRESH_EXPIRES_IN=7d' \
-            'KAFKA_BROKERS=localhost:19092' \
-            'CORS_ORIGIN=http://localhost:3000' \
-            > apps/user-service/.env
-
           printf '%s\n' \
             'PORT=3003' \
             'MONGODB_URI=mongodb://admin:password@localhost:27017/yana_stocks?authSource=admin' \
@@ -411,10 +376,11 @@ jobs:
             'MONGODB_URI=mongodb://admin:password@localhost:27017/yana_stocks?authSource=admin' \
             'REDIS_URL=redis://localhost:6379' \
             'KAFKA_BROKERS=localhost:19092' \
-            'USER_SERVICE_URL=http://localhost:3001' \
+            'AUTH_SERVICE_URL=http://localhost:3001' \
             'PORTFOLIO_SERVICE_URL=http://localhost:3003' \
             'PRICE_PROCESSOR_URL=http://localhost:3002' \
             'ML_PREDICTOR_URL=http://localhost:8000' \
+            'PROFILE_SERVICE_URL=http://localhost:3007' \
             'CORS_ORIGIN=http://localhost:3000' \
             > apps/portfolio-api/.env
 
@@ -425,10 +391,28 @@ jobs:
             'CORS_ORIGIN=http://localhost:3000' \
             > apps/profile-service/.env
 
+      - name: Build auth-service binary
+        working-directory: apps/auth-service
+        run: go build -o /tmp/auth-service ./cmd/server
+
       - name: Start backend services
         run: |
           mkdir -p logs
-          pnpm --filter @yana-stocks/user-service      start > logs/user-service.log      2>&1 &
+          # auth-service: Go binary — DB migrations run at startup
+          PORT=3001 \
+          DATABASE_URL=postgresql://postgres:password@localhost:5432/yana_stocks \
+          REDIS_URL=redis://localhost:6379 \
+          JWT_SECRET=e2e-jwt-secret \
+          JWT_EXPIRES_IN=15m \
+          JWT_REFRESH_EXPIRES_IN=168h \
+          KAFKA_BROKERS=localhost:19092 \
+          FRONTEND_URL=http://localhost:3000 \
+          SMTP_HOST=mail-eu.smtp2go.com \
+          SMTP_PORT=2525 \
+          SMTP_USERNAME=e2e-test \
+          SMTP_PASSWORD=e2e-test \
+          SMTP_FROM=noreply@yanatech.co.uk \
+          /tmp/auth-service > logs/auth-service.log 2>&1 &
           pnpm --filter @yana-stocks/portfolio-service start > logs/portfolio-service.log 2>&1 &
           pnpm --filter @yana-stocks/portfolio-api     start > logs/portfolio-api.log     2>&1 &
           pnpm --filter @yana-stocks/profile-service   start > logs/profile-service.log   2>&1 &
@@ -450,7 +434,7 @@ jobs:
             cat logs/${name}.log 2>/dev/null || true
             return 1
           }
-          wait_for http://localhost:3001/health user-service
+          wait_for http://localhost:3001/health auth-service
           wait_for http://localhost:3003/health portfolio-service
           wait_for http://localhost:3004/health portfolio-api
           wait_for http://localhost:3007/health profile-service

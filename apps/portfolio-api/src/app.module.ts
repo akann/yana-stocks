@@ -6,6 +6,7 @@ import { AuthProxyController } from './auth/auth-proxy.controller';
 import { HealthController } from './health.controller';
 import { PortfolioProxyController } from './portfolio/portfolio-proxy.controller';
 import { PredictProxyController } from './predict/predict-proxy.controller';
+import { ProfileProxyController } from './profile/profile-proxy.controller';
 import { KafkaModule } from './kafka/kafka.module';
 import { RedisModule } from './redis/redis.module';
 import { NewsModule } from './news/news.module';
@@ -24,6 +25,7 @@ import { StocksModule } from './stocks/stocks.module';
   ],
   controllers: [
     AuthProxyController,
+    ProfileProxyController,
     HealthController,
     PortfolioProxyController,
     PredictProxyController,

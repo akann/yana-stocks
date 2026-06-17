@@ -39,21 +39,21 @@ export class AuthProxyController {
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() body: unknown, @Res() res: Response): Promise<void> {
-    const { status, data } = await this.forward('POST', '/auth/register', body);
+    const { status, data } = await this.forward('POST', '/api/auth/register', body);
     res.status(status).json(data);
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() body: unknown, @Res() res: Response): Promise<void> {
-    const { status, data } = await this.forward('POST', '/auth/login', body);
+    const { status, data } = await this.forward('POST', '/api/auth/login', body);
     res.status(status).json(data);
   }
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   async refresh(@Body() body: unknown, @Res() res: Response): Promise<void> {
-    const { status, data } = await this.forward('POST', '/auth/refresh', body);
+    const { status, data } = await this.forward('POST', '/api/auth/refresh', body);
     res.status(status).json(data);
   }
 
@@ -63,7 +63,7 @@ export class AuthProxyController {
     @Headers('authorization') auth: string | undefined,
     @Res() res: Response,
   ): Promise<void> {
-    const { status, data } = await this.forward('POST', '/auth/logout', body, auth);
+    const { status, data } = await this.forward('POST', '/api/auth/logout', body, auth);
     res.status(status).json(data);
   }
 
@@ -72,7 +72,7 @@ export class AuthProxyController {
     @Headers('authorization') auth: string | undefined,
     @Res() res: Response,
   ): Promise<void> {
-    const { status, data } = await this.forward('GET', '/auth/me', undefined, auth);
+    const { status, data } = await this.forward('GET', '/api/auth/me', undefined, auth);
     res.status(status).json(data);
   }
 }

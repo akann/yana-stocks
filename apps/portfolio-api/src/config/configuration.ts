@@ -8,6 +8,7 @@ export default () => ({
   },
   priceProcessorUrl: process.env['PRICE_PROCESSOR_URL'] ?? 'http://localhost:3002',
   authServiceUrl: process.env['AUTH_SERVICE_URL'] ?? 'http://localhost:3004',
+  profileServiceUrl: process.env['PROFILE_SERVICE_URL'] ?? 'http://localhost:3007',
   portfolioServiceUrl: process.env['PORTFOLIO_SERVICE_URL'] ?? 'http://localhost:3005',
   mlPredictorUrl: process.env['ML_PREDICTOR_URL'] ?? 'http://localhost:8000',
   mongodbUri: process.env['MONGODB_URI'] ?? 'mongodb://localhost:27017/yana_stocks',
