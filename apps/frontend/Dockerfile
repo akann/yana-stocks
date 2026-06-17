@@ -4,12 +4,13 @@ RUN apk upgrade --no-cache && corepack enable pnpm
 FROM base AS deps
 WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/auth-service/package.json ./apps/auth-service/
 COPY apps/e2e/package.json ./apps/e2e/
 COPY apps/frontend/package.json ./apps/frontend/
 COPY apps/portfolio-api/package.json ./apps/portfolio-api/
 COPY apps/portfolio-service/package.json ./apps/portfolio-service/
 COPY apps/price-processor/package.json ./apps/price-processor/
-COPY apps/user-service/package.json ./apps/user-service/
+COPY apps/profile-service/package.json ./apps/profile-service/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
 COPY packages/kafka-client/package.json ./packages/kafka-client/
 COPY packages/prettier-config/package.json ./packages/prettier-config/
