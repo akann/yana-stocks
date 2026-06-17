@@ -13,6 +13,7 @@ export const KAFKA_GROUP_IDS = {
   ML_PREDICTOR: 'ml-predictor',
   PORTFOLIO_API: 'portfolio-api',
   PORTFOLIO_SERVICE: 'portfolio-service',
+  PROFILE_SERVICE: 'profile-service',
 } as const;
 
 export type KafkaGroupId = (typeof KAFKA_GROUP_IDS)[keyof typeof KAFKA_GROUP_IDS];

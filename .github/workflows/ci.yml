@@ -58,6 +58,9 @@ jobs:
             price-processor:
               - 'apps/price-processor/**'
               - 'packages/**'
+            profile-service:
+              - 'apps/profile-service/**'
+              - 'packages/**'
             portfolio-service:
               - 'apps/portfolio-service/**'
               - 'packages/**'
@@ -100,6 +103,7 @@ jobs:
           maybe_add "auth-service"       "apps/auth-service"           "apps/auth-service/Dockerfile"
           maybe_add "user-service"       "."                           "apps/user-service/Dockerfile"
           maybe_add "price-processor"    "."                           "apps/price-processor/Dockerfile"
+          maybe_add "profile-service"    "."                           "apps/profile-service/Dockerfile"
           maybe_add "portfolio-service"  "."                           "apps/portfolio-service/Dockerfile"
           maybe_add "portfolio-api"      "."                           "apps/portfolio-api/Dockerfile"
           maybe_add "price-ingestor"     "services/price-ingestor"     "services/price-ingestor/Dockerfile"
@@ -414,12 +418,20 @@ jobs:
             'CORS_ORIGIN=http://localhost:3000' \
             > apps/portfolio-api/.env
 
+          printf '%s\n' \
+            'PORT=3007' \
+            'MONGODB_URI=mongodb://admin:password@localhost:27017/yana_stocks?authSource=admin' \
+            'KAFKA_BROKERS=localhost:19092' \
+            'CORS_ORIGIN=http://localhost:3000' \
+            > apps/profile-service/.env
+
       - name: Start backend services
         run: |
           mkdir -p logs
           pnpm --filter @yana-stocks/user-service      start > logs/user-service.log      2>&1 &
           pnpm --filter @yana-stocks/portfolio-service start > logs/portfolio-service.log 2>&1 &
           pnpm --filter @yana-stocks/portfolio-api     start > logs/portfolio-api.log     2>&1 &
+          pnpm --filter @yana-stocks/profile-service   start > logs/profile-service.log   2>&1 &
           pnpm --filter @yana-stocks/frontend          start > logs/frontend.log          2>&1 &
 
       - name: Wait for all services to be ready
@@ -441,6 +453,7 @@ jobs:
           wait_for http://localhost:3001/health user-service
           wait_for http://localhost:3003/health portfolio-service
           wait_for http://localhost:3004/health portfolio-api
+          wait_for http://localhost:3007/health profile-service
           wait_for http://localhost:3000     frontend
 
       - name: Seed test data
