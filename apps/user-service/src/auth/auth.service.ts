@@ -84,7 +84,7 @@ export class AuthService {
   }
 
   private async issueTokens(userId: string, email: string, name?: string) {
-    const payload: Omit<JwtPayload, 'iat' | 'exp'> = { sub: userId, email, ...(name ? { name } : {}) };
+    const payload: Omit<JwtPayload, 'iat' | 'exp'> = { sub: userId, email, iss: 'yana-stocks', ...(name ? { name } : {}) };
     const accessToken = this.jwt.sign(payload);
 
     const refreshToken = randomBytes(40).toString('hex');
