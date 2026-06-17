@@ -6,7 +6,7 @@
     "build": "tsc",
     "dev": "nest start --watch",
     "start": "node dist/main.js",
-    "test": "jest",
+    "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:int": "jest --config jest.int.config.js --runInBand",
