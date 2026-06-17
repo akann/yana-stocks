@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/akann/yana-stocks/auth-service/internal/config"
@@ -20,11 +21,11 @@ import (
 )
 
 var (
-	ErrEmailTaken       = errors.New("email already registered")
-	ErrInvalidToken     = errors.New("invalid or expired token")
+	ErrEmailTaken         = errors.New("email already registered")
+	ErrInvalidToken       = errors.New("invalid or expired token")
 	ErrInvalidCredentials = errors.New("invalid email or password")
-	ErrEmailNotVerified = errors.New("email not verified")
-	ErrUserNotFound     = errors.New("user not found")
+	ErrEmailNotVerified   = errors.New("email not verified")
+	ErrUserNotFound       = errors.New("user not found")
 )
 
 type TokenPair struct {
@@ -60,7 +61,7 @@ func (s *AuthService) Register(ctx context.Context, emailAddr, password string) 
 		return err
 	}
 
-	user, err := s.queries.CreateUser(ctx, emailAddr, string(hash), token)
+	user, err := s.queries.CreateUserWithCredential(ctx, emailAddr, string(hash), token)
 	if err != nil {
 		if isDuplicateKeyError(err) {
 			return ErrEmailTaken
@@ -68,14 +69,12 @@ func (s *AuthService) Register(ctx context.Context, emailAddr, password string) 
 		return err
 	}
 
-	// Publish event (async — failure is logged, not returned)
 	go func() {
 		if err := s.publisher.PublishUserRegistered(context.Background(), user.ID, user.Email); err != nil {
 			log.Printf("kafka publish users.registered failed: %v", err)
 		}
 	}()
 
-	// Send verification email (failure is logged, not returned — user can request resend later)
 	go func() {
 		if err := s.emailer.SendVerification(emailAddr, s.cfg.FrontendURL, token); err != nil {
 			log.Printf("verification email failed for %s: %v", emailAddr, err)
@@ -97,7 +96,7 @@ func (s *AuthService) VerifyEmail(ctx context.Context, token string) error {
 }
 
 func (s *AuthService) Login(ctx context.Context, emailAddr, password string) (*TokenPair, error) {
-	user, err := s.queries.GetUserByEmail(ctx, emailAddr)
+	user, err := s.queries.GetUserByEmailWithCredential(ctx, emailAddr)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrInvalidCredentials
@@ -128,7 +127,6 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*TokenP
 		return nil, ErrUserNotFound
 	}
 
-	// Delete old token (rotation)
 	s.redis.Del(ctx, key)
 
 	return s.issueTokens(ctx, user.ID, user.Email)
@@ -194,18 +192,5 @@ func randomHex(n int) (string, error) {
 }
 
 func isDuplicateKeyError(err error) bool {
-	return err != nil && (contains(err.Error(), "duplicate key") || contains(err.Error(), "unique constraint"))
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsStr(s, substr))
-}
-
-func containsStr(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	return err != nil && (strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint"))
 }
