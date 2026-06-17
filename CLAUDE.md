@@ -113,18 +113,20 @@ yana-stocks/
 
 ### 5. user-service (NestJS)
 
-- **Purpose:** User registration, login, JWT auth, refresh tokens
-- **PostgreSQL (CNPG):** Users, refresh token store
-- **Redis:** Refresh token blacklist
-- **JWT:** Access token 15min (stateless), refresh token 7 days (Redis,
-  revocable)
-- **Refresh token rotation:** New refresh token issued on every use
+- **Purpose:** User registration, email verification, login, JWT auth, refresh tokens
+- **PostgreSQL (CNPG):** `UserProfile` table (email, passwordHash, isVerified, verificationToken)
+- **Redis:** Refresh token store (key `refresh:<token>` → userId, 7d TTL)
+- **JWT:** HS256 access token 15min (stateless), opaque refresh token 7 days (Redis, revocable)
+- **Refresh token rotation:** New refresh token issued on every use; old one deleted
+- **`iss` claim:** All JWTs include `iss: 'yana-stocks'` — Kong matches this to the HS256 credential
+- **Global prefix:** `app.setGlobalPrefix('api')` — all routes served at `/api/auth/*`
 - **Endpoints:**
-  - `POST /auth/register`
-  - `POST /auth/login`
-  - `POST /auth/refresh`
-  - `POST /auth/logout`
-  - `GET /auth/me`
+  - `POST /api/auth/register` — creates user, sends verification email
+  - `POST /api/auth/verify` — activates account via token from email
+  - `POST /api/auth/login` — returns `{ accessToken, refreshToken }`
+  - `POST /api/auth/refresh` — rotates refresh token
+  - `POST /api/auth/logout` — deletes refresh token from Redis
+  - `GET /api/auth/me` — decodes Bearer token (no signature check — Kong validates upstream)
 
 ### 6. portfolio-service (NestJS)
 
@@ -153,20 +155,22 @@ yana-stocks/
 
 - **Purpose:** Dashboard UI
 - **Routes:**
-  - `/` — market overview, top movers
-  - `/dashboard` — user portfolio summary
-  - `/stocks/:symbol` — price chart, signals, prediction
-  - `/portfolio` — portfolio management
-  - `/watchlist` — watchlist
-  - `/login`, `/register`
+  - `/` — market overview, top movers (public)
+  - `/login`, `/register`, `/verify` — auth pages (public)
+  - `/dashboard` — user portfolio summary (auth required)
+  - `/stocks/:symbol` — price chart, signals, prediction (auth required)
+  - `/portfolio` — portfolio management (auth required)
+  - `/watchlist` — watchlist (auth required)
 - **URL:** `https://stocks.yanatech.co.uk`
+- **Dev proxy:** `next.config.mjs` rewrites `/api/*` to local services (see frontend env vars)
 
 ### 9. e2e (Playwright)
 
 - **Purpose:** End-to-end tests
-- **Coverage:** Auth flows, portfolio CRUD, stock data display
-- **Config:** Chromium + iPhone 14 (mobile)
-- **Pattern:** Page Object Model
+- **Coverage:** Auth flows (register/verify/login/logout), portfolio CRUD, stock data display
+- **Config:** Chromium + iPhone 14 (mobile); `webServer` config auto-starts Next.js dev server
+- **Pattern:** Page Object Model; API layer mocked per-test via `page.route()`
+- **Run:** `pnpm --filter e2e test:e2e` (installs browsers with `playwright install` on first run)
 
 ## Kafka Topics
 
@@ -183,30 +187,58 @@ yana-stocks/
 ## Auth Flow
 
 ```shell
-POST /auth/login
-  → user-service validates credentials
-  → returns { accessToken (JWT 15min), refreshToken (opaque 7d) }
-  → refreshToken stored in Redis with userId
+POST /api/auth/register
+  → user-service creates user (passwordHash via bcrypt), sends verification email (SMTP2GO)
+  → returns { message }
 
-POST /auth/refresh
+POST /api/auth/verify
+  → user-service activates account, clears verificationToken
+  → returns { message }
+
+POST /api/auth/login
+  → user-service validates email+password, checks isVerified
+  → returns { accessToken (HS256 JWT 15min, iss:'yana-stocks'), refreshToken (opaque 7d) }
+  → refreshToken stored in Redis as refresh:<token> → userId
+
+POST /api/auth/refresh
   → validates refreshToken in Redis
   → issues new accessToken + new refreshToken (rotation)
   → old refreshToken deleted from Redis
 
-POST /auth/logout
+POST /api/auth/logout
   → deletes refreshToken from Redis
 
-Kong JWT plugin validates accessToken on all /api/* except /auth/*
+Kong JWT plugin (key_claim_name: iss):
+  → reads iss claim from JWT
+  → looks up KongConsumer credential with key: "yana-stocks"
+  → verifies HS256 signature using JWT_SECRET from Infisical
 ```
 
 ## Kong Routes (k8s-apps repo)
 
 ```shell
-/api/auth/*      → user-service:3000        (no JWT)
-/api/stocks/*    → portfolio-api:3000       (JWT required)
-/api/portfolio/* → portfolio-service:3000   (JWT required)
-/api/predict/*   → ml-predictor:8000        (JWT required)
-/*               → frontend:3000            (public)
+# Public auth routes (cors plugin only)
+/api/auth/register  → user-service:3000  (Exact)
+/api/auth/verify    → user-service:3000  (Exact)
+/api/auth/login     → user-service:3000  (Exact)
+/api/auth/refresh   → user-service:3000  (Exact)
+/api/auth/logout    → user-service:3000  (Exact)
+
+# JWT-protected auth route
+/api/auth/me        → user-service:3000  (Exact, jwt-auth+cors)
+
+# Public API routes
+/api/market/*       → portfolio-api:3000  (Prefix, cors only — shown on unauthenticated homepage)
+
+# JWT-protected API routes
+/api/stocks/*       → portfolio-api:3000  (Prefix, jwt-auth+cors)
+/api/signals/*      → portfolio-api:3000  (Prefix, jwt-auth+cors)
+/api/portfolio/*    → portfolio-api:3000  (Prefix, jwt-auth+cors — portfolio-api proxies to portfolio-service)
+/api/news/*         → portfolio-api:3000  (Prefix, jwt-auth+cors)
+/api/predict/*      → ml-predictor:8000   (Prefix, jwt-auth+cors)
+
+# Frontend (nginx, not Kong)
+/*                  → frontend:3000
 ```
 
 ## Shared Packages
@@ -232,7 +264,10 @@ TypeScript interfaces used across all services and frontend:
 Validation DTOs shared between services:
 
 ```typescript
-(CreatePortfolioDto, AddStockDto, RegisterDto, LoginDto);
+// auth
+RegisterDto, LoginDto, VerifyEmailDto, RefreshDto
+// portfolio
+CreatePortfolioDto, AddStockDto
 ```
 
 ### packages/kafka-client
@@ -258,29 +293,34 @@ KAFKA_TOPICS = {
 **k8s-apps repo:** `github.com/akann/k8s-apps` (local at `~/repo/k8s-apps` on
 k8s-cp-1)
 
-New resources needed in k8s-apps:
+All manifests are deployed. Structure:
 
 ```
 apps/yana-stocks/
 ├── namespace.yaml
+├── harbor-pull-secret.yaml
 ├── argocd-app-yana-stocks.yaml    # app-of-apps
-├── price-ingestor/
-│   ├── deployment.yaml
-│   ├── service.yaml
-│   ├── keda-scaledobject.yaml
-│   └── external-secret.yaml
-├── price-processor/
-├── sentiment-analyzer/
-├── ml-predictor/
-│   ├── rollout.yaml               # Argo Rollouts
-│   └── analysis-template.yaml
+├── kong/                          # JWT plugin, CORS plugin, KongConsumer, ingress routes
+│   ├── external-secret.yaml       # pulls JWT_SECRET → HS256 credential (key: "yana-stocks")
+│   ├── kongconsumer.yaml          # consumer: user-service
+│   ├── kongplugin-jwt.yaml        # key_claim_name: iss
+│   ├── kongplugin-cors.yaml
+│   ├── ingress-auth.yaml          # all /api/auth/* routes
+│   └── ingress-api.yaml           # /api/stocks|market|signals|portfolio|news|predict
 ├── user-service/
-│   ├── cnpg-cluster.yaml          # separate CNPG cluster
-│   └── external-secret.yaml
+│   ├── cnpg-cluster.yaml          # user-service-pg in yana-stocks namespace
+│   ├── external-secret.yaml       # JWT_SECRET, JWT_REFRESH_SECRET, REDIS_URL, FRONTEND_URL, SMTP_*
+│   ├── deployment.yaml            # envFrom: user-service-secret; init: prisma migrate deploy
+│   ├── service.yaml
+│   └── network-policy.yaml        # ingress from kong namespace on :3000
+├── price-ingestor/                # KEDA ScaledObject
+├── price-processor/
+├── sentiment-analyzer/            # KEDA ScaledObject
+├── ml-predictor/                  # Argo Rollouts canary (no deployment.yaml)
 ├── portfolio-service/
 ├── portfolio-api/
 └── frontend/
-    └── ingress.yaml               # stocks.yanatech.co.uk
+    └── ingress.yaml               # stocks.yanatech.co.uk via ingress-nginx
 ```
 
 ## Local Dev Infrastructure (docker-compose.yml)
@@ -321,6 +361,26 @@ services:
 - On successful build: update image tag in `k8s-apps` → ArgoCD auto-syncs
 - E2E: Playwright runs against staging before prod deploy
 
+## Local Dev Quick-Start
+
+```bash
+# 1. Start infrastructure
+docker compose up -d   # postgres:5432, redis:6379, mongodb:27017, kafka:19092, minio:9000
+
+# 2. Start services (each in its own terminal)
+pnpm --filter @yana-stocks/user-service dev       # :3004
+pnpm --filter @yana-stocks/portfolio-service dev  # :3005
+pnpm --filter @yana-stocks/portfolio-api dev      # :3006
+pnpm --filter @yana-stocks/frontend dev           # :3000
+
+# 3. Seed test user (password: password123)
+pnpm --filter @yana-stocks/user-service db:seed
+
+# 4. Run tests
+pnpm --filter @yana-stocks/user-service test      # unit
+pnpm --filter e2e test:e2e                        # e2e (starts frontend automatically)
+```
+
 ## Build Order (implement in this order)
 
 1. Monorepo scaffold (turbo.json, pnpm-workspace.yaml, docker-compose)
@@ -354,13 +414,20 @@ Each service reads from `.env` locally and from Kubernetes secrets in production
 ### user-service
 
 ```shell
-DATABASE_URL=postgresql://...   # Prisma
+DATABASE_URL=postgresql://...   # Prisma (CNPG in prod)
 REDIS_URL=redis://...
 JWT_SECRET=...
 JWT_EXPIRES_IN=15m
-JWT_REFRESH_SECRET=...
+JWT_REFRESH_SECRET=...          # not currently used (opaque refresh tokens in Redis)
 JWT_REFRESH_EXPIRES_IN=7d
 KAFKA_BROKERS=...
+FRONTEND_URL=http://localhost:3000        # base for /verify?token= links in emails
+SMTP_HOST=mail-eu.smtp2go.com
+SMTP_PORT=2525                            # SMTP2GO STARTTLS (egress allowed in netpol)
+SMTP_USERNAME=yanatech.co.uk
+SMTP_PASSWORD=...
+SMTP_FROM=info@yanatech.co.uk
+PORT=3004                                 # dev only; prod uses 3000
 ```
 
 ### price-processor
@@ -376,6 +443,7 @@ KAFKA_BROKERS=...
 ```shell
 MONGODB_URI=mongodb://...
 KAFKA_BROKERS=...
+PORT=3005                                      # dev only; prod uses 3000
 ```
 
 ### portfolio-api
@@ -383,10 +451,11 @@ KAFKA_BROKERS=...
 ```shell
 REDIS_URL=redis://...
 KAFKA_BROKERS=...
-USER_SERVICE_URL=http://user-service:3000
-PORTFOLIO_SERVICE_URL=http://portfolio-service:3000
+USER_SERVICE_URL=http://user-service:3000      # dev: http://localhost:3004
+PORTFOLIO_SERVICE_URL=http://portfolio-service:3000  # dev: http://localhost:3005
 PRICE_PROCESSOR_URL=http://price-processor:3000
 ML_PREDICTOR_URL=http://ml-predictor:8000
+PORT=3006                                      # dev only; prod uses 3000
 ```
 
 ### price-ingestor (Python)
@@ -423,7 +492,9 @@ MINIO_BUCKET=yana-stocks-models
 
 ```shell
 NEXT_PUBLIC_API_URL=https://api-gateway.yanatech.co.uk/api
-NEXT_PUBLIC_WS_URL=wss://api-gateway.yanatech.co.uk
+# In dev: unset — Next.js rewrites in next.config.mjs proxy /api/* to local services
+# user-service:  /api/auth/*     → http://localhost:3004/api/auth/*
+# portfolio-api: /api/portfolio|stocks|signals|market|news|predict/* → http://localhost:3006/api/*
 ```
 
 ---
