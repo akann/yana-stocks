@@ -1,12 +1,12 @@
 /** @type {import('next').NextConfig} */
 const config = {
   output: 'standalone',
-  serverExternalPackages: [
-    '@opentelemetry/sdk-node',
-    '@opentelemetry/auto-instrumentations-node',
-    '@opentelemetry/exporter-trace-otlp-http',
-  ],
   experimental: {
+    serverComponentsExternalPackages: [
+      '@opentelemetry/sdk-node',
+      '@opentelemetry/auto-instrumentations-node',
+      '@opentelemetry/exporter-trace-otlp-http',
+    ],
     turbo: {},
     instrumentationHook: true,
   },
