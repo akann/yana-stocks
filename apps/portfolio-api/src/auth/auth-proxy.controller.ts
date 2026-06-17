@@ -12,7 +12,7 @@ export class AuthProxyController {
   ) {}
 
   private get baseUrl(): string {
-    return this.config.getOrThrow<string>('userServiceUrl');
+    return this.config.getOrThrow<string>('authServiceUrl');
   }
 
   private async forward(

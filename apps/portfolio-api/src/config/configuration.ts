@@ -7,7 +7,7 @@ export default () => ({
     brokers: (process.env['KAFKA_BROKERS'] ?? 'localhost:19092').split(','),
   },
   priceProcessorUrl: process.env['PRICE_PROCESSOR_URL'] ?? 'http://localhost:3002',
-  userServiceUrl: process.env['USER_SERVICE_URL'] ?? 'http://localhost:3004',
+  authServiceUrl: process.env['AUTH_SERVICE_URL'] ?? 'http://localhost:3004',
   portfolioServiceUrl: process.env['PORTFOLIO_SERVICE_URL'] ?? 'http://localhost:3005',
   mlPredictorUrl: process.env['ML_PREDICTOR_URL'] ?? 'http://localhost:8000',
   mongodbUri: process.env['MONGODB_URI'] ?? 'mongodb://localhost:27017/yana_stocks',
