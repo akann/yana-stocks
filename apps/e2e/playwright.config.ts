@@ -8,6 +8,13 @@ export default defineConfig({
   workers: 1,
   timeout: 60_000,
   reporter: [['html', { open: 'never' }]],
+  webServer: {
+    command: 'pnpm --filter @yana-stocks/frontend dev',
+    url: 'http://localhost:3000',
+    reuseExistingServer: true,
+    timeout: 60_000,
+    cwd: '../..',
+  },
   use: {
     baseURL: process.env['BASE_URL'] ?? 'http://localhost:3000',
     trace: 'on-first-retry',
