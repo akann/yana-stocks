@@ -44,7 +44,7 @@ packages/
 
 ## Prerequisites
 
-- Node.js ≥ 22
+- Node.js ≥ 24
 - pnpm ≥ 11
 - Docker + Docker Compose
 - Python 3.12 (for services in `services/`)
@@ -119,24 +119,31 @@ pnpm --filter price-processor dev
 ## Auth Flow
 
 ```
-POST /auth/register  →  create user
-POST /auth/login     →  access token (JWT 15min) + refresh token (opaque 7d, stored in Redis)
+POST /auth/register  →  create user, sends verification email via SMTP2GO
+POST /auth/verify    →  activate account using token from email
+POST /auth/login     →  access token (HS256 JWT 15min, iss:'yana-stocks') + refresh token (opaque 7d, Redis)
 POST /auth/refresh   →  rotate refresh token, issue new access token
 POST /auth/logout    →  delete refresh token from Redis
 GET  /auth/me        →  current user (requires JWT)
 ```
 
-Kong JWT plugin validates access tokens on all `/api/*` routes except `/auth/*`.
+Kong JWT plugin reads the `iss` claim, matches it to the `yana-stocks` HS256 credential, and verifies the signature. All `/api/*` routes require JWT except the auth endpoints above and `/api/market/*`.
 
 ## API Gateway Routes (Kong)
 
-| Path               | Service                | Auth   |
-| ------------------ | ---------------------- | ------ |
-| `/api/auth/*`      | user-service:3000      | None   |
-| `/api/stocks/*`    | portfolio-api:3000     | JWT    |
-| `/api/portfolio/*` | portfolio-service:3000 | JWT    |
-| `/api/predict/*`   | ml-predictor:8000      | JWT    |
-| `/*`               | frontend:3000          | Public |
+| Path                                                                            | Service              | Auth   |
+| ------------------------------------------------------------------------------- | -------------------- | ------ |
+| `/api/auth/register`, `/api/auth/verify`, `/api/auth/login`, `/api/auth/refresh`, `/api/auth/logout` | user-service:3000 | None |
+| `/api/auth/me`                                                                  | user-service:3000    | JWT    |
+| `/api/market/*`                                                                 | portfolio-api:3000   | None   |
+| `/api/stocks/*`                                                                 | portfolio-api:3000   | JWT    |
+| `/api/signals/*`                                                                | portfolio-api:3000   | JWT    |
+| `/api/portfolio/*`                                                              | portfolio-api:3000   | JWT    |
+| `/api/news/*`                                                                   | portfolio-api:3000   | JWT    |
+| `/api/predict/*`                                                                | ml-predictor:8000    | JWT    |
+| `/*`                                                                            | frontend:3000        | Public |
+
+`/api/portfolio/*` is handled by `portfolio-api`, which internally proxies to `portfolio-service`.
 
 ## Testing
 
