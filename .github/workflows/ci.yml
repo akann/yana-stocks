@@ -400,7 +400,7 @@ jobs:
           mkdir -p logs
           # auth-service: Go binary — DB migrations run at startup
           PORT=3001 \
-          DATABASE_URL=postgresql://postgres:password@localhost:5432/yana_stocks \
+          DATABASE_URL=postgresql://postgres:password@localhost:5432/yana_stocks?sslmode=disable \
           REDIS_URL=redis://localhost:6379 \
           JWT_SECRET=e2e-jwt-secret \
           JWT_EXPIRES_IN=15m \
