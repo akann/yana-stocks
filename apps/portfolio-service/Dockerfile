@@ -1,5 +1,6 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
+ENV HUSKY=0
 
 RUN apk upgrade --no-cache && corepack enable
 
@@ -24,6 +25,7 @@ RUN pnpm --filter "@yana-stocks/shared-types" build && \
 
 FROM node:24-alpine
 WORKDIR /app
+ENV HUSKY=0
 
 RUN apk upgrade --no-cache && \
     corepack enable && \
