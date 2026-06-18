@@ -17,9 +17,7 @@ export class ProfileService {
   }
 
   async getMyProfile(userId: string): Promise<ProfileDocument> {
-    const profile = await this.profileModel.findOne({ userId });
-    if (!profile) throw new NotFoundException('Profile not found');
-    return profile;
+    return this.findOrCreateByUserId(userId);
   }
 
   async updateMyProfile(userId: string, dto: UpdateProfileDto): Promise<ProfileDocument> {
