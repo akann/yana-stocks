@@ -193,6 +193,14 @@ yana-stocks/
 - **URL:** `https://stocks.yanatech.co.uk`
 - **Dev proxy:** `next.config.mjs` rewrites `/api/*` to local services (see
   frontend env vars)
+- **SEO:** Uses Next.js 14 native `Metadata` API (not next-seo — redundant in
+  App Router). Root `layout.tsx` sets site-wide metadata: title template
+  (`%s | YanaStocks`), description, keywords, `authors`/`creator` (Akan
+  Nkweini), OpenGraph site config, robots. `app/page.tsx` is a server component
+  that exports page-specific `alternates.canonical` and OG url; client logic
+  lives in `src/components/home/HomePageView.tsx`.
+- **metadataBase:** `https://stocks.yanatech.co.uk` — all relative canonical
+  URLs resolve against this.
 
 ### 9. e2e (Playwright)
 
@@ -442,6 +450,46 @@ pnpm --filter e2e test:e2e                        # e2e (starts frontend automat
 10. `ml-predictor` — predictions
 11. `frontend` — dashboard
 12. `e2e` — Playwright tests
+
+## Code Quality / Tooling
+
+### Pre-commit hook (husky + lint-staged)
+
+A pre-commit hook runs automatically on every `git commit`:
+
+```bash
+# .husky/pre-commit
+pnpm exec lint-staged
+```
+
+`lint-staged` config (root `package.json`):
+
+```json
+"lint-staged": {
+  "*.{ts,tsx,js,mjs,json,md,css}": "prettier --write"
+}
+```
+
+This auto-formats all staged files with Prettier before the commit is recorded.
+
+### Format + lint tasks (turbo.json)
+
+- `lint` — runs with `"cache": false` (never skipped due to stale cache).
+- `format` — per-package format task, `"cache": false`. Run with
+  `pnpm turbo format`.
+- `format:check` — CI verification task, same.
+
+Every TypeScript package has its own `format` / `format:check` scripts pointing
+to `prettier --write "src/**/*.{ts,tsx}"` (or `src/**/*.ts` for NestJS). The
+auth-service Go passthrough uses `gofmt -w ./cmd ./internal`.
+
+Root convenience scripts:
+
+| Command             | What it does                                 |
+| ------------------- | -------------------------------------------- |
+| `pnpm format`       | `prettier --write` across the whole monorepo |
+| `pnpm format:check` | `prettier --check` (exits non-zero on diff)  |
+| `pnpm lint`         | `turbo lint` — lints all packages            |
 
 ## Code Style
 

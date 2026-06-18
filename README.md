@@ -99,22 +99,29 @@ pnpm --filter price-processor dev
 
 ## Scripts
 
-| Command             | Description                        |
-| ------------------- | ---------------------------------- |
-| `pnpm dev`          | Start all services in watch mode   |
-| `pnpm build`        | Build all packages and services    |
-| `pnpm test`         | Run all unit/integration tests     |
-| `pnpm lint`         | Lint all packages                  |
-| `pnpm type-check`   | TypeScript type-check all packages |
-| `pnpm format`       | Format all files with Prettier     |
-| `pnpm docker:up`    | Start local infrastructure         |
-| `pnpm docker:down`  | Stop local infrastructure          |
-| `pnpm docker:reset` | Destroy volumes and restart fresh  |
+| Command             | Description                                     |
+| ------------------- | ----------------------------------------------- |
+| `pnpm dev`          | Start all services in watch mode                |
+| `pnpm build`        | Build all packages and services                 |
+| `pnpm test`         | Run all unit/integration tests                  |
+| `pnpm lint`         | Lint all packages (always runs, no turbo cache) |
+| `pnpm type-check`   | TypeScript type-check all packages              |
+| `pnpm format`       | Format all files with Prettier (write)          |
+| `pnpm format:check` | Check formatting without writing                |
+| `pnpm docker:up`    | Start local infrastructure                      |
+| `pnpm docker:down`  | Stop local infrastructure                       |
+| `pnpm docker:reset` | Destroy volumes and restart fresh               |
+
+A **pre-commit hook** (husky + lint-staged) auto-formats all staged
+`*.{ts,tsx,js,mjs,json,md,css}` files with Prettier before every commit. Every
+package also has its own `format` / `format:check` scripts (gofmt for
+auth-service); `turbo format` runs them in parallel.
 
 ## Kafka Topics
 
 | Topic                       | Partitions | Retention | Producer           | Consumer(s)                 |
 | --------------------------- | ---------- | --------- | ------------------ | --------------------------- |
+| `users.registered`          | 3          | 7d        | auth-service       | profile-service             |
 | `stocks.prices.raw`         | 3          | 24h       | price-ingestor     | price-processor             |
 | `stocks.prices.processed`   | 3          | 7d        | price-processor    | ml-predictor, portfolio-api |
 | `stocks.signals.sentiment`  | 3          | 7d        | sentiment-analyzer | portfolio-api               |
