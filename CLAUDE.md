@@ -126,7 +126,10 @@ yana-stocks/
 - **Purpose:** User registration, email verification, login, JWT issuance,
   refresh token rotation
 - **PostgreSQL (CNPG):** `auth-service-pg` cluster — `users` table (id, email,
-  passwordHash, isVerified, verificationToken)
+  passwordHash, isVerified, verificationToken). Cluster uses CNPG defaults for
+  owner/credentials; `postInitSQL` creates the `auth` schema and sets
+  `search_path = auth` on the app role. Migrations run at pod startup via
+  golang-migrate (no initContainer).
 - **Redis:** Refresh token store (key `refresh:<token>` → userId, 7d TTL)
 - **JWT:** HS256 access token 15min (stateless), opaque refresh token 7 days
   (Redis, revocable)
@@ -406,6 +409,21 @@ services:
 - **Images:** pushed to `harbor.yanatech.co.uk/yana-stocks/<service>:<tag>`
 - **Secrets:** ESO from Infisical project `k8s-homelab` (ID
   `69b39965-b778-47a7-ba52-2cd66a7aad0a`)
+
+### K8s Manifest Pitfalls
+
+- **Never set `ServerSideApply=false` on a Rollout.** The Argo Rollouts CRD uses
+  `x-kubernetes-preserve-unknown-fields` for `.spec.template`, which breaks
+  ArgoCD's client-side structured merge diff with "field not declared in
+  schema". The app-level `ServerSideApply=true` handles Rollouts correctly.
+- **Stray `spec.template` blocks in Service definitions.** When a YAML file
+  contains both a Deployment and a Service (separated by `---`), be careful not
+  to accidentally include a `template:` block under the Service's `spec:`.
+  Services don't have `.spec.template`; the stray field causes the same ArgoCD
+  ComparisonError.
+- **ml-predictor Rollout shows cosmetic OutOfSync** in ArgoCD after SSA
+  field-manager migration. `argocd app diff` returns empty — no real diff. This
+  is a known false-positive; the Rollout is Healthy.
 
 ## CI/CD
 
