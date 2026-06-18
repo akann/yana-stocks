@@ -337,19 +337,13 @@ jobs:
         run: pnpm install --frozen-lockfile || (pnpm approve-builds --all && pnpm install --frozen-lockfile)
 
       - name: Cache Playwright browsers
-        id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('apps/e2e/package.json') }}
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Playwright browsers
         run: pnpm --filter @yana-stocks/e2e exec playwright install --with-deps chromium webkit
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-
-      - name: Install Playwright OS dependencies
-        run: pnpm --filter @yana-stocks/e2e exec playwright install-deps chromium webkit
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
 
       - name: Write frontend .env.local
         run: |
