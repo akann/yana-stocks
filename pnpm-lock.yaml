@@ -144,6 +144,9 @@ importers:
       '@yana-stocks/kafka-client':
         specifier: workspace:*
         version: link:../../packages/kafka-client
+      '@yana-stocks/shared-dto':
+        specifier: workspace:*
+        version: link:../../packages/shared-dto
       '@yana-stocks/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types

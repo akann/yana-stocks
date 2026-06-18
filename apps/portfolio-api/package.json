@@ -23,6 +23,7 @@
     "@nestjs/platform-express": "^11.1.26",
     "@nestjs/swagger": "^11.4.4",
     "@yana-stocks/kafka-client": "workspace:*",
+    "@yana-stocks/shared-dto": "workspace:*",
     "@yana-stocks/shared-types": "workspace:*",
     "axios": "^1.7.9",
     "ioredis": "^5.11.1",

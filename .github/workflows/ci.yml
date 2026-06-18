@@ -64,6 +64,12 @@ jobs:
             portfolio-api:
               - 'apps/portfolio-api/**'
               - 'packages/**'
+            api-docs:
+              - 'apps/api-docs/**'
+              - 'apps/portfolio-api/**'
+              - 'apps/portfolio-service/**'
+              - 'apps/profile-service/**'
+              - 'packages/**'
             price-ingestor:
               - 'services/price-ingestor/**'
             sentiment-analyzer:
@@ -102,6 +108,7 @@ jobs:
           maybe_add "profile-service"    "."                           "apps/profile-service/Dockerfile"
           maybe_add "portfolio-service"  "."                           "apps/portfolio-service/Dockerfile"
           maybe_add "portfolio-api"      "."                           "apps/portfolio-api/Dockerfile"
+          maybe_add "api-docs"           "."                           "apps/api-docs/Dockerfile"
           maybe_add "price-ingestor"     "services/price-ingestor"     "services/price-ingestor/Dockerfile"
           maybe_add "sentiment-analyzer" "services/sentiment-analyzer" "services/sentiment-analyzer/Dockerfile"
           maybe_add "ml-predictor"       "services/ml-predictor"       "services/ml-predictor/Dockerfile"
