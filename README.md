@@ -17,6 +17,7 @@ apps/
 ├── price-processor/    # NestJS — consume raw prices, store OHLCV, cache
 ├── portfolio-service/  # NestJS — portfolios, watchlists, trades (MongoDB)
 ├── portfolio-api/      # NestJS — REST aggregator (prices + signals + predictions)
+├── api-docs/           # Static nginx — Swagger UI hub at api-docs.yanatech.co.uk (Authentik-protected)
 └── e2e/                # Playwright end-to-end tests
 
 services/
@@ -214,5 +215,9 @@ Notable patterns:
 - **Argo Rollouts canary** — `ml-predictor` promotes 10% → 50% → 100% on new
   model versions
 - **CNPG** — CloudNativePG cluster `auth-service-pg` for PostgreSQL
-  (auth-service)
+  (auth-service); migrations run at pod startup via golang-migrate (no
+  initContainer)
 - **ESO** — ExternalSecrets pulls from Infisical project `k8s-homelab`
+- **api-docs** — static nginx serving per-service Swagger UIs at
+  `api-docs.yanatech.co.uk`; built from `generate-openapi.ts` in each NestJS
+  service, Authentik-protected
