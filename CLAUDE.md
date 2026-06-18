@@ -20,6 +20,7 @@ yana-stocks/
 │   ├── price-processor/       # NestJS
 │   ├── portfolio-service/     # NestJS
 │   ├── portfolio-api/         # NestJS
+│   ├── api-docs/              # Static nginx — Swagger UI index (index.html + nginx.conf + Dockerfile)
 │   └── e2e/                   # Playwright
 ├── services/
 │   ├── price-ingestor/        # Python (standalone)
@@ -205,7 +206,18 @@ yana-stocks/
 - **metadataBase:** `https://stocks.yanatech.co.uk` — all relative canonical
   URLs resolve against this.
 
-### 9. e2e (Playwright)
+### 9. api-docs (static nginx)
+
+- **Purpose:** Internal Swagger UI hub at `https://api-docs.yanatech.co.uk`
+  (Authentik-protected)
+- **Source:** `apps/api-docs/` — `index.html` + `nginx.conf` + `Dockerfile`
+- **Serves:** Per-service OpenAPI pages for portfolio-api, portfolio-service,
+  profile-service
+- **Build:** Each NestJS service has `src/generate-openapi.ts` — run during CI
+  to emit `<service>.html` bundled into the api-docs Docker image
+- **No backend** — pure static files, health check at `GET /health → 200 ok`
+
+### 11. e2e (Playwright)
 
 - **Purpose:** End-to-end tests
 - **Coverage:** Auth flows (register/verify/login/logout), portfolio CRUD, stock
@@ -376,6 +388,7 @@ apps/yana-stocks/
 ├── ml-predictor/                  # Argo Rollouts canary (no deployment.yaml)
 ├── portfolio-service/
 ├── portfolio-api/
+├── api-docs/                      # Static nginx Swagger hub (Authentik-protected, api-docs.yanatech.co.uk)
 └── frontend/
     └── ingress.yaml               # stocks.yanatech.co.uk via ingress-nginx
 ```
