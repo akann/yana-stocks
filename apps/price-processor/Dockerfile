@@ -38,7 +38,7 @@ COPY packages/shared-types/package.json ./packages/shared-types/
 COPY packages/kafka-client/package.json ./packages/kafka-client/
 COPY apps/price-processor/package.json ./apps/price-processor/
 
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 
 COPY --from=builder /app/packages/shared-types/dist ./packages/shared-types/dist
 COPY --from=builder /app/packages/kafka-client/dist ./packages/kafka-client/dist

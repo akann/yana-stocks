@@ -38,7 +38,7 @@ COPY packages/shared-dto/package.json ./packages/shared-dto/
 COPY packages/kafka-client/package.json ./packages/kafka-client/
 COPY apps/profile-service/package.json ./apps/profile-service/
 
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 
 COPY --from=builder /app/packages/shared-dto/dist ./packages/shared-dto/dist
 COPY --from=builder /app/packages/kafka-client/dist ./packages/kafka-client/dist

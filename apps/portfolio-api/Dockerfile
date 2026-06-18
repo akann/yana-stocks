@@ -41,7 +41,7 @@ COPY packages/shared-dto/package.json ./packages/shared-dto/
 COPY packages/kafka-client/package.json ./packages/kafka-client/
 COPY apps/portfolio-api/package.json ./apps/portfolio-api/
 
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 
 COPY --from=builder /app/packages/shared-types/dist ./packages/shared-types/dist
 COPY --from=builder /app/packages/shared-dto/dist ./packages/shared-dto/dist
