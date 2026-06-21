@@ -9,13 +9,13 @@ type RequestWithUser = { user: AuthUser };
 
 @Injectable({ scope: Scope.REQUEST })
 export class PortfolioRepository {
-  private readonly userId: string;
-
   constructor(
     @InjectModel(Portfolio.name) private readonly model: Model<Portfolio>,
-    @Inject(REQUEST) request: RequestWithUser,
-  ) {
-    this.userId = request.user.id;
+    @Inject(REQUEST) private readonly request: RequestWithUser,
+  ) {}
+
+  private get userId(): string {
+    return this.request.user.id;
   }
 
   findAll(): Promise<Portfolio[]> {

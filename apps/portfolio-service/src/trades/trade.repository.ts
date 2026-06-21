@@ -20,13 +20,13 @@ export interface RecordTradeInput {
 
 @Injectable({ scope: Scope.REQUEST })
 export class TradeRepository {
-  private readonly userId: string;
-
   constructor(
     @InjectModel(Trade.name) private readonly model: Model<Trade>,
-    @Inject(REQUEST) request: RequestWithUser,
-  ) {
-    this.userId = request.user.id;
+    @Inject(REQUEST) private readonly request: RequestWithUser,
+  ) {}
+
+  private get userId(): string {
+    return this.request.user.id;
   }
 
   findAll(): Promise<(Trade & { _id: unknown })[]> {

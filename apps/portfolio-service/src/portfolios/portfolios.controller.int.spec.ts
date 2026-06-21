@@ -163,7 +163,7 @@ describe('PortfoliosController (integration)', () => {
       expect(body.name).toBe('Fetch Me');
     });
 
-    it('returns 403 when the portfolio belongs to another user', async () => {
+    it('returns 404 when the portfolio belongs to another user', async () => {
       const doc = await portfolioModel.create({
         userId: OTHER_USER_ID,
         name: 'Not Mine',
@@ -172,7 +172,7 @@ describe('PortfoliosController (integration)', () => {
       await request(server)
         .get(`/portfolios/${doc._id.toString()}`)
         .set('Authorization', AUTH)
-        .expect(403);
+        .expect(404);
     });
 
     it('returns 404 for a non-existent portfolio', async () => {
@@ -241,7 +241,7 @@ describe('PortfoliosController (integration)', () => {
       expect(holding!.avgCostBasis).toBe(110); // (10*100 + 10*120) / 20
     });
 
-    it('returns 403 when the portfolio belongs to another user', async () => {
+    it('returns 404 when the portfolio belongs to another user', async () => {
       const doc = await portfolioModel.create({
         userId: OTHER_USER_ID,
         name: 'Not Mine',
@@ -251,7 +251,7 @@ describe('PortfoliosController (integration)', () => {
         .post(`/portfolios/${doc._id.toString()}/stocks`)
         .set('Authorization', AUTH)
         .send({ symbol: 'TSLA', shares: 5, price: 200 })
-        .expect(403);
+        .expect(404);
     });
   });
 
@@ -268,6 +268,19 @@ describe('PortfoliosController (integration)', () => {
       ).body as PortfolioResponse;
 
       expect(body.name).toBe('New Name');
+    });
+
+    it('returns 404 when the portfolio belongs to another user', async () => {
+      const doc = await portfolioModel.create({
+        userId: OTHER_USER_ID,
+        name: 'Not Mine',
+        stocks: [],
+      });
+      await request(server)
+        .put(`/portfolios/${doc._id.toString()}`)
+        .set('Authorization', AUTH)
+        .send({ name: 'Hijacked' })
+        .expect(404);
     });
   });
 
@@ -287,6 +300,21 @@ describe('PortfoliosController (integration)', () => {
         .delete('/portfolios/000000000000000000000001')
         .set('Authorization', AUTH)
         .expect(404);
+    });
+
+    it('returns 404 when the portfolio belongs to another user', async () => {
+      const doc = await portfolioModel.create({
+        userId: OTHER_USER_ID,
+        name: 'Not Mine',
+        stocks: [],
+      });
+      await request(server)
+        .delete(`/portfolios/${doc._id.toString()}`)
+        .set('Authorization', AUTH)
+        .expect(404);
+
+      const stillExists = await portfolioModel.findById(doc._id).lean().exec();
+      expect(stillExists).not.toBeNull();
     });
   });
 });

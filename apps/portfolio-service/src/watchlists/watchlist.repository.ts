@@ -9,13 +9,13 @@ type RequestWithUser = { user: AuthUser };
 
 @Injectable({ scope: Scope.REQUEST })
 export class WatchlistRepository {
-  private readonly userId: string;
-
   constructor(
     @InjectModel(Watchlist.name) private readonly model: Model<Watchlist>,
-    @Inject(REQUEST) request: RequestWithUser,
-  ) {
-    this.userId = request.user.id;
+    @Inject(REQUEST) private readonly request: RequestWithUser,
+  ) {}
+
+  private get userId(): string {
+    return this.request.user.id;
   }
 
   findAll(): Promise<Watchlist[]> {
