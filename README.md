@@ -73,7 +73,16 @@ PostgreSQL (5432), and MinIO (9000/9001).
 pnpm install
 ```
 
-### 3. Configure environment
+### 3. Seed dev data
+
+```bash
+pnpm seed   # creates dev@example.com in PostgreSQL auth tables (idempotent)
+```
+
+> After `pnpm docker:reset` (volume wipe), re-run `pnpm seed`. MongoDB enforces
+> auth on fresh volumes — `.env.example` files already include credentials.
+
+### 4. Configure environment
 
 Copy and fill in `.env` files for each service you're running:
 
@@ -86,7 +95,7 @@ cp apps/portfolio-api/.env.example apps/portfolio-api/.env
 auth-service runs database migrations automatically at startup via
 golang-migrate.
 
-### 4. Start services
+### 5. Start services
 
 ```bash
 # All services in parallel (Turborepo)
@@ -100,18 +109,19 @@ pnpm --filter price-processor dev
 
 ## Scripts
 
-| Command             | Description                                     |
-| ------------------- | ----------------------------------------------- |
-| `pnpm dev`          | Start all services in watch mode                |
-| `pnpm build`        | Build all packages and services                 |
-| `pnpm test`         | Run all unit/integration tests                  |
-| `pnpm lint`         | Lint all packages (always runs, no turbo cache) |
-| `pnpm type-check`   | TypeScript type-check all packages              |
-| `pnpm format`       | Format all files with Prettier (write)          |
-| `pnpm format:check` | Check formatting without writing                |
-| `pnpm docker:up`    | Start local infrastructure                      |
-| `pnpm docker:down`  | Stop local infrastructure                       |
-| `pnpm docker:reset` | Destroy volumes and restart fresh               |
+| Command             | Description                                                                |
+| ------------------- | -------------------------------------------------------------------------- |
+| `pnpm dev`          | Start all services in watch mode                                           |
+| `pnpm build`        | Build all packages and services                                            |
+| `pnpm test`         | Run all unit/integration tests                                             |
+| `pnpm lint`         | Lint all packages (always runs, no turbo cache)                            |
+| `pnpm type-check`   | TypeScript type-check all packages                                         |
+| `pnpm format`       | Format all files with Prettier (write)                                     |
+| `pnpm format:check` | Check formatting without writing                                           |
+| `pnpm seed`         | Seed dev user (`dev@example.com`) into PostgreSQL auth tables (idempotent) |
+| `pnpm docker:up`    | Start local infrastructure                                                 |
+| `pnpm docker:down`  | Stop local infrastructure                                                  |
+| `pnpm docker:reset` | Destroy volumes and restart fresh (run `pnpm seed` afterwards)             |
 
 A **pre-commit hook** (husky + lint-staged) auto-formats all staged
 `*.{ts,tsx,js,mjs,json,md,css}` files with Prettier before every commit. Every

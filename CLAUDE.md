@@ -454,18 +454,30 @@ Requires Go ≥ 1.22 installed (Mac: `brew install go`).
 # 1. Start infrastructure
 docker compose up -d   # postgres:5432, redis:6379, mongodb:27017, kafka:19092, minio:9000
 
-# 2. Start services (each in its own terminal)
+# 2. Seed dev user (PostgreSQL — idempotent, safe to re-run)
+pnpm seed              # creates dev@example.com in auth tables via portfolio-api seed script
+
+# 3. Start services (each in its own terminal)
 pnpm --filter @yana-stocks/auth-service dev       # :3004 (go run ./cmd/server — runs migrations)
 pnpm --filter @yana-stocks/profile-service dev    # :3007
 pnpm --filter @yana-stocks/portfolio-service dev  # :3005
 pnpm --filter @yana-stocks/portfolio-api dev      # :3006
 pnpm --filter @yana-stocks/frontend dev           # :3000
 
-# 3. Run tests
+# 4. Run tests
 pnpm --filter @yana-stocks/auth-service test      # go test ./...
 pnpm --filter @yana-stocks/profile-service test   # jest
 pnpm --filter e2e test:e2e                        # e2e (starts frontend automatically)
 ```
+
+### MongoDB auth after volume reset
+
+`docker compose down -v` (or `pnpm docker:reset`) recreates MongoDB volumes and
+enforces authentication on startup via `MONGO_INITDB_ROOT_USERNAME/PASSWORD`.
+All `.env` files already include credentials
+(`admin:password@localhost:27017/...?authSource=admin`), so copying from
+`.env.example` is sufficient. If you see `MongoServerError: Unauthorized`, the
+URI is missing credentials.
 
 ## Build Order (implement in this order)
 
@@ -819,6 +831,21 @@ Following CLAUDE.md, create k8s/ manifests for all services:
 - **Secrets:** `HARBOR_USERNAME`, `HARBOR_PASSWORD`, `GH_PAT`
 - **On push to main:** lint → type-check → test → docker build → push to Harbor
   → update image tag in k8s-apps
+
+### Playwright CI caching
+
+Browser binaries are cached via `actions/cache` (key:
+`playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}`). The install
+is split into two steps intentionally:
+
+- `playwright install chromium webkit` — runs only on cache miss (restores
+  binaries from cache otherwise)
+- `playwright install-deps chromium webkit` — runs on **every** job (installs OS
+  system libraries via apt-get, which are NOT cached)
+
+Do not merge these into a single `playwright install --with-deps` step gated by
+the cache — system libraries are not cached and the browsers will crash at
+runtime with missing `.so` errors.
 
 ## Alpaca API
 
