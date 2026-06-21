@@ -354,7 +354,10 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm --filter @yana-stocks/e2e exec playwright install --with-deps chromium webkit
+        run: pnpm --filter @yana-stocks/e2e exec playwright install chromium webkit
+
+      - name: Install Playwright system dependencies
+        run: pnpm --filter @yana-stocks/e2e exec playwright install-deps chromium webkit
 
       - name: Write frontend .env.local
         run: |
