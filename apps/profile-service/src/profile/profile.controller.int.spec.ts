@@ -7,6 +7,7 @@
  */
 import { INestApplication, NotFoundException, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { type Server } from 'http';
 import request from 'supertest';
 import { ProfileController } from './profile.controller';
 import { ProfileService } from './profile.service';
@@ -65,7 +66,7 @@ describe('ProfileController (integration)', () => {
     it('returns 200 with profile for authenticated user', async () => {
       profileService.getMyProfile.mockResolvedValue(mockProfile as never);
 
-      const res = await request(app.getHttpServer())
+      const res = await request(app.getHttpServer() as Server)
         .get('/api/profile/me')
         .set('Authorization', AUTH);
 
@@ -75,7 +76,7 @@ describe('ProfileController (integration)', () => {
     });
 
     it('returns 401 when Authorization header is missing', async () => {
-      const res = await request(app.getHttpServer()).get('/api/profile/me');
+      const res = await request(app.getHttpServer() as Server).get('/api/profile/me');
       expect(res.status).toBe(401);
     });
 
@@ -84,7 +85,7 @@ describe('ProfileController (integration)', () => {
         'base64url',
       );
       const badToken = `Bearer eyJhbGciOiJIUzI1NiJ9.${payload}.fakesig`;
-      const res = await request(app.getHttpServer())
+      const res = await request(app.getHttpServer() as Server)
         .get('/api/profile/me')
         .set('Authorization', badToken);
       expect(res.status).toBe(401);
@@ -98,7 +99,7 @@ describe('ProfileController (integration)', () => {
       const updated = { ...mockProfile, displayName: 'Ada Lovelace' };
       profileService.updateMyProfile.mockResolvedValue(updated as never);
 
-      const res = await request(app.getHttpServer())
+      const res = await request(app.getHttpServer() as Server)
         .put('/api/profile/me')
         .set('Authorization', AUTH)
         .send({ displayName: 'Ada Lovelace' });
@@ -113,7 +114,7 @@ describe('ProfileController (integration)', () => {
     it('strips unknown fields (whitelist validation)', async () => {
       profileService.updateMyProfile.mockResolvedValue(mockProfile as never);
 
-      await request(app.getHttpServer())
+      await request(app.getHttpServer() as Server)
         .put('/api/profile/me')
         .set('Authorization', AUTH)
         .send({ displayName: 'Ada', hacked: 'payload' });
@@ -125,7 +126,7 @@ describe('ProfileController (integration)', () => {
     });
 
     it('returns 401 without auth header', async () => {
-      const res = await request(app.getHttpServer())
+      const res = await request(app.getHttpServer() as Server)
         .put('/api/profile/me')
         .send({ displayName: 'Ada' });
       expect(res.status).toBe(401);
@@ -142,7 +143,7 @@ describe('ProfileController (integration)', () => {
         avatar: '',
       });
 
-      const res = await request(app.getHttpServer()).get('/api/profile/user-1');
+      const res = await request(app.getHttpServer() as Server).get('/api/profile/user-1');
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ userId: 'user-1', displayName: 'Ada', avatar: '' });
@@ -151,7 +152,7 @@ describe('ProfileController (integration)', () => {
     it('returns 404 when profile does not exist', async () => {
       profileService.getPublicProfile.mockRejectedValue(new NotFoundException('Profile not found'));
 
-      const res = await request(app.getHttpServer()).get('/api/profile/unknown-user');
+      const res = await request(app.getHttpServer() as Server).get('/api/profile/unknown-user');
       expect(res.status).toBe(404);
     });
   });
