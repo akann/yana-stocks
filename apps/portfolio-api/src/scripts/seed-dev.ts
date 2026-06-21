@@ -1,5 +1,6 @@
 /**
  * Seed Redis with price/sentiment/prediction/history data and MongoDB with news + OHLCV bars.
+ * Also seeds a dev user into PostgreSQL so login works without manual registration.
  * Run: pnpm seed
  *
  * Redis keys:
@@ -12,10 +13,15 @@
  * MongoDB:
  *   yana_stocks.articles    — drives /news/:symbol
  *   yana_stocks.price_bars  — drives price-processor /prices/:symbol/history
+ *
+ * PostgreSQL (auth-service schema):
+ *   users + user_credentials — dev@example.com / dF1o3WlFqCxctJ5U12 (pre-verified)
  */
 import 'dotenv/config';
 import Redis from 'ioredis';
 import { MongoClient } from 'mongodb';
+import { Client as PgClient } from 'pg';
+import bcrypt from 'bcryptjs';
 import type { PredictionSignal, SentimentSignal } from '@yana-stocks/shared-types';
 import { MOCK_ASSETS } from '../stocks/mock-assets';
 import type { PriceCacheEntry } from '../stocks/price-cache.types';
@@ -24,7 +30,13 @@ const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 const MONGODB_URI =
   process.env['MONGODB_URI'] ??
   'mongodb://admin:password@localhost:27017/yana_stocks?authSource=admin';
+const DATABASE_URL =
+  process.env['DATABASE_URL'] ??
+  'postgresql://postgres:password@localhost:5432/yana_stocks?sslmode=disable';
 const TTL = 86_400; // 24 hours — survives overnight dev sessions
+
+const DEV_USER_EMAIL = 'dev@example.com';
+const DEV_USER_PASSWORD = 'dF1o3WlFqCxctJ5U12';
 
 const BARS_PER_DAY = 390; // 6.5 trading hours × 60 min
 const TRADING_DAYS = 252; // ~1 year of daily bars
@@ -896,6 +908,61 @@ const STOCKS: StockSeed[] = [
   },
 ];
 
+async function seedAuthUser(): Promise<void> {
+  const pg = new PgClient({ connectionString: DATABASE_URL });
+  try {
+    await pg.connect();
+
+    // Create tables if auth-service hasn't run migrations yet (idempotent)
+    await pg.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
+    await pg.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        email              TEXT        NOT NULL UNIQUE,
+        is_verified        BOOLEAN     NOT NULL DEFAULT false,
+        verification_token TEXT,
+        created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+    await pg.query(`
+      CREATE TABLE IF NOT EXISTS user_credentials (
+        user_id       UUID        PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        password_hash TEXT        NOT NULL,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    const hash = await bcrypt.hash(DEV_USER_PASSWORD, 12);
+
+    const { rows } = await pg.query<{ id: string }>(
+      `INSERT INTO users (email, is_verified)
+       VALUES ($1, true)
+       ON CONFLICT (email) DO UPDATE SET is_verified = true, updated_at = NOW()
+       RETURNING id`,
+      [DEV_USER_EMAIL],
+    );
+    const userId = rows[0]!.id;
+
+    await pg.query(
+      `INSERT INTO user_credentials (user_id, password_hash)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id) DO UPDATE SET password_hash = $2, updated_at = NOW()`,
+      [userId, hash],
+    );
+
+    console.log(`Seeded dev user into PostgreSQL\n`);
+    console.log(`  Email:    ${DEV_USER_EMAIL}`);
+    console.log(`  Password: ${DEV_USER_PASSWORD}`);
+    console.log(`  Verified: true\n`);
+  } catch (err) {
+    console.warn(`PostgreSQL seed skipped: ${String(err)}`);
+  } finally {
+    await pg.end();
+  }
+}
+
 async function seed(): Promise<void> {
   const redis = new Redis(REDIS_URL);
   const now = new Date();
@@ -1058,6 +1125,8 @@ async function seed(): Promise<void> {
         `   ${sentiment.label.padEnd(9)}  $${prediction.predictedPrice.toFixed(2)}`,
     );
   }
+
+  await seedAuthUser();
 }
 
 seed().catch((err) => {
