@@ -4,13 +4,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 
-function avatarInitial(displayName: string | undefined, email: string | undefined): string {
-  const src = displayName || email || '?';
-  return src.charAt(0).toUpperCase();
-}
-
 export function Navbar(): React.JSX.Element {
-  const { isAuthenticated, logout, profile, user } = useAuth();
+  const { isAuthenticated, logout, profile } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -54,33 +49,27 @@ export function Navbar(): React.JSX.Element {
         <div className="flex items-center gap-3 text-sm">
           {isAuthenticated ? (
             <>
-              <Link href="/profile" className="text-gray-400 hover:text-white transition-colors">
-                My Account
-              </Link>
               <div className="relative" ref={menuRef}>
                 <button
                   onClick={() => setMenuOpen((o) => !o)}
                   className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
                 >
-                  <span className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-semibold select-none">
-                    {avatarInitial(profile?.displayName, user?.email)}
+                  <span className="text-sm">My Account</span>
+                  <span className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white select-none overflow-hidden">
+                    {profile?.avatar ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={profile.avatar} alt="avatar" className="w-8 h-8 object-cover" />
+                    ) : (
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        className="w-8 h-8 translate-y-1"
+                      >
+                        <circle cx="12" cy="8" r="4" />
+                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+                      </svg>
+                    )}
                   </span>
-                  <span className="hidden md:block text-sm">
-                    {profile?.displayName || user?.email?.split('@')[0]}
-                  </span>
-                  <svg
-                    className={`w-3 h-3 transition-transform ${menuOpen ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
                 </button>
 
                 {menuOpen && (

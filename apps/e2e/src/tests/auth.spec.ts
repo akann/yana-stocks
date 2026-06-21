@@ -174,6 +174,7 @@ test.describe('Logout', () => {
     );
 
     await page.goto('/dashboard');
+    await page.getByRole('button', { name: 'My Account' }).click();
     await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Sign out' }).click();
