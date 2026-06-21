@@ -229,11 +229,9 @@ function EditProfileForm({
       {error && <p className="text-red-400 text-sm">{error}</p>}
       {success && <p className="text-green-400 text-sm">Profile saved.</p>}
 
-      <div className="flex justify-end">
-        <button type="submit" disabled={loading} className={BTN}>
-          {loading ? 'Saving…' : 'Save changes'}
-        </button>
-      </div>
+      <button type="submit" disabled={loading} className={BTN}>
+        {loading ? 'Saving…' : 'Save changes'}
+      </button>
     </form>
   );
 }
@@ -286,15 +284,13 @@ function DeleteAccountSection({ onDelete }: DeleteAccountSectionProps): React.JS
         <p className="text-sm text-gray-400 mb-6">
           Permanently delete your account and all associated data. This cannot be undone.
         </p>
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={openModal}
-            className="bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-          >
-            Delete my account
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={openModal}
+          className="bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+        >
+          Delete my account
+        </button>
       </div>
 
       {open && (
@@ -442,11 +438,9 @@ function ChangePasswordForm({ onSave }: ChangePasswordFormProps): React.JSX.Elem
       {error && <p className="text-red-400 text-sm">{error}</p>}
       {success && <p className="text-green-400 text-sm">Password updated.</p>}
 
-      <div className="flex justify-end">
-        <button type="submit" disabled={loading} className={BTN}>
-          {loading ? 'Updating…' : 'Update password'}
-        </button>
-      </div>
+      <button type="submit" disabled={loading} className={BTN}>
+        {loading ? 'Updating…' : 'Update password'}
+      </button>
     </form>
   );
 }
