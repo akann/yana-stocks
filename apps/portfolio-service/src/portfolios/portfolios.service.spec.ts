@@ -1,16 +1,15 @@
 import { NotFoundException } from '@nestjs/common';
-import { getModelToken } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
 import type { AuthUser } from '../common/current-user.decorator';
 import { KafkaProducerService } from '../kafka/kafka-producer.service';
-import { Trade } from '../trades/schemas/trade.schema';
+import { TradeRepository } from '../trades/trade.repository';
+import { PortfolioRepository } from './portfolio.repository';
 import { PortfoliosService } from './portfolios.service';
-import { Portfolio } from './schemas/portfolio.schema';
 
 const mockUser: AuthUser = { id: 'user-1', email: 'user@example.com' };
 
 const mockPortfolioDoc = {
-  _id: 'portfolio-1',
+  _id: { toString: () => 'portfolio-1' },
   id: 'portfolio-1',
   userId: 'user-1',
   name: 'My Portfolio',
@@ -21,40 +20,45 @@ const mockPortfolioDoc = {
 
 describe('PortfoliosService', () => {
   let service: PortfoliosService;
-  let portfolioModel: {
-    find: jest.Mock;
-    findOne: jest.Mock;
-    findOneAndUpdate: jest.Mock;
-    findOneAndDelete: jest.Mock;
-    create: jest.Mock;
-  };
-  let tradeModel: { create: jest.Mock };
+  let portfolioRepo: jest.Mocked<
+    Pick<
+      PortfolioRepository,
+      'findAll' | 'findById' | 'create' | 'updateName' | 'delete' | 'findByIdForMutation'
+    >
+  >;
+  let tradeRepo: jest.Mocked<Pick<TradeRepository, 'record'>>;
   let kafkaProducer: jest.Mocked<KafkaProducerService>;
 
   beforeEach(async () => {
-    portfolioModel = {
-      find: jest
-        .fn()
-        .mockReturnValue({ lean: () => ({ exec: () => Promise.resolve([mockPortfolioDoc]) }) }),
-      findOne: jest.fn(),
-      findOneAndUpdate: jest
-        .fn()
-        .mockReturnValue({ lean: () => ({ exec: () => Promise.resolve(mockPortfolioDoc) }) }),
-      findOneAndDelete: jest
-        .fn()
-        .mockReturnValue({ exec: () => Promise.resolve(mockPortfolioDoc) }),
-      create: jest
-        .fn()
-        .mockResolvedValue({ ...mockPortfolioDoc, toObject: () => mockPortfolioDoc }),
+    portfolioRepo = {
+      findAll: jest.fn().mockResolvedValue([mockPortfolioDoc]),
+      findById: jest.fn().mockResolvedValue(mockPortfolioDoc),
+      create: jest.fn().mockResolvedValue({
+        toObject: () => mockPortfolioDoc,
+      }),
+      updateName: jest.fn().mockResolvedValue(mockPortfolioDoc),
+      delete: jest.fn().mockResolvedValue(mockPortfolioDoc),
+      findByIdForMutation: jest.fn().mockResolvedValue({
+        ...mockPortfolioDoc,
+        stocks: [] as Array<{ symbol: string; shares: number; avgCostBasis: number }>,
+        save: jest.fn().mockResolvedValue({
+          toObject: () => ({
+            ...mockPortfolioDoc,
+            stocks: [{ symbol: 'AAPL', shares: 10, avgCostBasis: 150 }],
+          }),
+        }),
+      }),
     };
 
-    tradeModel = { create: jest.fn().mockResolvedValue({}) };
+    tradeRepo = {
+      record: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PortfoliosService,
-        { provide: getModelToken(Portfolio.name), useValue: portfolioModel },
-        { provide: getModelToken(Trade.name), useValue: tradeModel },
+        { provide: PortfolioRepository, useValue: portfolioRepo },
+        { provide: TradeRepository, useValue: tradeRepo },
         {
           provide: KafkaProducerService,
           useValue: {
@@ -70,9 +74,10 @@ describe('PortfoliosService', () => {
 
   describe('findAll', () => {
     it('returns portfolios for the user', async () => {
-      const result = await service.findAll('user-1');
+      const result = await service.findAll();
       expect(result).toHaveLength(1);
       expect(result[0]?.name).toBe('My Portfolio');
+      expect(portfolioRepo.findAll).toHaveBeenCalled();
     });
   });
 
@@ -80,6 +85,7 @@ describe('PortfoliosService', () => {
     it('creates a portfolio and emits a portfolio_created event', async () => {
       const result = await service.create({ name: 'New Portfolio' }, mockUser);
 
+      expect(portfolioRepo.create).toHaveBeenCalledWith('New Portfolio');
       expect(result.name).toBe('My Portfolio');
       expect(kafkaProducer.emitPortfolioEvent).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'portfolio_created', userId: 'user-1' }),
@@ -88,94 +94,58 @@ describe('PortfoliosService', () => {
   });
 
   describe('findOne', () => {
-    it('returns the portfolio when it belongs to the user', async () => {
-      portfolioModel.findOne.mockReturnValue({
-        lean: () => ({ exec: () => Promise.resolve(mockPortfolioDoc) }),
-      });
-      const result = await service.findOne('portfolio-1', 'user-1');
+    it('returns the portfolio when found', async () => {
+      const result = await service.findOne('portfolio-1');
       expect(result.id).toBe('portfolio-1');
-      expect(result.name).toBe('My Portfolio');
-      expect(portfolioModel.findOne).toHaveBeenCalledWith({ _id: 'portfolio-1', userId: 'user-1' });
+      expect(portfolioRepo.findById).toHaveBeenCalledWith('portfolio-1');
     });
 
     it('throws NotFoundException when portfolio does not exist', async () => {
-      portfolioModel.findOne.mockReturnValue({
-        lean: () => ({ exec: () => Promise.resolve(null) }),
-      });
-      await expect(service.findOne('missing', 'user-1')).rejects.toThrow(NotFoundException);
+      portfolioRepo.findById.mockResolvedValue(null);
+      await expect(service.findOne('missing')).rejects.toThrow(NotFoundException);
     });
 
     it('throws NotFoundException when portfolio belongs to another user', async () => {
-      portfolioModel.findOne.mockReturnValue({
-        lean: () => ({ exec: () => Promise.resolve(null) }),
-      });
-      await expect(service.findOne('portfolio-1', 'user-1')).rejects.toThrow(NotFoundException);
+      portfolioRepo.findById.mockResolvedValue(null);
+      await expect(service.findOne('portfolio-1')).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('update', () => {
     it('renames the portfolio and returns the updated document', async () => {
       const updated = { ...mockPortfolioDoc, name: 'Renamed' };
-      portfolioModel.findOneAndUpdate.mockReturnValue({
-        lean: () => ({ exec: () => Promise.resolve(updated) }),
-      });
+      portfolioRepo.updateName.mockResolvedValue(updated);
 
-      const result = await service.update('portfolio-1', { name: 'Renamed' }, 'user-1');
+      const result = await service.update('portfolio-1', { name: 'Renamed' });
 
-      expect(portfolioModel.findOneAndUpdate).toHaveBeenCalledWith(
-        { _id: 'portfolio-1', userId: 'user-1' },
-        { $set: { name: 'Renamed' } },
-        { new: true },
-      );
+      expect(portfolioRepo.updateName).toHaveBeenCalledWith('portfolio-1', 'Renamed');
       expect(result.name).toBe('Renamed');
     });
 
     it('throws NotFoundException when the portfolio is not found', async () => {
-      portfolioModel.findOneAndUpdate.mockReturnValue({
-        lean: () => ({ exec: () => Promise.resolve(null) }),
-      });
-      await expect(service.update('missing', { name: 'X' }, 'user-1')).rejects.toThrow(
-        NotFoundException,
-      );
+      portfolioRepo.updateName.mockResolvedValue(null);
+      await expect(service.update('missing', { name: 'X' })).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('remove', () => {
     it('deletes the portfolio', async () => {
-      portfolioModel.findOneAndDelete.mockReturnValue({
-        exec: () => Promise.resolve(mockPortfolioDoc),
-      });
-      await service.remove('portfolio-1', 'user-1');
-      expect(portfolioModel.findOneAndDelete).toHaveBeenCalledWith({
-        _id: 'portfolio-1',
-        userId: 'user-1',
-      });
+      await service.remove('portfolio-1');
+      expect(portfolioRepo.delete).toHaveBeenCalledWith('portfolio-1');
     });
 
     it('throws NotFoundException when the portfolio is not found', async () => {
-      portfolioModel.findOneAndDelete.mockReturnValue({ exec: () => Promise.resolve(null) });
-      await expect(service.remove('missing', 'user-1')).rejects.toThrow(NotFoundException);
+      portfolioRepo.delete.mockResolvedValue(null);
+      await expect(service.remove('missing')).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('addStock', () => {
     it('adds a new holding, records a trade, and emits stock_added event', async () => {
-      const docMock = {
-        ...mockPortfolioDoc,
-        stocks: [] as Array<{ symbol: string; shares: number; avgCostBasis: number }>,
-        save: jest.fn().mockResolvedValue({
-          toObject: () => ({
-            ...mockPortfolioDoc,
-            stocks: [{ symbol: 'AAPL', shares: 10, avgCostBasis: 150 }],
-          }),
-        }),
-      };
-      portfolioModel.findOne.mockReturnValue({ exec: () => Promise.resolve(docMock) });
-
       await service.addStock('portfolio-1', { symbol: 'AAPL', shares: 10, price: 150 }, mockUser);
 
-      expect(portfolioModel.findOne).toHaveBeenCalledWith({ _id: 'portfolio-1', userId: 'user-1' });
-      expect(tradeModel.create).toHaveBeenCalledWith(
+      expect(portfolioRepo.findByIdForMutation).toHaveBeenCalledWith('portfolio-1');
+      expect(tradeRepo.record).toHaveBeenCalledWith(
         expect.objectContaining({ symbol: 'AAPL', type: 'buy', shares: 10, price: 150 }),
       );
       expect(kafkaProducer.emitPortfolioEvent).toHaveBeenCalledWith(
@@ -185,7 +155,7 @@ describe('PortfoliosService', () => {
 
     it('averages cost basis when the symbol already exists in the portfolio', async () => {
       const existing = { symbol: 'AAPL', shares: 10, avgCostBasis: 100 };
-      const docMock = {
+      portfolioRepo.findByIdForMutation.mockResolvedValue({
         ...mockPortfolioDoc,
         stocks: [existing],
         save: jest.fn().mockResolvedValue({
@@ -194,8 +164,7 @@ describe('PortfoliosService', () => {
             stocks: [{ symbol: 'AAPL', shares: 20, avgCostBasis: 110 }],
           }),
         }),
-      };
-      portfolioModel.findOne.mockReturnValue({ exec: () => Promise.resolve(docMock) });
+      } as unknown as Awaited<ReturnType<PortfolioRepository['findByIdForMutation']>>);
 
       await service.addStock('portfolio-1', { symbol: 'AAPL', shares: 10, price: 120 }, mockUser);
 
@@ -205,12 +174,12 @@ describe('PortfoliosService', () => {
     });
 
     it('throws NotFoundException when portfolio belongs to another user', async () => {
-      portfolioModel.findOne.mockReturnValue({ exec: () => Promise.resolve(null) });
+      portfolioRepo.findByIdForMutation.mockResolvedValue(null);
 
       await expect(
         service.addStock('portfolio-1', { symbol: 'AAPL', shares: 5, price: 150 }, mockUser),
       ).rejects.toThrow(NotFoundException);
-      expect(portfolioModel.findOne).toHaveBeenCalledWith({ _id: 'portfolio-1', userId: 'user-1' });
+      expect(portfolioRepo.findByIdForMutation).toHaveBeenCalledWith('portfolio-1');
     });
   });
 });

@@ -1,35 +1,34 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
 import type { AddStockDto, CreatePortfolioDto } from '@yana-stocks/shared-dto';
 import type { Portfolio as PortfolioType, PortfolioStock } from '@yana-stocks/shared-types';
-import { Model } from 'mongoose';
 import type { AuthUser } from '../common/current-user.decorator';
 import { KafkaProducerService } from '../kafka/kafka-producer.service';
-import { Trade } from '../trades/schemas/trade.schema';
+import { TradeRepository } from '../trades/trade.repository';
 import { UpdatePortfolioDto } from './dto/update-portfolio.dto';
+import { PortfolioRepository } from './portfolio.repository';
 import { Portfolio, PortfolioDocument } from './schemas/portfolio.schema';
 
 @Injectable()
 export class PortfoliosService {
   constructor(
-    @InjectModel(Portfolio.name) private readonly portfolioModel: Model<Portfolio>,
-    @InjectModel(Trade.name) private readonly tradeModel: Model<Trade>,
+    private readonly repo: PortfolioRepository,
+    private readonly tradeRepo: TradeRepository,
     private readonly kafkaProducer: KafkaProducerService,
   ) {}
 
-  async findAll(userId: string): Promise<PortfolioType[]> {
-    const docs = await this.portfolioModel.find({ userId }).lean<Portfolio[]>().exec();
+  async findAll(): Promise<PortfolioType[]> {
+    const docs = await this.repo.findAll();
     return docs.map((d) => this.toResponse(d));
   }
 
-  async findOne(id: string, userId: string): Promise<PortfolioType> {
-    const doc = await this.portfolioModel.findOne({ _id: id, userId }).lean<Portfolio>().exec();
+  async findOne(id: string): Promise<PortfolioType> {
+    const doc = await this.repo.findById(id);
     if (!doc) throw new NotFoundException('Portfolio not found');
     return this.toResponse(doc);
   }
 
   async create(dto: CreatePortfolioDto, user: AuthUser): Promise<PortfolioType> {
-    const doc = await this.portfolioModel.create({ userId: user.id, name: dto.name, stocks: [] });
+    const doc = await this.repo.create(dto.name);
     const plain = doc.toObject() as Portfolio & {
       _id: { toString(): string };
       createdAt: Date;
@@ -47,22 +46,19 @@ export class PortfoliosService {
     return this.toResponse(plain);
   }
 
-  async update(id: string, dto: UpdatePortfolioDto, userId: string): Promise<PortfolioType> {
-    const doc = await this.portfolioModel
-      .findOneAndUpdate({ _id: id, userId }, { $set: { name: dto.name } }, { new: true })
-      .lean<Portfolio>()
-      .exec();
+  async update(id: string, dto: UpdatePortfolioDto): Promise<PortfolioType> {
+    const doc = await this.repo.updateName(id, dto.name);
     if (!doc) throw new NotFoundException('Portfolio not found');
     return this.toResponse(doc);
   }
 
-  async remove(id: string, userId: string): Promise<void> {
-    const result = await this.portfolioModel.findOneAndDelete({ _id: id, userId }).exec();
+  async remove(id: string): Promise<void> {
+    const result = await this.repo.delete(id);
     if (!result) throw new NotFoundException('Portfolio not found');
   }
 
   async addStock(id: string, dto: AddStockDto, user: AuthUser): Promise<PortfolioType> {
-    const doc = await this.portfolioModel.findOne({ _id: id, userId: user.id }).exec();
+    const doc = await this.repo.findByIdForMutation(id);
     if (!doc) throw new NotFoundException('Portfolio not found');
 
     const existing = doc.stocks.find((s) => s.symbol === dto.symbol);
@@ -77,9 +73,8 @@ export class PortfoliosService {
 
     const saved = await doc.save();
 
-    await this.tradeModel.create({
+    await this.tradeRepo.record({
       portfolioId: id,
-      userId: user.id,
       symbol: dto.symbol,
       type: 'buy',
       shares: dto.shares,

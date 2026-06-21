@@ -25,14 +25,14 @@ export class PortfoliosController {
 
   @Get()
   @ApiOperation({ summary: 'List portfolios for the authenticated user' })
-  findAll(@CurrentUser() user: AuthUser): Promise<Portfolio[]> {
-    return this.portfoliosService.findAll(user.id);
+  findAll(): Promise<Portfolio[]> {
+    return this.portfoliosService.findAll();
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a portfolio by ID' })
-  findOne(@Param('id') id: string, @CurrentUser() user: AuthUser): Promise<Portfolio> {
-    return this.portfoliosService.findOne(id, user.id);
+  findOne(@Param('id') id: string): Promise<Portfolio> {
+    return this.portfoliosService.findOne(id);
   }
 
   @Post()
@@ -49,16 +49,15 @@ export class PortfoliosController {
   update(
     @Param('id') id: string,
     @Body(ValidationPipe) dto: UpdatePortfolioDto,
-    @CurrentUser() user: AuthUser,
   ): Promise<Portfolio> {
-    return this.portfoliosService.update(id, dto, user.id);
+    return this.portfoliosService.update(id, dto);
   }
 
   @Delete(':id')
   @HttpCode(204)
   @ApiOperation({ summary: 'Delete a portfolio' })
-  remove(@Param('id') id: string, @CurrentUser() user: AuthUser): Promise<void> {
-    return this.portfoliosService.remove(id, user.id);
+  remove(@Param('id') id: string): Promise<void> {
+    return this.portfoliosService.remove(id);
   }
 
   @Post(':id/stocks')

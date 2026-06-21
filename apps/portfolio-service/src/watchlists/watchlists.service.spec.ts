@@ -1,7 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
-import { getModelToken } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
-import { Watchlist } from './schemas/watchlist.schema';
+import { WatchlistRepository } from './watchlist.repository';
 import { WatchlistsService } from './watchlists.service';
 
 const mockWatchlist = {
@@ -16,45 +15,34 @@ const mockWatchlist = {
 
 describe('WatchlistsService', () => {
   let service: WatchlistsService;
-  let watchlistModel: {
-    find: jest.Mock;
-    findOne: jest.Mock;
-    findOneAndUpdate: jest.Mock;
-    findOneAndDelete: jest.Mock;
-    create: jest.Mock;
-  };
+  let watchlistRepo: jest.Mocked<
+    Pick<
+      WatchlistRepository,
+      'findAll' | 'findById' | 'create' | 'addSymbol' | 'removeSymbol' | 'delete'
+    >
+  >;
 
   beforeEach(async () => {
-    watchlistModel = {
-      find: jest
-        .fn()
-        .mockReturnValue({ lean: () => ({ exec: () => Promise.resolve([mockWatchlist]) }) }),
-      findOne: jest
-        .fn()
-        .mockReturnValue({ lean: () => ({ exec: () => Promise.resolve(mockWatchlist) }) }),
-      findOneAndUpdate: jest
-        .fn()
-        .mockReturnValue({ lean: () => ({ exec: () => Promise.resolve(mockWatchlist) }) }),
-      findOneAndDelete: jest.fn().mockReturnValue({ exec: () => Promise.resolve(mockWatchlist) }),
-      create: jest.fn().mockResolvedValue({
-        toObject: () => mockWatchlist,
-      }),
+    watchlistRepo = {
+      findAll: jest.fn().mockResolvedValue([mockWatchlist]),
+      findById: jest.fn().mockResolvedValue(mockWatchlist),
+      create: jest.fn().mockResolvedValue(mockWatchlist),
+      addSymbol: jest.fn().mockResolvedValue(mockWatchlist),
+      removeSymbol: jest.fn().mockResolvedValue(mockWatchlist),
+      delete: jest.fn().mockResolvedValue(mockWatchlist),
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        WatchlistsService,
-        { provide: getModelToken(Watchlist.name), useValue: watchlistModel },
-      ],
+      providers: [WatchlistsService, { provide: WatchlistRepository, useValue: watchlistRepo }],
     }).compile();
 
     service = module.get(WatchlistsService);
   });
 
   describe('findAll', () => {
-    it('returns all watchlists for a user', async () => {
-      const result = await service.findAll('user-1');
-      expect(watchlistModel.find).toHaveBeenCalledWith({ userId: 'user-1' });
+    it('returns all watchlists for the user', async () => {
+      const result = await service.findAll();
+      expect(watchlistRepo.findAll).toHaveBeenCalled();
       expect(result).toHaveLength(1);
       expect(result[0]?.name).toBe('Tech Stocks');
     });
@@ -62,91 +50,63 @@ describe('WatchlistsService', () => {
 
   describe('findOne', () => {
     it('returns the watchlist when found', async () => {
-      const result = await service.findOne('wl-1', 'user-1');
-      expect(watchlistModel.findOne).toHaveBeenCalledWith({ _id: 'wl-1', userId: 'user-1' });
+      const result = await service.findOne('wl-1');
+      expect(watchlistRepo.findById).toHaveBeenCalledWith('wl-1');
       expect(result.name).toBe('Tech Stocks');
     });
 
     it('throws NotFoundException when not found', async () => {
-      watchlistModel.findOne.mockReturnValue({
-        lean: () => ({ exec: () => Promise.resolve(null) }),
-      });
-      await expect(service.findOne('missing', 'user-1')).rejects.toThrow(NotFoundException);
+      watchlistRepo.findById.mockResolvedValue(null);
+      await expect(service.findOne('missing')).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('create', () => {
     it('creates a watchlist with the provided symbols', async () => {
-      const result = await service.create(
-        { name: 'Tech Stocks', symbols: ['AAPL', 'MSFT'] },
-        'user-1',
-      );
-      expect(watchlistModel.create).toHaveBeenCalledWith({
-        userId: 'user-1',
-        name: 'Tech Stocks',
-        symbols: ['AAPL', 'MSFT'],
-      });
+      const result = await service.create({ name: 'Tech Stocks', symbols: ['AAPL', 'MSFT'] });
+      expect(watchlistRepo.create).toHaveBeenCalledWith('Tech Stocks', ['AAPL', 'MSFT']);
       expect(result.name).toBe('Tech Stocks');
     });
 
     it('defaults symbols to an empty array when not provided', async () => {
-      await service.create({ name: 'Empty List' }, 'user-1');
-      expect(watchlistModel.create).toHaveBeenCalledWith(expect.objectContaining({ symbols: [] }));
+      await service.create({ name: 'Empty List' });
+      expect(watchlistRepo.create).toHaveBeenCalledWith('Empty List', []);
     });
   });
 
   describe('addSymbol', () => {
-    it('uses $addToSet with the uppercased symbol', async () => {
-      await service.addSymbol('wl-1', 'tsla', 'user-1');
-      expect(watchlistModel.findOneAndUpdate).toHaveBeenCalledWith(
-        { _id: 'wl-1', userId: 'user-1' },
-        { $addToSet: { symbols: 'TSLA' } },
-        { new: true },
-      );
+    it('passes the uppercased symbol to the repository', async () => {
+      await service.addSymbol('wl-1', 'tsla');
+      expect(watchlistRepo.addSymbol).toHaveBeenCalledWith('wl-1', 'TSLA');
     });
 
     it('throws NotFoundException when watchlist not found', async () => {
-      watchlistModel.findOneAndUpdate.mockReturnValue({
-        lean: () => ({ exec: () => Promise.resolve(null) }),
-      });
-      await expect(service.addSymbol('missing', 'AAPL', 'user-1')).rejects.toThrow(
-        NotFoundException,
-      );
+      watchlistRepo.addSymbol.mockResolvedValue(null);
+      await expect(service.addSymbol('missing', 'AAPL')).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('removeSymbol', () => {
-    it('uses $pull with the uppercased symbol', async () => {
-      await service.removeSymbol('wl-1', 'aapl', 'user-1');
-      expect(watchlistModel.findOneAndUpdate).toHaveBeenCalledWith(
-        { _id: 'wl-1', userId: 'user-1' },
-        { $pull: { symbols: 'AAPL' } },
-        { new: true },
-      );
+    it('passes the uppercased symbol to the repository', async () => {
+      await service.removeSymbol('wl-1', 'aapl');
+      expect(watchlistRepo.removeSymbol).toHaveBeenCalledWith('wl-1', 'AAPL');
     });
 
     it('throws NotFoundException when watchlist not found', async () => {
-      watchlistModel.findOneAndUpdate.mockReturnValue({
-        lean: () => ({ exec: () => Promise.resolve(null) }),
-      });
-      await expect(service.removeSymbol('missing', 'AAPL', 'user-1')).rejects.toThrow(
-        NotFoundException,
-      );
+      watchlistRepo.removeSymbol.mockResolvedValue(null);
+      await expect(service.removeSymbol('missing', 'AAPL')).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('remove', () => {
     it('deletes the watchlist', async () => {
-      await service.remove('wl-1', 'user-1');
-      expect(watchlistModel.findOneAndDelete).toHaveBeenCalledWith({
-        _id: 'wl-1',
-        userId: 'user-1',
-      });
+      await service.remove('wl-1');
+      expect(watchlistRepo.delete).toHaveBeenCalledWith('wl-1');
     });
 
     it('throws NotFoundException when watchlist not found', async () => {
-      watchlistModel.findOneAndDelete.mockReturnValue({ exec: () => Promise.resolve(null) });
-      await expect(service.remove('missing', 'user-1')).rejects.toThrow(NotFoundException);
+      watchlistRepo.delete.mockResolvedValue(null);
+      await expect(service.remove('missing')).rejects.toThrow(NotFoundException);
     });
   });
 });

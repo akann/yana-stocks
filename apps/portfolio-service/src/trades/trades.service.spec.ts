@@ -1,6 +1,5 @@
-import { getModelToken } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
-import { Trade } from './schemas/trade.schema';
+import { TradeRepository } from './trade.repository';
 import { TradesService } from './trades.service';
 
 const mockTrades = [
@@ -30,27 +29,25 @@ const mockTrades = [
 
 describe('TradesService', () => {
   let service: TradesService;
-  let tradeModel: { find: jest.Mock };
+  let tradeRepo: jest.Mocked<Pick<TradeRepository, 'findAll'>>;
 
   beforeEach(async () => {
-    tradeModel = {
-      find: jest.fn().mockReturnValue({
-        sort: () => ({ lean: () => ({ exec: () => Promise.resolve(mockTrades) }) }),
-      }),
+    tradeRepo = {
+      findAll: jest.fn().mockResolvedValue(mockTrades),
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [TradesService, { provide: getModelToken(Trade.name), useValue: tradeModel }],
+      providers: [TradesService, { provide: TradeRepository, useValue: tradeRepo }],
     }).compile();
 
     service = module.get(TradesService);
   });
 
-  describe('findAllByUser', () => {
-    it('queries by userId and returns mapped trade objects', async () => {
-      const result = await service.findAllByUser('user-1');
+  describe('findAll', () => {
+    it('returns mapped trade objects for the current user', async () => {
+      const result = await service.findAll();
 
-      expect(tradeModel.find).toHaveBeenCalledWith({ userId: 'user-1' });
+      expect(tradeRepo.findAll).toHaveBeenCalled();
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual(
         expect.objectContaining({
@@ -65,11 +62,8 @@ describe('TradesService', () => {
     });
 
     it('returns an empty array when the user has no trades', async () => {
-      tradeModel.find.mockReturnValue({
-        sort: () => ({ lean: () => ({ exec: () => Promise.resolve([]) }) }),
-      });
-
-      const result = await service.findAllByUser('user-with-no-trades');
+      tradeRepo.findAll.mockResolvedValue([]);
+      const result = await service.findAll();
       expect(result).toEqual([]);
     });
   });
