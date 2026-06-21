@@ -125,6 +125,41 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"message": "logged out"}, http.StatusOK)
 }
 
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value(middleware.ContextKeyUserID).(string)
+	if userID == "" {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var body struct {
+		CurrentPassword string `json:"currentPassword"`
+		NewPassword     string `json:"newPassword"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.CurrentPassword == "" || body.NewPassword == "" {
+		jsonError(w, "currentPassword and newPassword are required", http.StatusBadRequest)
+		return
+	}
+	if len(body.NewPassword) < 8 {
+		jsonError(w, "password must be at least 8 characters", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.svc.ChangePassword(r.Context(), userID, body.CurrentPassword, body.NewPassword); err != nil {
+		switch {
+		case errors.Is(err, service.ErrWrongPassword):
+			jsonError(w, "current password is incorrect", http.StatusUnauthorized)
+		case errors.Is(err, service.ErrUserNotFound):
+			jsonError(w, "user not found", http.StatusNotFound)
+		default:
+			jsonError(w, "failed to change password", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	jsonOK(w, map[string]string{"message": "password updated"}, http.StatusOK)
+}
+
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(middleware.ContextKeyUserID).(string)
 	if userID == "" {

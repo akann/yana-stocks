@@ -43,6 +43,7 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   updateProfile: (dto: UpdateProfileInput) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -164,6 +165,19 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     setProfile((await res.json()) as UserProfile);
   }
 
+  async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    if (!accessToken) throw new Error('Not authenticated');
+    const res = await fetch(`${API_URL}/auth/password`, {
+      method: 'PUT',
+      headers: authHeaders(accessToken),
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error ?? 'Failed to change password');
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -176,6 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
         logout,
         refresh,
         updateProfile,
+        changePassword,
       }}
     >
       {children}

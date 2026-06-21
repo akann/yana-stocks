@@ -143,6 +143,32 @@ func (q *Queries) VerifyUser(ctx context.Context, id string) error {
 	return err
 }
 
+func (q *Queries) GetUserWithCredentialByID(ctx context.Context, userID string) (*UserWithCredential, error) {
+	row := q.pool.QueryRow(ctx, `
+		SELECT u.id, u.email, u.is_verified, u.verification_token, u.created_at, u.updated_at,
+		       uc.password_hash
+		FROM users u
+		JOIN user_credentials uc ON uc.user_id = u.id
+		WHERE u.id = $1
+	`, userID)
+	u := &UserWithCredential{}
+	err := row.Scan(
+		&u.ID, &u.Email, &u.IsVerified, &u.VerificationToken,
+		&u.CreatedAt, &u.UpdatedAt, &u.PasswordHash,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return u, nil
+}
+
+func (q *Queries) UpdatePasswordHash(ctx context.Context, userID, passwordHash string) error {
+	_, err := q.pool.Exec(ctx, `
+		UPDATE user_credentials SET password_hash = $1, updated_at = NOW() WHERE user_id = $2
+	`, passwordHash, userID)
+	return err
+}
+
 type scanner interface {
 	Scan(dest ...any) error
 }

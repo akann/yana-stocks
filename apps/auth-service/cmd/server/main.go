@@ -82,6 +82,7 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.JWTAuth(cfg.JWTSecret))
 			r.Get("/me", authHandler.Me)
+			r.Put("/password", authHandler.ChangePassword)
 		})
 	})
 

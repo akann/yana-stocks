@@ -26,6 +26,7 @@ var (
 	ErrInvalidCredentials = errors.New("invalid email or password")
 	ErrEmailNotVerified   = errors.New("email not verified")
 	ErrUserNotFound       = errors.New("user not found")
+	ErrWrongPassword      = errors.New("current password is incorrect")
 )
 
 type TokenPair struct {
@@ -135,6 +136,24 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*TokenP
 func (s *AuthService) Logout(ctx context.Context, refreshToken string) error {
 	s.redis.Del(ctx, refreshKey(refreshToken))
 	return nil
+}
+
+func (s *AuthService) ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error {
+	user, err := s.queries.GetUserWithCredentialByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrUserNotFound
+		}
+		return err
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(currentPassword)); err != nil {
+		return ErrWrongPassword
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	return s.queries.UpdatePasswordHash(ctx, userID, string(hash))
 }
 
 func (s *AuthService) Me(ctx context.Context, userID string) (*MeResponse, error) {
