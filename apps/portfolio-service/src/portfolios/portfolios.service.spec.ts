@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
 import type { AuthUser } from '../common/current-user.decorator';
@@ -24,7 +24,6 @@ describe('PortfoliosService', () => {
   let portfolioModel: {
     find: jest.Mock;
     findOne: jest.Mock;
-    findById: jest.Mock;
     findOneAndUpdate: jest.Mock;
     findOneAndDelete: jest.Mock;
     create: jest.Mock;
@@ -38,7 +37,6 @@ describe('PortfoliosService', () => {
         .fn()
         .mockReturnValue({ lean: () => ({ exec: () => Promise.resolve([mockPortfolioDoc]) }) }),
       findOne: jest.fn(),
-      findById: jest.fn(),
       findOneAndUpdate: jest
         .fn()
         .mockReturnValue({ lean: () => ({ exec: () => Promise.resolve(mockPortfolioDoc) }) }),
@@ -172,10 +170,11 @@ describe('PortfoliosService', () => {
           }),
         }),
       };
-      portfolioModel.findById.mockReturnValue({ exec: () => Promise.resolve(docMock) });
+      portfolioModel.findOne.mockReturnValue({ exec: () => Promise.resolve(docMock) });
 
       await service.addStock('portfolio-1', { symbol: 'AAPL', shares: 10, price: 150 }, mockUser);
 
+      expect(portfolioModel.findOne).toHaveBeenCalledWith({ _id: 'portfolio-1', userId: 'user-1' });
       expect(tradeModel.create).toHaveBeenCalledWith(
         expect.objectContaining({ symbol: 'AAPL', type: 'buy', shares: 10, price: 150 }),
       );
@@ -188,7 +187,6 @@ describe('PortfoliosService', () => {
       const existing = { symbol: 'AAPL', shares: 10, avgCostBasis: 100 };
       const docMock = {
         ...mockPortfolioDoc,
-        userId: 'user-1',
         stocks: [existing],
         save: jest.fn().mockResolvedValue({
           toObject: () => ({
@@ -197,7 +195,7 @@ describe('PortfoliosService', () => {
           }),
         }),
       };
-      portfolioModel.findById.mockReturnValue({ exec: () => Promise.resolve(docMock) });
+      portfolioModel.findOne.mockReturnValue({ exec: () => Promise.resolve(docMock) });
 
       await service.addStock('portfolio-1', { symbol: 'AAPL', shares: 10, price: 120 }, mockUser);
 
@@ -206,13 +204,13 @@ describe('PortfoliosService', () => {
       expect(existing.avgCostBasis).toBe(110);
     });
 
-    it('throws ForbiddenException when the portfolio belongs to another user', async () => {
-      const docMock = { ...mockPortfolioDoc, userId: 'other-user', stocks: [] };
-      portfolioModel.findById.mockReturnValue({ exec: () => Promise.resolve(docMock) });
+    it('throws NotFoundException when portfolio belongs to another user', async () => {
+      portfolioModel.findOne.mockReturnValue({ exec: () => Promise.resolve(null) });
 
       await expect(
         service.addStock('portfolio-1', { symbol: 'AAPL', shares: 5, price: 150 }, mockUser),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(NotFoundException);
+      expect(portfolioModel.findOne).toHaveBeenCalledWith({ _id: 'portfolio-1', userId: 'user-1' });
     });
   });
 });

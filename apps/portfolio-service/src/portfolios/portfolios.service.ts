@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import type { AddStockDto, CreatePortfolioDto } from '@yana-stocks/shared-dto';
 import type { Portfolio as PortfolioType, PortfolioStock } from '@yana-stocks/shared-types';
@@ -62,9 +62,8 @@ export class PortfoliosService {
   }
 
   async addStock(id: string, dto: AddStockDto, user: AuthUser): Promise<PortfolioType> {
-    const doc = await this.portfolioModel.findById(id).exec();
+    const doc = await this.portfolioModel.findOne({ _id: id, userId: user.id }).exec();
     if (!doc) throw new NotFoundException('Portfolio not found');
-    if (doc.userId !== user.id) throw new ForbiddenException();
 
     const existing = doc.stocks.find((s) => s.symbol === dto.symbol);
     if (existing) {
