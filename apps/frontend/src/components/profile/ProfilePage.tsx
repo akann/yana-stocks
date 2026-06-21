@@ -290,7 +290,6 @@ function ChangePasswordForm({ onSave }: ChangePasswordFormProps): React.JSX.Elem
           onChange={(e) => setNext(e.target.value)}
           placeholder="••••••••"
           required
-          minLength={8}
           className={INPUT}
         />
       </div>
