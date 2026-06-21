@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
-type Tab = 'profile' | 'security';
+type Tab = 'profile' | 'password' | 'delete';
 
 const INPUT =
   'w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500';
@@ -41,22 +41,28 @@ export function ProfilePage(): React.JSX.Element {
       </div>
 
       <div className="flex border-b border-gray-700 mb-6">
-        {(['profile', 'security'] as Tab[]).map((t) => (
+        {(
+          [
+            { key: 'profile', label: 'Profile' },
+            { key: 'password', label: 'Change password' },
+            { key: 'delete', label: 'Delete account' },
+          ] as { key: Tab; label: string }[]
+        ).map(({ key, label }) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
-              tab === t
+            key={key}
+            onClick={() => setTab(key)}
+            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              tab === key
                 ? 'border-blue-500 text-white'
                 : 'border-transparent text-gray-400 hover:text-white'
             }`}
           >
-            {t === 'security' ? 'Security' : 'Profile'}
+            {label}
           </button>
         ))}
       </div>
 
-      {tab === 'profile' ? (
+      {tab === 'profile' && (
         <EditProfileForm
           initialDisplayName={profile?.displayName ?? ''}
           initialBio={profile?.bio ?? ''}
@@ -66,12 +72,9 @@ export function ProfilePage(): React.JSX.Element {
           initialEmailNotifications={profile?.preferences?.emailNotifications ?? true}
           onSave={updateProfile}
         />
-      ) : (
-        <div className="space-y-10">
-          <ChangePasswordForm onSave={changePassword} />
-          <DeleteAccountSection onDelete={deleteAccount} />
-        </div>
       )}
+      {tab === 'password' && <ChangePasswordForm onSave={changePassword} />}
+      {tab === 'delete' && <DeleteAccountSection onDelete={deleteAccount} />}
     </div>
   );
 }
@@ -277,9 +280,8 @@ function DeleteAccountSection({ onDelete }: DeleteAccountSectionProps): React.JS
 
   return (
     <>
-      <div className="border border-red-800 rounded-lg p-5">
-        <h3 className="text-sm font-semibold text-red-400 mb-1">Danger zone</h3>
-        <p className="text-sm text-gray-400 mb-4">
+      <div>
+        <p className="text-sm text-gray-400 mb-6">
           Permanently delete your account and all associated data. This cannot be undone.
         </p>
         <button
@@ -287,7 +289,7 @@ function DeleteAccountSection({ onDelete }: DeleteAccountSectionProps): React.JS
           onClick={openModal}
           className="bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >
-          Delete account
+          Delete my account
         </button>
       </div>
 
