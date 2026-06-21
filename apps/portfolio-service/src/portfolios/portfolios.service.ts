@@ -23,9 +23,8 @@ export class PortfoliosService {
   }
 
   async findOne(id: string, userId: string): Promise<PortfolioType> {
-    const doc = await this.portfolioModel.findById(id).lean<Portfolio>().exec();
+    const doc = await this.portfolioModel.findOne({ _id: id, userId }).lean<Portfolio>().exec();
     if (!doc) throw new NotFoundException('Portfolio not found');
-    if (doc.userId !== userId) throw new ForbiddenException();
     return this.toResponse(doc);
   }
 

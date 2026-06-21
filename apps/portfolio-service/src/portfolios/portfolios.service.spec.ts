@@ -23,6 +23,7 @@ describe('PortfoliosService', () => {
   let service: PortfoliosService;
   let portfolioModel: {
     find: jest.Mock;
+    findOne: jest.Mock;
     findById: jest.Mock;
     findOneAndUpdate: jest.Mock;
     findOneAndDelete: jest.Mock;
@@ -36,6 +37,7 @@ describe('PortfoliosService', () => {
       find: jest
         .fn()
         .mockReturnValue({ lean: () => ({ exec: () => Promise.resolve([mockPortfolioDoc]) }) }),
+      findOne: jest.fn(),
       findById: jest.fn(),
       findOneAndUpdate: jest
         .fn()
@@ -89,28 +91,27 @@ describe('PortfoliosService', () => {
 
   describe('findOne', () => {
     it('returns the portfolio when it belongs to the user', async () => {
-      portfolioModel.findById.mockReturnValue({
+      portfolioModel.findOne.mockReturnValue({
         lean: () => ({ exec: () => Promise.resolve(mockPortfolioDoc) }),
       });
       const result = await service.findOne('portfolio-1', 'user-1');
       expect(result.id).toBe('portfolio-1');
       expect(result.name).toBe('My Portfolio');
+      expect(portfolioModel.findOne).toHaveBeenCalledWith({ _id: 'portfolio-1', userId: 'user-1' });
     });
 
     it('throws NotFoundException when portfolio does not exist', async () => {
-      portfolioModel.findById.mockReturnValue({
+      portfolioModel.findOne.mockReturnValue({
         lean: () => ({ exec: () => Promise.resolve(null) }),
       });
       await expect(service.findOne('missing', 'user-1')).rejects.toThrow(NotFoundException);
     });
 
-    it('throws ForbiddenException when portfolio belongs to another user', async () => {
-      portfolioModel.findById.mockReturnValue({
-        lean: () => ({
-          exec: () => Promise.resolve({ ...mockPortfolioDoc, userId: 'other-user' }),
-        }),
+    it('throws NotFoundException when portfolio belongs to another user', async () => {
+      portfolioModel.findOne.mockReturnValue({
+        lean: () => ({ exec: () => Promise.resolve(null) }),
       });
-      await expect(service.findOne('portfolio-1', 'user-1')).rejects.toThrow(ForbiddenException);
+      await expect(service.findOne('portfolio-1', 'user-1')).rejects.toThrow(NotFoundException);
     });
   });
 
