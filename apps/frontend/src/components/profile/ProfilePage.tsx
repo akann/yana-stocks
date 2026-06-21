@@ -280,7 +280,7 @@ function DeleteAccountSection({ onDelete }: DeleteAccountSectionProps): React.JS
 
   return (
     <>
-      <div>
+      <div className="border border-red-800 rounded-lg p-5">
         <p className="text-sm text-gray-400 mb-6">
           Permanently delete your account and all associated data. This cannot be undone.
         </p>
