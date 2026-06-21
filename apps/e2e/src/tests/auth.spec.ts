@@ -154,6 +154,12 @@ test.describe('Auth guards', () => {
     await page.waitForURL('/login');
     await expect(page).toHaveURL('/login');
   });
+
+  test('redirects /profile to /login when unauthenticated', async ({ page }) => {
+    await page.goto('/profile');
+    await page.waitForURL('/login');
+    await expect(page).toHaveURL('/login');
+  });
 });
 
 test.describe('Logout', () => {

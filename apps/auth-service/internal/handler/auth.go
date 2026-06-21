@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -9,8 +10,18 @@ import (
 	"github.com/akann/yana-stocks/auth-service/internal/service"
 )
 
+type authServicer interface {
+	Register(ctx context.Context, email, password string) error
+	VerifyEmail(ctx context.Context, token string) error
+	Login(ctx context.Context, email, password string) (*service.TokenPair, error)
+	Refresh(ctx context.Context, refreshToken string) (*service.TokenPair, error)
+	Logout(ctx context.Context, refreshToken string) error
+	Me(ctx context.Context, userID string) (*service.MeResponse, error)
+	ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error
+}
+
 type AuthHandler struct {
-	svc *service.AuthService
+	svc authServicer
 }
 
 func NewAuthHandler(svc *service.AuthService) *AuthHandler {
