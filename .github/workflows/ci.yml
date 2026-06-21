@@ -338,18 +338,22 @@ jobs:
         with:
           path: .turbo
           key: turbo-e2e-${{ runner.os }}-${{ github.sha }}
-          restore-keys: turbo-e2e-${{ runner.os }}-
+          restore-keys: |
+            turbo-e2e-${{ runner.os }}-
+            turbo-ts-${{ runner.os }}-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile || (pnpm approve-builds --all && pnpm install --frozen-lockfile)
 
       - name: Cache Playwright browsers
+        id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm --filter @yana-stocks/e2e exec playwright install --with-deps chromium webkit
 
       - name: Write frontend .env.local
@@ -435,11 +439,12 @@ jobs:
             cat logs/${name}.log 2>/dev/null || true
             return 1
           }
-          wait_for http://localhost:3001/health auth-service
-          wait_for http://localhost:3003/health portfolio-service
-          wait_for http://localhost:3004/health portfolio-api
-          wait_for http://localhost:3007/health profile-service
-          wait_for http://localhost:3000     frontend
+          wait_for http://localhost:3001/health auth-service      &
+          wait_for http://localhost:3003/health portfolio-service  &
+          wait_for http://localhost:3004/health portfolio-api      &
+          wait_for http://localhost:3007/health profile-service    &
+          wait_for http://localhost:3000        frontend           &
+          wait
 
       - name: Seed test data
         run: pnpm seed
