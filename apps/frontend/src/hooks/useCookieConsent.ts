@@ -12,22 +12,20 @@ interface ConsentRecord {
 }
 
 export function useCookieConsent() {
-  const [status, setStatus] = useState<ConsentStatus>(() => {
-    if (typeof window === 'undefined') return null;
+  const [status, setStatus] = useState<ConsentStatus>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const rec = JSON.parse(raw) as ConsentRecord;
-        return rec.status;
+        const record = JSON.parse(raw) as ConsentRecord;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setStatus(record.status);
       }
     } catch {
       // ignore parse errors
     }
-    return null;
-  });
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
     setReady(true);
   }, []);
 
