@@ -74,7 +74,9 @@ async function fetchProfile(token: string): Promise<UserProfile | null> {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }): React.JSX.Element {
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(() =>
+    typeof window !== 'undefined' ? sessionStorage.getItem(ACCESS_TOKEN_KEY) : null,
+  );
   const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -88,7 +90,6 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   useEffect(() => {
     const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
     if (token) {
-      setAccessToken(token);
       void loadUserData(token).finally(() => setIsLoading(false));
     } else {
       setIsLoading(false);

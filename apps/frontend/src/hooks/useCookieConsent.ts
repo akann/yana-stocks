@@ -12,19 +12,22 @@ interface ConsentRecord {
 }
 
 export function useCookieConsent() {
-  const [status, setStatus] = useState<ConsentStatus>(null);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
+  const [status, setStatus] = useState<ConsentStatus>(() => {
+    if (typeof window === 'undefined') return null;
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const record = JSON.parse(raw) as ConsentRecord;
-        setStatus(record.status);
+        const rec = JSON.parse(raw) as ConsentRecord;
+        return rec.status;
       }
     } catch {
       // ignore parse errors
     }
+    return null;
+  });
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
     setReady(true);
   }, []);
 

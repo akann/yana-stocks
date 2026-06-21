@@ -8,20 +8,16 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api';
 
 function VerifyInner(): React.JSX.Element {
   const params = useSearchParams();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState('');
+  const token = params.get('token');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>(
+    token ? 'loading' : 'error',
+  );
+  const [message, setMessage] = useState(token ? '' : 'Missing verification token.');
   const done = useRef(false);
 
   useEffect(() => {
-    if (done.current) return;
+    if (!token || done.current) return;
     done.current = true;
-
-    const token = params.get('token');
-    if (!token) {
-      setStatus('error');
-      setMessage('Missing verification token.');
-      return;
-    }
 
     fetch(`${API_URL}/auth/verify`, {
       method: 'POST',
@@ -42,7 +38,7 @@ function VerifyInner(): React.JSX.Element {
         setStatus('error');
         setMessage('Network error. Please try again.');
       });
-  }, [params]);
+  }, [token]);
 
   if (status === 'loading') {
     return (
