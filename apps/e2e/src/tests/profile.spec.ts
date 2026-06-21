@@ -81,7 +81,7 @@ test.describe('Profile page', () => {
     await page.getByRole('button', { name: 'Security' }).click();
 
     await expect(page.getByLabel('Current password')).toBeVisible();
-    await expect(page.getByLabel('New password')).toBeVisible();
+    await expect(page.getByLabel('New password', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Confirm new password')).toBeVisible();
   });
 
@@ -105,7 +105,7 @@ test.describe('Profile page', () => {
 
     await page.getByRole('button', { name: 'Security' }).click();
     await page.getByLabel('Current password').fill('OldPass1!');
-    await page.getByLabel('New password').fill('short');
+    await page.getByLabel('New password', { exact: true }).fill('short');
     await page.getByLabel('Confirm new password').fill('short');
     await page.getByRole('button', { name: 'Update password' }).click();
 
@@ -119,7 +119,7 @@ test.describe('Profile page', () => {
 
     await page.getByRole('button', { name: 'Security' }).click();
     await page.getByLabel('Current password').fill('OldPass1!');
-    await page.getByLabel('New password').fill('NewPass1!');
+    await page.getByLabel('New password', { exact: true }).fill('NewPass1!');
     await page.getByLabel('Confirm new password').fill('DifferentPass1!');
     await page.getByRole('button', { name: 'Update password' }).click();
 
@@ -133,7 +133,7 @@ test.describe('Profile page', () => {
 
     await page.getByRole('button', { name: 'Security' }).click();
     await page.getByLabel('Current password').fill('OldPass1!');
-    await page.getByLabel('New password').fill('NewPass1!');
+    await page.getByLabel('New password', { exact: true }).fill('NewPass1!');
     await page.getByLabel('Confirm new password').fill('NewPass1!');
     await page.getByRole('button', { name: 'Update password' }).click();
 
@@ -141,7 +141,7 @@ test.describe('Profile page', () => {
 
     // Fields should be cleared after success
     await expect(page.getByLabel('Current password')).toHaveValue('');
-    await expect(page.getByLabel('New password')).toHaveValue('');
+    await expect(page.getByLabel('New password', { exact: true })).toHaveValue('');
     await expect(page.getByLabel('Confirm new password')).toHaveValue('');
   });
 
@@ -156,7 +156,7 @@ test.describe('Profile page', () => {
 
     await page.getByRole('button', { name: 'Security' }).click();
     await page.getByLabel('Current password').fill('WrongPass1!');
-    await page.getByLabel('New password').fill('NewPass1!');
+    await page.getByLabel('New password', { exact: true }).fill('NewPass1!');
     await page.getByLabel('Confirm new password').fill('NewPass1!');
     await page.getByRole('button', { name: 'Update password' }).click();
 
