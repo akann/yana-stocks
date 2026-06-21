@@ -19,6 +19,8 @@ type authServicer interface {
 	Me(ctx context.Context, userID string) (*service.MeResponse, error)
 	ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error
 	DeleteAccount(ctx context.Context, userID, password string) error
+	RequestPasswordReset(ctx context.Context, email string) error
+	ResetPassword(ctx context.Context, token, newPassword string) error
 }
 
 type AuthHandler struct {
@@ -220,6 +222,46 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, me, http.StatusOK)
+}
+
+func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Email == "" {
+		jsonError(w, "email is required", http.StatusBadRequest)
+		return
+	}
+
+	// Always 200 — don't reveal whether the email is registered.
+	_ = h.svc.RequestPasswordReset(r.Context(), body.Email)
+	jsonOK(w, map[string]string{"message": "if that email is registered you will receive a reset link"}, http.StatusOK)
+}
+
+func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Token       string `json:"token"`
+		NewPassword string `json:"newPassword"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Token == "" || body.NewPassword == "" {
+		jsonError(w, "token and newPassword are required", http.StatusBadRequest)
+		return
+	}
+	if len(body.NewPassword) < 8 {
+		jsonError(w, "password must be at least 8 characters", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.svc.ResetPassword(r.Context(), body.Token, body.NewPassword); err != nil {
+		if errors.Is(err, service.ErrInvalidToken) {
+			jsonError(w, "invalid or expired reset link", http.StatusBadRequest)
+			return
+		}
+		jsonError(w, "password reset failed", http.StatusInternalServerError)
+		return
+	}
+
+	jsonOK(w, map[string]string{"message": "password reset successfully"}, http.StatusOK)
 }
 
 func jsonOK(w http.ResponseWriter, body any, status int) {

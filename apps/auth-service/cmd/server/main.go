@@ -77,6 +77,8 @@ func main() {
 		r.Post("/login", authHandler.Login)
 		r.Post("/refresh", authHandler.Refresh)
 		r.Post("/logout", authHandler.Logout)
+		r.Post("/password/reset-request", authHandler.RequestPasswordReset)
+		r.Post("/password/reset", authHandler.ResetPassword)
 
 		// JWT-protected
 		r.Group(func(r chi.Router) {

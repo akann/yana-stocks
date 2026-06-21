@@ -14,8 +14,10 @@ import (
 
 // mockAuthService satisfies authServicer with configurable per-test fns.
 type mockAuthService struct {
-	changePasswordFn func(ctx context.Context, userID, current, next string) error
-	deleteAccountFn  func(ctx context.Context, userID, password string) error
+	changePasswordFn      func(ctx context.Context, userID, current, next string) error
+	deleteAccountFn       func(ctx context.Context, userID, password string) error
+	requestPasswordResetFn func(ctx context.Context, email string) error
+	resetPasswordFn       func(ctx context.Context, token, newPassword string) error
 }
 
 func (m *mockAuthService) Register(_ context.Context, _, _ string) error { return nil }
@@ -41,6 +43,28 @@ func (m *mockAuthService) DeleteAccount(ctx context.Context, userID, password st
 		return m.deleteAccountFn(ctx, userID, password)
 	}
 	return nil
+}
+func (m *mockAuthService) RequestPasswordReset(ctx context.Context, email string) error {
+	if m.requestPasswordResetFn != nil {
+		return m.requestPasswordResetFn(ctx, email)
+	}
+	return nil
+}
+func (m *mockAuthService) ResetPassword(ctx context.Context, token, newPassword string) error {
+	if m.resetPasswordFn != nil {
+		return m.resetPasswordFn(ctx, token, newPassword)
+	}
+	return nil
+}
+
+func postJSON(path string, body any) *http.Request {
+	var buf bytes.Buffer
+	if body != nil {
+		_ = json.NewEncoder(&buf).Encode(body)
+	}
+	r := httptest.NewRequest(http.MethodPost, path, &buf)
+	r.Header.Set("Content-Type", "application/json")
+	return r
 }
 
 func deleteWithUser(body any, userID string) *http.Request {
@@ -190,6 +214,91 @@ func TestDeleteAccount(t *testing.T) {
 			w := httptest.NewRecorder()
 			h.DeleteAccount(w, deleteWithUser(tt.body, tt.userID))
 
+			if w.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d (body: %s)", w.Code, tt.wantStatus, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestRequestPasswordReset(t *testing.T) {
+	tests := []struct {
+		name       string
+		body       any
+		svcFn      func(context.Context, string) error
+		wantStatus int
+	}{
+		{
+			name:       "missing email returns 400",
+			body:       map[string]string{},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "always returns 200 even when email not found",
+			body:       map[string]string{"email": "notfound@example.com"},
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "returns 200 on success",
+			body:       map[string]string{"email": "user@example.com"},
+			svcFn:      func(_ context.Context, _ string) error { return nil },
+			wantStatus: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := &AuthHandler{svc: &mockAuthService{requestPasswordResetFn: tt.svcFn}}
+			w := httptest.NewRecorder()
+			h.RequestPasswordReset(w, postJSON("/api/auth/password/reset-request", tt.body))
+			if w.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d (body: %s)", w.Code, tt.wantStatus, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestResetPassword(t *testing.T) {
+	tests := []struct {
+		name       string
+		body       any
+		svcFn      func(context.Context, string, string) error
+		wantStatus int
+	}{
+		{
+			name:       "missing token returns 400",
+			body:       map[string]string{"newPassword": "newpass12345"},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "missing newPassword returns 400",
+			body:       map[string]string{"token": "abc123"},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "short newPassword returns 400",
+			body:       map[string]string{"token": "abc123", "newPassword": "short"},
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "invalid or expired token returns 400",
+			body:       map[string]string{"token": "expired", "newPassword": "newpass12345"},
+			svcFn:      func(_ context.Context, _, _ string) error { return service.ErrInvalidToken },
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "valid request returns 200",
+			body:       map[string]string{"token": "validtoken", "newPassword": "newpass12345"},
+			svcFn:      func(_ context.Context, _, _ string) error { return nil },
+			wantStatus: http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := &AuthHandler{svc: &mockAuthService{resetPasswordFn: tt.svcFn}}
+			w := httptest.NewRecorder()
+			h.ResetPassword(w, postJSON("/api/auth/password/reset", tt.body))
 			if w.Code != tt.wantStatus {
 				t.Errorf("status = %d, want %d (body: %s)", w.Code, tt.wantStatus, w.Body.String())
 			}

@@ -212,8 +212,60 @@ func (s *AuthService) signJWT(userID, emailAddr string) (string, error) {
 	return token.SignedString([]byte(s.cfg.JWTSecret))
 }
 
+func (s *AuthService) RequestPasswordReset(ctx context.Context, emailAddr string) error {
+	user, err := s.queries.GetUserByEmail(ctx, emailAddr)
+	if err != nil {
+		// Don't reveal whether the email exists.
+		return nil
+	}
+	if !user.IsVerified {
+		return nil
+	}
+
+	token, err := randomHex(32)
+	if err != nil {
+		return err
+	}
+
+	if err := s.redis.Set(ctx, passwordResetKey(token), user.ID, time.Hour).Err(); err != nil {
+		return err
+	}
+
+	go func() {
+		if err := s.emailer.SendPasswordReset(emailAddr, s.cfg.FrontendURL, token); err != nil {
+			log.Printf("password reset email failed for %s: %v", emailAddr, err)
+		}
+	}()
+
+	return nil
+}
+
+func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword string) error {
+	key := passwordResetKey(token)
+	userID, err := s.redis.Get(ctx, key).Result()
+	if err != nil {
+		return ErrInvalidToken
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	if err := s.queries.UpdatePasswordHash(ctx, userID, string(hash)); err != nil {
+		return err
+	}
+
+	s.redis.Del(ctx, key)
+	return nil
+}
+
 func refreshKey(token string) string {
 	return fmt.Sprintf("refresh:%s", token)
+}
+
+func passwordResetKey(token string) string {
+	return fmt.Sprintf("password_reset:%s", token)
 }
 
 func randomHex(n int) (string, error) {
