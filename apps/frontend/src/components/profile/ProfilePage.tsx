@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
@@ -13,7 +13,15 @@ const BTN =
   'bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
 
 export function ProfilePage(): React.JSX.Element {
-  const { isAuthenticated, isLoading, user, profile, updateProfile, changePassword } = useAuth();
+  const {
+    isAuthenticated,
+    isLoading,
+    user,
+    profile,
+    updateProfile,
+    changePassword,
+    deleteAccount,
+  } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('profile');
 
@@ -59,7 +67,10 @@ export function ProfilePage(): React.JSX.Element {
           onSave={updateProfile}
         />
       ) : (
-        <ChangePasswordForm onSave={changePassword} />
+        <div className="space-y-10">
+          <ChangePasswordForm onSave={changePassword} />
+          <DeleteAccountSection onDelete={deleteAccount} />
+        </div>
       )}
     </div>
   );
@@ -219,6 +230,119 @@ function EditProfileForm({
         {loading ? 'Saving…' : 'Save changes'}
       </button>
     </form>
+  );
+}
+
+interface DeleteAccountSectionProps {
+  onDelete: (password: string) => Promise<void>;
+}
+
+function DeleteAccountSection({ onDelete }: DeleteAccountSectionProps): React.JSX.Element {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function openModal() {
+    setPassword('');
+    setError('');
+    setOpen(true);
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }
+
+  function closeModal() {
+    if (loading) return;
+    setOpen(false);
+    setPassword('');
+    setError('');
+  }
+
+  async function handleConfirm() {
+    if (!password) {
+      setError('Password is required');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      await onDelete(password);
+      router.replace('/login');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete account');
+      setLoading(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="border border-red-800 rounded-lg p-5">
+        <h3 className="text-sm font-semibold text-red-400 mb-1">Danger zone</h3>
+        <p className="text-sm text-gray-400 mb-4">
+          Permanently delete your account and all associated data. This cannot be undone.
+        </p>
+        <button
+          type="button"
+          onClick={openModal}
+          className="bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+        >
+          Delete account
+        </button>
+      </div>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeModal();
+          }}
+        >
+          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-sm mx-4 shadow-xl">
+            <h2 className="text-lg font-semibold text-white mb-1">Delete account</h2>
+            <p className="text-sm text-gray-400 mb-5">
+              Enter your password to confirm. This action is permanent and cannot be reversed.
+            </p>
+
+            <label className={LABEL}>Password</label>
+            <input
+              ref={inputRef}
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void handleConfirm();
+                if (e.key === 'Escape') closeModal();
+              }}
+              placeholder="••••••••"
+              className={`${INPUT} mb-4`}
+              disabled={loading}
+            />
+
+            {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
+
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={closeModal}
+                disabled={loading}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConfirm()}
+                disabled={loading || !password}
+                className="bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Deleting…' : 'Delete my account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

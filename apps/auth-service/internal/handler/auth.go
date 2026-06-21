@@ -18,6 +18,7 @@ type authServicer interface {
 	Logout(ctx context.Context, refreshToken string) error
 	Me(ctx context.Context, userID string) (*service.MeResponse, error)
 	ChangePassword(ctx context.Context, userID, currentPassword, newPassword string) error
+	DeleteAccount(ctx context.Context, userID, password string) error
 }
 
 type AuthHandler struct {
@@ -169,6 +170,36 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, map[string]string{"message": "password updated"}, http.StatusOK)
+}
+
+func (h *AuthHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value(middleware.ContextKeyUserID).(string)
+	if userID == "" {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var body struct {
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Password == "" {
+		jsonError(w, "password is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.svc.DeleteAccount(r.Context(), userID, body.Password); err != nil {
+		switch {
+		case errors.Is(err, service.ErrWrongPassword):
+			jsonError(w, "incorrect password", http.StatusUnauthorized)
+		case errors.Is(err, service.ErrUserNotFound):
+			jsonError(w, "user not found", http.StatusNotFound)
+		default:
+			jsonError(w, "failed to delete account", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	jsonOK(w, map[string]string{"message": "account deleted"}, http.StatusOK)
 }
 
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {

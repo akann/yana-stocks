@@ -156,6 +156,20 @@ func (s *AuthService) ChangePassword(ctx context.Context, userID, currentPasswor
 	return s.queries.UpdatePasswordHash(ctx, userID, string(hash))
 }
 
+func (s *AuthService) DeleteAccount(ctx context.Context, userID, password string) error {
+	user, err := s.queries.GetUserWithCredentialByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrUserNotFound
+		}
+		return err
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		return ErrWrongPassword
+	}
+	return s.queries.DeleteUser(ctx, userID)
+}
+
 func (s *AuthService) Me(ctx context.Context, userID string) (*MeResponse, error) {
 	user, err := s.queries.GetUserByID(ctx, userID)
 	if err != nil {

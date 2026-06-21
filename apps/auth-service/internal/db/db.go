@@ -169,6 +169,11 @@ func (q *Queries) UpdatePasswordHash(ctx context.Context, userID, passwordHash s
 	return err
 }
 
+func (q *Queries) DeleteUser(ctx context.Context, id string) error {
+	_, err := q.pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
+	return err
+}
+
 type scanner interface {
 	Scan(dest ...any) error
 }

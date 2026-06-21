@@ -44,6 +44,7 @@ interface AuthContextValue {
   refresh: () => Promise<void>;
   updateProfile: (dto: UpdateProfileInput) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  deleteAccount: (password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -178,6 +179,24 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     }
   }
 
+  async function deleteAccount(password: string): Promise<void> {
+    if (!accessToken) throw new Error('Not authenticated');
+    const res = await fetch(`${API_URL}/auth/account`, {
+      method: 'DELETE',
+      headers: authHeaders(accessToken),
+      body: JSON.stringify({ password }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error ?? 'Failed to delete account');
+    }
+    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+    setAccessToken(null);
+    setUser(null);
+    setProfile(null);
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -191,6 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
         refresh,
         updateProfile,
         changePassword,
+        deleteAccount,
       }}
     >
       {children}
