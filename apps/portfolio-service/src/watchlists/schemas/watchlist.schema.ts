@@ -5,7 +5,7 @@ export type WatchlistDocument = HydratedDocument<Watchlist>;
 
 @Schema({ collection: 'watchlists', timestamps: true })
 export class Watchlist {
-  @Prop({ required: true, index: true })
+  @Prop({ required: true })
   userId!: string;
 
   @Prop({ required: true })
@@ -19,3 +19,4 @@ export class Watchlist {
 }
 
 export const WatchlistSchema = SchemaFactory.createForClass(Watchlist);
+WatchlistSchema.index({ userId: 1, _id: 1 });

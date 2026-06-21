@@ -22,7 +22,7 @@ export type PortfolioDocument = HydratedDocument<Portfolio>;
 
 @Schema({ collection: 'portfolios', timestamps: true })
 export class Portfolio {
-  @Prop({ required: true, index: true })
+  @Prop({ required: true })
   userId!: string;
 
   @Prop({ required: true })
@@ -36,3 +36,4 @@ export class Portfolio {
 }
 
 export const PortfolioSchema = SchemaFactory.createForClass(Portfolio);
+PortfolioSchema.index({ userId: 1, _id: 1 });

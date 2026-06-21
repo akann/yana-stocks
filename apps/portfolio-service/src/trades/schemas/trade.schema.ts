@@ -6,10 +6,10 @@ export type TradeDocument = HydratedDocument<Trade>;
 
 @Schema({ collection: 'trades', timestamps: false })
 export class Trade {
-  @Prop({ required: true, index: true })
+  @Prop({ required: true })
   portfolioId!: string;
 
-  @Prop({ required: true, index: true })
+  @Prop({ required: true })
   userId!: string;
 
   @Prop({ required: true })
@@ -32,3 +32,5 @@ export class Trade {
 }
 
 export const TradeSchema = SchemaFactory.createForClass(Trade);
+TradeSchema.index({ userId: 1, executedAt: -1 });
+TradeSchema.index({ userId: 1, portfolioId: 1, executedAt: -1 });
