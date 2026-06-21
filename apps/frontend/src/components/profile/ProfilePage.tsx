@@ -265,8 +265,11 @@ function ChangePasswordForm({ onSave }: ChangePasswordFormProps): React.JSX.Elem
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div>
-        <label className={LABEL}>Current password</label>
+        <label htmlFor="current-password" className={LABEL}>
+          Current password
+        </label>
         <input
+          id="current-password"
           type="password"
           value={current}
           onChange={(e) => setCurrent(e.target.value)}
@@ -277,8 +280,11 @@ function ChangePasswordForm({ onSave }: ChangePasswordFormProps): React.JSX.Elem
       </div>
 
       <div>
-        <label className={LABEL}>New password</label>
+        <label htmlFor="new-password" className={LABEL}>
+          New password
+        </label>
         <input
+          id="new-password"
           type="password"
           value={next}
           onChange={(e) => setNext(e.target.value)}
@@ -290,8 +296,11 @@ function ChangePasswordForm({ onSave }: ChangePasswordFormProps): React.JSX.Elem
       </div>
 
       <div>
-        <label className={LABEL}>Confirm new password</label>
+        <label htmlFor="confirm-password" className={LABEL}>
+          Confirm new password
+        </label>
         <input
+          id="confirm-password"
           type="password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
