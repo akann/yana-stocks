@@ -14,7 +14,7 @@ Turborepo + pnpm workspaces.
 ```shell
 yana-stocks/
 ├── apps/
-│   ├── frontend/              # Next.js 14 (App Router)
+│   ├── frontend/              # Next.js 16 (App Router)
 │   ├── auth-service/          # Go (Chi) — JWT auth, email verification, refresh tokens
 │   ├── profile-service/       # NestJS — non-PII display data (MongoDB)
 │   ├── price-processor/       # NestJS
@@ -65,7 +65,7 @@ yana-stocks/
 
 ### Frontend
 
-- Next.js 14 (App Router)
+- Next.js 16 (App Router)
 - TailwindCSS
 - Recharts (charts)
 - TanStack Query (data fetching)
@@ -125,13 +125,15 @@ yana-stocks/
 ### 5. auth-service (Go)
 
 - **Purpose:** User registration, email verification, login, JWT issuance,
-  refresh token rotation
+  refresh token rotation, password reset, account deletion
 - **PostgreSQL (CNPG):** `auth-service-pg` cluster — `users` table (id, email,
   passwordHash, isVerified, verificationToken). Cluster uses CNPG defaults for
   owner/credentials; `postInitSQL` creates the `auth` schema and sets
   `search_path = auth` on the app role. Migrations run at pod startup via
   golang-migrate (no initContainer).
-- **Redis:** Refresh token store (key `refresh:<token>` → userId, 7d TTL)
+- **Redis:** Refresh token store (key `refresh:<token>` → userId, 7d TTL);
+  password reset store (key `password_reset:<token>` → userId, 1h TTL,
+  single-use)
 - **JWT:** HS256 access token 15min (stateless), opaque refresh token 7 days
   (Redis, revocable)
 - **Refresh token rotation:** New refresh token on every use; old one deleted
@@ -147,6 +149,12 @@ yana-stocks/
   - `POST /api/auth/logout` — deletes refresh token from Redis
   - `GET /api/auth/me` — decodes Bearer token (no signature check — Kong
     validates upstream)
+  - `POST /api/auth/password/reset-request` — sends reset email (always 200, no
+    email enumeration); public route (cors only, no JWT)
+  - `POST /api/auth/password/reset` — validates Redis token, updates password
+    hash, deletes token; public route (cors only, no JWT)
+  - `PUT /api/auth/password` — change password (JWT required)
+  - `DELETE /api/auth/account` — delete account and all data (JWT required)
 
 ### 5b. profile-service (NestJS)
 
@@ -184,20 +192,24 @@ yana-stocks/
   - `GET /signals/:symbol` — latest signals
   - `GET /market/movers` — top gainers/losers
 
-### 8. frontend (Next.js 14)
+### 8. frontend (Next.js 16)
 
 - **Purpose:** Dashboard UI
 - **Routes:**
   - `/` — market overview, top movers (public)
   - `/login`, `/register`, `/verify` — auth pages (public)
+  - `/forgot-password` — request password reset email (public)
+  - `/reset-password?token=...` — set new password via emailed token (public)
   - `/dashboard` — user portfolio summary (auth required)
   - `/stocks/:symbol` — price chart, signals, prediction (auth required)
   - `/portfolio` — portfolio management (auth required)
   - `/watchlist` — watchlist (auth required)
+  - `/profile` — account settings: Profile / Change password / Delete account
+    tabs (auth required)
 - **URL:** `https://stocks.yanatech.co.uk`
 - **Dev proxy:** `next.config.mjs` rewrites `/api/*` to local services (see
   frontend env vars)
-- **SEO:** Uses Next.js 14 native `Metadata` API (not next-seo — redundant in
+- **SEO:** Uses Next.js 16 native `Metadata` API (not next-seo — redundant in
   App Router). Root `layout.tsx` sets site-wide metadata: title template
   (`%s | YanaStocks`), description, keywords, `authors`/`creator` (Akan
   Nkweini), OpenGraph site config, robots. `app/page.tsx` is a server component
@@ -266,6 +278,14 @@ POST /api/auth/refresh
 POST /api/auth/logout
   → deletes refreshToken from Redis
 
+POST /api/auth/password/reset-request
+  → always returns 200 (no email enumeration)
+  → if email exists: stores password_reset:<token> → userId in Redis (1h TTL), sends email
+
+POST /api/auth/password/reset
+  → validates token in Redis, updates bcrypt hash, deletes token (single-use)
+  → returns 400 with ErrInvalidToken for expired/unknown tokens
+
 Kong JWT plugin (key_claim_name: iss):
   → reads iss claim from JWT
   → looks up KongConsumer (auth-service) credential with key: "yana-stocks"
@@ -276,14 +296,18 @@ Kong JWT plugin (key_claim_name: iss):
 
 ```shell
 # Public auth routes (cors plugin only)
-/api/auth/register  → auth-service:3000    (Exact)
-/api/auth/verify    → auth-service:3000    (Exact)
-/api/auth/login     → auth-service:3000    (Exact)
-/api/auth/refresh   → auth-service:3000    (Exact)
-/api/auth/logout    → auth-service:3000    (Exact)
+/api/auth/register                  → auth-service:3000    (Exact)
+/api/auth/verify                    → auth-service:3000    (Exact)
+/api/auth/login                     → auth-service:3000    (Exact)
+/api/auth/refresh                   → auth-service:3000    (Exact)
+/api/auth/logout                    → auth-service:3000    (Exact)
+/api/auth/password/reset-request    → auth-service:3000    (Exact)
+/api/auth/password/reset            → auth-service:3000    (Exact)
 
-# JWT-protected auth route
+# JWT-protected auth routes
 /api/auth/me        → auth-service:3000    (Exact, jwt-auth+cors)
+/api/auth/password  → auth-service:3000    (Exact, jwt-auth+cors — change password)
+/api/auth/account   → auth-service:3000    (Exact, jwt-auth+cors — delete account)
 
 # JWT-protected profile routes
 /api/profile/*      → profile-service:3000 (Prefix, jwt-auth+cors)
@@ -445,6 +469,11 @@ services:
 - Per-service Docker image → Harbor
 - On successful build: update image tag in `k8s-apps` → ArgoCD auto-syncs
 - E2E: Playwright runs against staging before prod deploy
+- **Service containers:** `postgres:16-alpine`, `mongo:8`, `redis:8-alpine` are
+  mirrored to `harbor.yanatech.co.uk/library/*` (amd64) to avoid Docker Hub
+  anonymous pull rate limits on the self-hosted runner
+- **ESLint:** Frontend uses ESLint 9 with flat config (`eslint.config.mjs`);
+  `eslint-config-next@16` requires ESLint ≥9
 
 ## Local Dev Quick-Start
 
@@ -778,7 +807,7 @@ Following CLAUDE.md, scaffold services/ml-predictor as a Python service with:
 ### Prompt 9 — frontend
 
 ```text
-Following CLAUDE.md, scaffold apps/frontend as a Next.js 14 App Router app with:
+Following CLAUDE.md, scaffold apps/frontend as a Next.js 16 App Router app with:
 - TailwindCSS
 - Recharts for price charts
 - TanStack Query for data fetching
