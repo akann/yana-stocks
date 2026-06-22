@@ -47,6 +47,47 @@ function mockProfileRoutes(page: import('@playwright/test').Page, profile = MOCK
   );
 }
 
+function mockMFARoutes(
+  page: import('@playwright/test').Page,
+  opts: {
+    enabled?: boolean;
+    setupError?: boolean;
+    enableError?: string;
+    disableError?: boolean;
+  } = {},
+) {
+  void page.route('**/api/auth/mfa', (r) => {
+    if (r.request().method() === 'GET') {
+      return r.fulfill({ json: { enabled: opts.enabled ?? false } });
+    }
+    if (r.request().method() === 'DELETE') {
+      if (opts.disableError) {
+        return r.fulfill({ status: 500, json: { error: 'Failed to disable MFA' } });
+      }
+      return r.fulfill({ json: { message: 'MFA disabled' } });
+    }
+    return r.fulfill({ status: 404, json: {} });
+  });
+  void page.route('**/api/auth/mfa/setup', (r) => {
+    if (opts.setupError) {
+      return r.fulfill({ status: 500, json: { error: 'failed to generate MFA secret' } });
+    }
+    return r.fulfill({
+      json: {
+        otpAuthURL:
+          'otpauth://totp/YanaStocks%3Aada%40example.com?secret=JBSWY3DPEHPK3PXP&issuer=YanaStocks',
+        secret: 'JBSWY3DPEHPK3PXP',
+      },
+    });
+  });
+  void page.route('**/api/auth/mfa/enable', (r) => {
+    if (opts.enableError) {
+      return r.fulfill({ status: 400, json: { error: opts.enableError } });
+    }
+    return r.fulfill({ json: { message: 'MFA enabled' } });
+  });
+}
+
 test.describe('Profile page', () => {
   test('auth guard: redirects to /login when unauthenticated', async ({ page }) => {
     await page.goto('/profile');
@@ -220,5 +261,125 @@ test.describe('Profile page', () => {
 
     await page.waitForURL('/login');
     await expect(page).toHaveURL('/login');
+  });
+});
+
+test.describe('MFA section (Profile tab)', () => {
+  test('shows "Disabled" badge and "Set up MFA" button when MFA is off', async ({ page }) => {
+    mockProfileRoutes(page);
+    mockMFARoutes(page, { enabled: false });
+    await seedAuth(page);
+    await page.goto('/profile');
+
+    await expect(page.getByText('Two-factor authentication')).toBeVisible();
+    await expect(page.getByText('Disabled')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Set up MFA' })).toBeVisible();
+  });
+
+  test('shows "Enabled" badge and "Disable MFA" button when MFA is on', async ({ page }) => {
+    mockProfileRoutes(page);
+    mockMFARoutes(page, { enabled: true });
+    await seedAuth(page);
+    await page.goto('/profile');
+
+    await expect(page.getByText('Enabled')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Disable MFA' })).toBeVisible();
+  });
+
+  test('clicking "Set up MFA" shows QR code section and secret', async ({ page }) => {
+    mockProfileRoutes(page);
+    mockMFARoutes(page, { enabled: false });
+    await seedAuth(page);
+    await page.goto('/profile');
+
+    await page.getByRole('button', { name: 'Set up MFA' }).click();
+
+    await expect(page.getByText('JBSWY3DPEHPK3PXP')).toBeVisible();
+    await expect(page.getByPlaceholder('123456')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Enable MFA' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
+  });
+
+  test('"Enable MFA" button is disabled until 6 digits are entered', async ({ page }) => {
+    mockProfileRoutes(page);
+    mockMFARoutes(page, { enabled: false });
+    await seedAuth(page);
+    await page.goto('/profile');
+
+    await page.getByRole('button', { name: 'Set up MFA' }).click();
+
+    const enableBtn = page.getByRole('button', { name: 'Enable MFA' });
+    await expect(enableBtn).toBeDisabled();
+    await page.getByPlaceholder('123456').fill('12345');
+    await expect(enableBtn).toBeDisabled();
+    await page.getByPlaceholder('123456').fill('123456');
+    await expect(enableBtn).toBeEnabled();
+  });
+
+  test('valid code enables MFA and shows "Enabled" state', async ({ page }) => {
+    mockProfileRoutes(page);
+    mockMFARoutes(page, { enabled: false });
+    await seedAuth(page);
+    await page.goto('/profile');
+
+    await page.getByRole('button', { name: 'Set up MFA' }).click();
+    await page.getByPlaceholder('123456').fill('654321');
+    await page.getByRole('button', { name: 'Enable MFA' }).click();
+
+    await expect(page.getByText('Enabled')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Disable MFA' })).toBeVisible();
+  });
+
+  test('invalid code shows error and stays on setup step', async ({ page }) => {
+    mockProfileRoutes(page);
+    mockMFARoutes(page, { enabled: false, enableError: 'invalid TOTP code' });
+    await seedAuth(page);
+    await page.goto('/profile');
+
+    await page.getByRole('button', { name: 'Set up MFA' }).click();
+    await page.getByPlaceholder('123456').fill('000000');
+    await page.getByRole('button', { name: 'Enable MFA' }).click();
+
+    await expect(page.getByText(/invalid totp code/i)).toBeVisible();
+    await expect(page.getByPlaceholder('123456')).toBeVisible();
+  });
+
+  test('"Cancel" hides setup form and returns to disabled state', async ({ page }) => {
+    mockProfileRoutes(page);
+    mockMFARoutes(page, { enabled: false });
+    await seedAuth(page);
+    await page.goto('/profile');
+
+    await page.getByRole('button', { name: 'Set up MFA' }).click();
+    await expect(page.getByPlaceholder('123456')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Cancel' }).click();
+
+    await expect(page.getByPlaceholder('123456')).not.toBeVisible();
+    await expect(page.getByRole('button', { name: 'Set up MFA' })).toBeVisible();
+  });
+
+  test('"Disable MFA" reverts to disabled state', async ({ page }) => {
+    mockProfileRoutes(page);
+    mockMFARoutes(page, { enabled: true });
+    await seedAuth(page);
+    await page.goto('/profile');
+
+    await page.getByRole('button', { name: 'Disable MFA' }).click();
+
+    await expect(page.getByText('Disabled')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Set up MFA' })).toBeVisible();
+  });
+
+  test('disable MFA failure shows error', async ({ page }) => {
+    mockProfileRoutes(page);
+    mockMFARoutes(page, { enabled: true, disableError: true });
+    await seedAuth(page);
+    await page.goto('/profile');
+
+    await page.getByRole('button', { name: 'Disable MFA' }).click();
+
+    await expect(page.getByText(/failed to disable mfa/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Disable MFA' })).toBeVisible();
   });
 });

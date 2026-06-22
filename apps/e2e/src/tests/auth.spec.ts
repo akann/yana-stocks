@@ -79,6 +79,92 @@ test.describe('Login', () => {
   });
 });
 
+test.describe('MFA login', () => {
+  test('shows TOTP step after credentials succeed for MFA-enabled account', async ({ page }) => {
+    await page.route('**/api/auth/login', (r) =>
+      r.fulfill({ json: { mfaRequired: true, mfaToken: 'tok-abc123' } }),
+    );
+
+    const login = new LoginPage(page);
+    await login.goto();
+    await login.login('user@example.com', TEST_PASSWORD);
+
+    await expect(login.totpHeading).toBeVisible();
+    await expect(login.totpInput).toBeVisible();
+    await expect(login.totpSubmitButton).toBeVisible();
+    await expect(page).toHaveURL('/login');
+  });
+
+  test('verify button is disabled until 6 digits are entered', async ({ page }) => {
+    await page.route('**/api/auth/login', (r) =>
+      r.fulfill({ json: { mfaRequired: true, mfaToken: 'tok-abc123' } }),
+    );
+
+    const login = new LoginPage(page);
+    await login.goto();
+    await login.login('user@example.com', TEST_PASSWORD);
+
+    await expect(login.totpSubmitButton).toBeDisabled();
+    await login.totpInput.fill('12345');
+    await expect(login.totpSubmitButton).toBeDisabled();
+    await login.totpInput.fill('123456');
+    await expect(login.totpSubmitButton).toBeEnabled();
+  });
+
+  test('valid TOTP code redirects to dashboard', async ({ page }) => {
+    await page.route('**/api/auth/login', (r) =>
+      r.fulfill({ json: { mfaRequired: true, mfaToken: 'tok-abc123' } }),
+    );
+    await page.route('**/api/auth/mfa/verify', (r) =>
+      r.fulfill({ json: { accessToken: MOCK_ACCESS_TOKEN, refreshToken: MOCK_REFRESH_TOKEN } }),
+    );
+    await page.route('**/api/portfolio/portfolios', (r) => r.fulfill({ json: [] }));
+
+    const login = new LoginPage(page);
+    await login.goto();
+    await login.login('user@example.com', TEST_PASSWORD);
+    await login.submitTOTP('654321');
+
+    await page.waitForURL('/dashboard');
+    await expect(page).toHaveURL('/dashboard');
+  });
+
+  test('invalid TOTP code shows error and stays on TOTP step', async ({ page }) => {
+    await page.route('**/api/auth/login', (r) =>
+      r.fulfill({ json: { mfaRequired: true, mfaToken: 'tok-abc123' } }),
+    );
+    await page.route('**/api/auth/mfa/verify', (r) =>
+      r.fulfill({ status: 401, json: { error: 'Invalid code. Please try again.' } }),
+    );
+
+    const login = new LoginPage(page);
+    await login.goto();
+    await login.login('user@example.com', TEST_PASSWORD);
+    await login.submitTOTP('000000');
+
+    await expect(page.getByText(/invalid code/i)).toBeVisible();
+    await expect(login.totpHeading).toBeVisible();
+    await expect(page).toHaveURL('/login');
+  });
+
+  test('expired MFA session shows error', async ({ page }) => {
+    await page.route('**/api/auth/login', (r) =>
+      r.fulfill({ json: { mfaRequired: true, mfaToken: 'tok-abc123' } }),
+    );
+    await page.route('**/api/auth/mfa/verify', (r) =>
+      r.fulfill({ status: 401, json: { error: 'invalid or expired MFA session' } }),
+    );
+
+    const login = new LoginPage(page);
+    await login.goto();
+    await login.login('user@example.com', TEST_PASSWORD);
+    await login.submitTOTP('999999');
+
+    await expect(page.getByText(/invalid or expired/i)).toBeVisible();
+    await expect(login.totpHeading).toBeVisible();
+  });
+});
+
 test.describe('Register', () => {
   test('renders registration form with email, name, and password fields', async ({ page }) => {
     const register = new RegisterPage(page);
