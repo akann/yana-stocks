@@ -97,7 +97,13 @@ func (s *AuthService) VerifyEmail(ctx context.Context, token string) error {
 	return s.queries.VerifyUser(ctx, user.ID)
 }
 
-func (s *AuthService) Login(ctx context.Context, emailAddr, password string) (*TokenPair, error) {
+type LoginResult struct {
+	Tokens      *TokenPair
+	MFARequired bool
+	MFAToken    string
+}
+
+func (s *AuthService) Login(ctx context.Context, emailAddr, password string) (*LoginResult, error) {
 	user, err := s.queries.GetUserByEmailWithCredential(ctx, emailAddr)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -114,6 +120,44 @@ func (s *AuthService) Login(ctx context.Context, emailAddr, password string) (*T
 		return nil, ErrEmailNotVerified
 	}
 
+	if user.MFAEnabled {
+		mfaToken, err := randomHex(40)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.redis.Set(ctx, mfaChallengeKey(mfaToken), user.ID, 5*time.Minute).Err(); err != nil {
+			return nil, err
+		}
+		return &LoginResult{MFARequired: true, MFAToken: mfaToken}, nil
+	}
+
+	tokens, err := s.issueTokens(ctx, user.ID, user.Email)
+	if err != nil {
+		return nil, err
+	}
+	return &LoginResult{Tokens: tokens}, nil
+}
+
+func (s *AuthService) VerifyMFALogin(ctx context.Context, mfaToken, code string) (*TokenPair, error) {
+	userID, err := s.redis.Get(ctx, mfaChallengeKey(mfaToken)).Result()
+	if err != nil {
+		return nil, ErrInvalidToken
+	}
+
+	user, err := s.queries.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
+
+	if !user.MFAEnabled || user.MFASecret == nil {
+		return nil, ErrInvalidToken
+	}
+
+	if !totp.Validate(code, *user.MFASecret) {
+		return nil, errors.New("invalid TOTP code")
+	}
+
+	s.redis.Del(ctx, mfaChallengeKey(mfaToken))
 	return s.issueTokens(ctx, user.ID, user.Email)
 }
 
@@ -319,6 +363,10 @@ func (s *AuthService) DisableMFA(ctx context.Context, userID string) error {
 	}
 	log.Printf("MFA disabled for user: %s", userID)
 	return nil
+}
+
+func mfaChallengeKey(token string) string {
+	return fmt.Sprintf("mfa_challenge:%s", token)
 }
 
 func mfaPendingKey(userID string) string {

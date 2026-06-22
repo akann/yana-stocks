@@ -42,9 +42,11 @@ interface AuthContextValue {
   accessToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  mfaRequired: boolean;
   user: AuthUser | null;
   profile: UserProfile | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ mfaRequired: boolean }>;
+  verifyMFALogin: (code: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   updateProfile: (dto: UpdateProfileInput) => Promise<void>;
@@ -58,7 +60,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function authHeaders(token: string) {
+function authHeaders(token: string): Record<string, string> {
   return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 }
 
@@ -82,11 +84,39 @@ async function fetchProfile(token: string): Promise<UserProfile | null> {
   }
 }
 
+async function doRefresh(): Promise<string | null> {
+  const refreshToken = sessionStorage.getItem(REFRESH_TOKEN_KEY);
+  if (!refreshToken) return null;
+  try {
+    const res = await fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (!res.ok) return null;
+    const tokens = (await res.json()) as { accessToken: string; refreshToken: string };
+    sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
+    sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+    return tokens.accessToken;
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }): React.JSX.Element {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [mfaPendingToken, setMfaPendingToken] = useState<string | null>(null);
+
+  const clearSession = useCallback(() => {
+    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+    setAccessToken(null);
+    setUser(null);
+    setProfile(null);
+  }, []);
 
   const loadUserData = useCallback(async (token: string): Promise<void> => {
     const [identity, prof] = await Promise.all([fetchIdentity(token), fetchProfile(token)]);
@@ -94,18 +124,65 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     setProfile(prof);
   }, []);
 
+  // Silently refresh the access token on 401 and retry the original request once.
+  const fetchWithAuth = useCallback(
+    async (url: string, init: RequestInit = {}): Promise<Response> => {
+      const makeRequest = (token: string): Promise<Response> =>
+        fetch(url, {
+          ...init,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(init.headers as Record<string, string> | undefined),
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+      const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+      if (!token) throw new Error('Not authenticated');
+
+      const res = await makeRequest(token);
+      if (res.status !== 401) return res;
+
+      const newToken = await doRefresh();
+      if (!newToken) {
+        clearSession();
+        throw new Error('Session expired');
+      }
+
+      setAccessToken(newToken);
+      return makeRequest(newToken);
+    },
+    [clearSession],
+  );
+
   useEffect(() => {
     const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
-    if (token) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setAccessToken(token);
-      void loadUserData(token).finally(() => setIsLoading(false));
-    } else {
+    if (!token) {
       setIsLoading(false);
+      return;
     }
-  }, [loadUserData]);
 
-  async function login(email: string, password: string): Promise<void> {
+    void (async () => {
+      setAccessToken(token);
+      const identity = await fetchIdentity(token);
+      if (identity) {
+        setUser(identity);
+        void fetchProfile(token).then(setProfile);
+      } else {
+        // Access token expired on startup — try silent refresh before logging out.
+        const newToken = await doRefresh();
+        if (newToken) {
+          setAccessToken(newToken);
+          await loadUserData(newToken);
+        } else {
+          clearSession();
+        }
+      }
+      setIsLoading(false);
+    })();
+  }, [loadUserData, clearSession]);
+
+  async function login(email: string, password: string): Promise<{ mfaRequired: boolean }> {
     const res = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -113,11 +190,40 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     });
 
     if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { message?: string };
-      throw new Error(body.message ?? 'Login failed');
+      const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+      throw new Error(body.error ?? body.message ?? 'Login failed');
     }
 
+    const data = (await res.json()) as
+      | { mfaRequired: true; mfaToken: string }
+      | { accessToken: string; refreshToken: string };
+
+    if ('mfaRequired' in data && data.mfaRequired) {
+      setMfaPendingToken(data.mfaToken);
+      return { mfaRequired: true };
+    }
+
+    const tokens = data as { accessToken: string; refreshToken: string };
+    sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
+    sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+    setAccessToken(tokens.accessToken);
+    await loadUserData(tokens.accessToken);
+    return { mfaRequired: false };
+  }
+
+  async function verifyMFALogin(code: string): Promise<void> {
+    if (!mfaPendingToken) throw new Error('No MFA session');
+    const res = await fetch(`${API_URL}/auth/mfa/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mfaToken: mfaPendingToken, code }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error ?? 'Invalid code');
+    }
     const tokens = (await res.json()) as { accessToken: string; refreshToken: string };
+    setMfaPendingToken(null);
     sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
     sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
     setAccessToken(tokens.accessToken);
@@ -133,43 +239,21 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
         body: JSON.stringify({ refreshToken }),
       }).catch(() => undefined);
     }
-    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-    setAccessToken(null);
-    setUser(null);
-    setProfile(null);
+    clearSession();
   }
 
   async function refresh(): Promise<void> {
-    const refreshToken = sessionStorage.getItem(REFRESH_TOKEN_KEY);
-    if (!refreshToken) throw new Error('No refresh token');
-
-    const res = await fetch(`${API_URL}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    });
-
-    if (!res.ok) {
-      sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-      sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-      setAccessToken(null);
-      setUser(null);
-      setProfile(null);
+    const newToken = await doRefresh();
+    if (!newToken) {
+      clearSession();
       throw new Error('Session expired');
     }
-
-    const tokens = (await res.json()) as { accessToken: string; refreshToken: string };
-    sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
-    sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
-    setAccessToken(tokens.accessToken);
+    setAccessToken(newToken);
   }
 
   async function updateProfile(dto: UpdateProfileInput): Promise<void> {
-    if (!accessToken) throw new Error('Not authenticated');
-    const res = await fetch(`${API_URL}/profile/me`, {
+    const res = await fetchWithAuth(`${API_URL}/profile/me`, {
       method: 'PUT',
-      headers: authHeaders(accessToken),
       body: JSON.stringify(dto),
     });
     if (!res.ok) throw new Error('Failed to update profile');
@@ -177,10 +261,8 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   }
 
   async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
-    if (!accessToken) throw new Error('Not authenticated');
-    const res = await fetch(`${API_URL}/auth/password`, {
+    const res = await fetchWithAuth(`${API_URL}/auth/password`, {
       method: 'PUT',
-      headers: authHeaders(accessToken),
       body: JSON.stringify({ currentPassword, newPassword }),
     });
     if (!res.ok) {
@@ -190,28 +272,21 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   }
 
   async function getMFAStatus(): Promise<boolean> {
-    if (!accessToken) throw new Error('Not authenticated');
-    const res = await fetch(`${API_URL}/auth/mfa`, { headers: authHeaders(accessToken) });
+    const res = await fetchWithAuth(`${API_URL}/auth/mfa`);
     if (!res.ok) throw new Error('Failed to get MFA status');
     const body = (await res.json()) as { enabled: boolean };
     return body.enabled;
   }
 
   async function setupMFA(): Promise<MFASetupData> {
-    if (!accessToken) throw new Error('Not authenticated');
-    const res = await fetch(`${API_URL}/auth/mfa/setup`, {
-      method: 'POST',
-      headers: authHeaders(accessToken),
-    });
+    const res = await fetchWithAuth(`${API_URL}/auth/mfa/setup`, { method: 'POST' });
     if (!res.ok) throw new Error('Failed to generate MFA secret');
     return (await res.json()) as MFASetupData;
   }
 
   async function enableMFA(code: string): Promise<void> {
-    if (!accessToken) throw new Error('Not authenticated');
-    const res = await fetch(`${API_URL}/auth/mfa/enable`, {
+    const res = await fetchWithAuth(`${API_URL}/auth/mfa/enable`, {
       method: 'POST',
-      headers: authHeaders(accessToken),
       body: JSON.stringify({ code }),
     });
     if (!res.ok) {
@@ -221,41 +296,33 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   }
 
   async function disableMFA(): Promise<void> {
-    if (!accessToken) throw new Error('Not authenticated');
-    const res = await fetch(`${API_URL}/auth/mfa`, {
-      method: 'DELETE',
-      headers: authHeaders(accessToken),
-    });
+    const res = await fetchWithAuth(`${API_URL}/auth/mfa`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to disable MFA');
   }
 
   async function deleteAccount(password: string): Promise<void> {
-    if (!accessToken) throw new Error('Not authenticated');
-    const res = await fetch(`${API_URL}/auth/account`, {
+    const res = await fetchWithAuth(`${API_URL}/auth/account`, {
       method: 'DELETE',
-      headers: authHeaders(accessToken),
       body: JSON.stringify({ password }),
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       throw new Error(body.error ?? 'Failed to delete account');
     }
-    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-    setAccessToken(null);
-    setUser(null);
-    setProfile(null);
+    clearSession();
   }
 
   return (
     <AuthContext.Provider
       value={{
         accessToken,
-        isAuthenticated: !!accessToken,
+        isAuthenticated: !!user,
         isLoading,
+        mfaRequired: !!mfaPendingToken,
         user,
         profile,
         login,
+        verifyMFALogin,
         logout,
         refresh,
         updateProfile,

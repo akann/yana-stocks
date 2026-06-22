@@ -13,7 +13,8 @@ import (
 type authServicer interface {
 	Register(ctx context.Context, email, password string) error
 	VerifyEmail(ctx context.Context, token string) error
-	Login(ctx context.Context, email, password string) (*service.TokenPair, error)
+	Login(ctx context.Context, email, password string) (*service.LoginResult, error)
+	VerifyMFALogin(ctx context.Context, mfaToken, code string) (*service.TokenPair, error)
 	Refresh(ctx context.Context, refreshToken string) (*service.TokenPair, error)
 	Logout(ctx context.Context, refreshToken string) error
 	Me(ctx context.Context, userID string) (*service.MeResponse, error)
@@ -92,7 +93,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokens, err := h.svc.Login(r.Context(), body.Email, body.Password)
+	result, err := h.svc.Login(r.Context(), body.Email, body.Password)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrInvalidCredentials):
@@ -102,6 +103,34 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		default:
 			jsonError(w, "login failed", http.StatusInternalServerError)
 		}
+		return
+	}
+
+	if result.MFARequired {
+		jsonOK(w, map[string]any{"mfaRequired": true, "mfaToken": result.MFAToken}, http.StatusOK)
+		return
+	}
+
+	jsonOK(w, result.Tokens, http.StatusOK)
+}
+
+func (h *AuthHandler) VerifyMFALogin(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		MFAToken string `json:"mfaToken"`
+		Code     string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.MFAToken == "" || body.Code == "" {
+		jsonError(w, "mfaToken and code are required", http.StatusBadRequest)
+		return
+	}
+
+	tokens, err := h.svc.VerifyMFALogin(r.Context(), body.MFAToken, body.Code)
+	if err != nil {
+		if errors.Is(err, service.ErrInvalidToken) {
+			jsonError(w, "invalid or expired MFA session", http.StatusUnauthorized)
+			return
+		}
+		jsonError(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
 

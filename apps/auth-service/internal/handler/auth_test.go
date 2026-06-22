@@ -22,8 +22,11 @@ type mockAuthService struct {
 
 func (m *mockAuthService) Register(_ context.Context, _, _ string) error { return nil }
 func (m *mockAuthService) VerifyEmail(_ context.Context, _ string) error  { return nil }
-func (m *mockAuthService) Login(_ context.Context, _, _ string) (*service.TokenPair, error) {
-	return nil, nil
+func (m *mockAuthService) Login(_ context.Context, _, _ string) (*service.LoginResult, error) {
+	return &service.LoginResult{Tokens: &service.TokenPair{}}, nil
+}
+func (m *mockAuthService) VerifyMFALogin(_ context.Context, _, _ string) (*service.TokenPair, error) {
+	return &service.TokenPair{}, nil
 }
 func (m *mockAuthService) Refresh(_ context.Context, _ string) (*service.TokenPair, error) {
 	return nil, nil

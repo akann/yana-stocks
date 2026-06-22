@@ -6,20 +6,23 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
 export function LoginForm(): React.JSX.Element {
-  const { login } = useAuth();
+  const { login, verifyMFALogin, mfaRequired } = useAuth();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [totpCode, setTotpCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleCredentialsSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
-      router.replace('/dashboard');
+      const result = await login(email, password);
+      if (!result.mfaRequired) {
+        router.replace('/dashboard');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
     } finally {
@@ -27,11 +30,65 @@ export function LoginForm(): React.JSX.Element {
     }
   }
 
+  async function handleTOTPSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await verifyMFALogin(totpCode);
+      router.replace('/dashboard');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Invalid code. Please try again.');
+      setTotpCode('');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (mfaRequired) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-full max-w-sm">
+          <h1 className="text-2xl font-bold text-white mb-2 text-center">
+            Two-factor authentication
+          </h1>
+          <p className="text-gray-400 text-sm text-center mb-6">
+            Enter the 6-digit code from your authenticator app.
+          </p>
+          <form onSubmit={handleTOTPSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-1">Authentication code</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 text-center text-xl tracking-widest"
+                required
+                autoFocus
+              />
+            </div>
+            {error && <p className="text-red-400 text-sm">{error}</p>}
+            <button
+              type="submit"
+              disabled={loading || totpCode.length !== 6}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-lg font-medium transition-colors"
+            >
+              {loading ? 'Verifying…' : 'Verify'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
       <div className="w-full max-w-sm">
         <h1 className="text-2xl font-bold text-white mb-6 text-center">Sign in</h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleCredentialsSubmit} className="space-y-4">
           <div>
             <label className="block text-sm text-gray-400 mb-1">Email</label>
             <input
