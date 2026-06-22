@@ -156,13 +156,13 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   );
 
   useEffect(() => {
-    const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
-
     void (async () => {
+      const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
       setAccessToken(token);
       const identity = await fetchIdentity(token);
       if (identity) {
