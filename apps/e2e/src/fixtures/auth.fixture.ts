@@ -21,18 +21,19 @@ const MOCK_PROFILE_DATA = {
 
 export const test = base.extend<AuthFixtures>({
   authedPage: async ({ page }, use) => {
-    // Await route registration so WebKit processes interceptors before any navigation
-    await page.route('**/api/auth/me', (r) => r.fulfill({ json: MOCK_USER }));
-    await page.route('**/api/profile/me', (r) => r.fulfill({ json: MOCK_PROFILE_DATA }));
-    await page.goto('/');
-    await page.waitForLoadState('domcontentloaded');
-    await page.evaluate(
-      ({ at, rt }) => {
+    // Inject tokens before any page scripts run so AuthContext.useEffect always finds them
+    await page.addInitScript(
+      ({ at, rt }: { at: string; rt: string }) => {
         sessionStorage.setItem('access_token', at);
         sessionStorage.setItem('refresh_token', rt);
       },
       { at: MOCK_ACCESS_TOKEN, rt: MOCK_REFRESH_TOKEN },
     );
+    // Register route interceptors (await ensures WebKit acknowledges them before navigation)
+    await page.route('**/api/auth/me', (r) => r.fulfill({ json: MOCK_USER }));
+    await page.route('**/api/profile/me', (r) => r.fulfill({ json: MOCK_PROFILE_DATA }));
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
     await use(page);
   },
 });

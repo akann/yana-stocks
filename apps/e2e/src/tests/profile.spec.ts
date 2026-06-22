@@ -7,12 +7,6 @@
 import { test, expect } from '@playwright/test';
 import { MOCK_ACCESS_TOKEN, MOCK_REFRESH_TOKEN } from '../fixtures/data';
 
-// Minimal Base64url-encoded JWT where payload = { sub: "user-1", email: "ada@example.com" }
-const PAYLOAD_B64 = Buffer.from(
-  JSON.stringify({ sub: 'user-1', email: 'ada@example.com' }),
-).toString('base64url');
-const FAKE_JWT = `eyJhbGciOiJIUzI1NiJ9.${PAYLOAD_B64}.fakesig`;
-
 const MOCK_PROFILE = {
   userId: 'user-1',
   displayName: 'Ada Lovelace',
@@ -22,20 +16,20 @@ const MOCK_PROFILE = {
 };
 
 async function seedAuth(page: import('@playwright/test').Page) {
-  // Await route registration so WebKit processes interceptors before navigation
+  // Inject tokens before any page scripts run so AuthContext.useEffect always finds them
+  await page.addInitScript(
+    ({ at, rt }: { at: string; rt: string }) => {
+      sessionStorage.setItem('access_token', at);
+      sessionStorage.setItem('refresh_token', rt);
+    },
+    { at: MOCK_ACCESS_TOKEN, rt: MOCK_REFRESH_TOKEN },
+  );
+  // Register route interceptors (await ensures WebKit acknowledges them before navigation)
   await page.route('**/api/auth/me', (r) =>
     r.fulfill({ json: { userId: 'user-1', email: 'ada@example.com' } }),
   );
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
-  await page.evaluate(
-    ({ at, rt, jwt }) => {
-      sessionStorage.setItem('access_token', at);
-      sessionStorage.setItem('refresh_token', rt);
-      sessionStorage.setItem('fake_jwt', jwt);
-    },
-    { at: MOCK_ACCESS_TOKEN, rt: MOCK_REFRESH_TOKEN, jwt: FAKE_JWT },
-  );
 }
 
 async function mockProfileRoutes(page: import('@playwright/test').Page, profile = MOCK_PROFILE) {
