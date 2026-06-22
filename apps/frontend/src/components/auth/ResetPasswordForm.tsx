@@ -87,8 +87,11 @@ function ResetPasswordInner(): React.JSX.Element {
         <p className="text-gray-400 text-sm text-center mb-6">Choose a strong password.</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm text-gray-400 mb-1">New password</label>
+            <label htmlFor="new-password" className="block text-sm text-gray-400 mb-1">
+              New password
+            </label>
             <input
+              id="new-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -98,8 +101,11 @@ function ResetPasswordInner(): React.JSX.Element {
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Confirm password</label>
+            <label htmlFor="confirm-password" className="block text-sm text-gray-400 mb-1">
+              Confirm password
+            </label>
             <input
+              id="confirm-password"
               type="password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
