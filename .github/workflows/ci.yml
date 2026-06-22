@@ -194,7 +194,10 @@ jobs:
     if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
     services:
       postgres:
-        image: postgres:16-alpine
+        image: harbor.yanatech.co.uk/library/postgres:16-alpine
+        credentials:
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
@@ -207,7 +210,10 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       mongodb:
-        image: mongo:8
+        image: harbor.yanatech.co.uk/library/mongo:8
+        credentials:
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
         env:
           MONGO_INITDB_ROOT_USERNAME: admin
           MONGO_INITDB_ROOT_PASSWORD: password
@@ -219,7 +225,10 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       redis:
-        image: redis:8-alpine
+        image: harbor.yanatech.co.uk/library/redis:8-alpine
+        credentials:
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
         ports:
           - 6379:6379
         options: >-
@@ -277,7 +286,10 @@ jobs:
     if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
     services:
       postgres:
-        image: postgres:16-alpine
+        image: harbor.yanatech.co.uk/library/postgres:16-alpine
+        credentials:
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
@@ -290,7 +302,10 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       mongodb:
-        image: mongo:8
+        image: harbor.yanatech.co.uk/library/mongo:8
+        credentials:
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
         env:
           MONGO_INITDB_ROOT_USERNAME: admin
           MONGO_INITDB_ROOT_PASSWORD: password
@@ -302,7 +317,10 @@ jobs:
           --health-timeout 5s
           --health-retries 5
       redis:
-        image: redis:8-alpine
+        image: harbor.yanatech.co.uk/library/redis:8-alpine
+        credentials:
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
         ports:
           - 6379:6379
         options: >-
