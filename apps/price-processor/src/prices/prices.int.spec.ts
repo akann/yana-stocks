@@ -216,7 +216,7 @@ describe('PricesService / PricesController (integration)', () => {
     });
 
     it('returns an empty array when no bars exist', async () => {
-      const bars = (await request(server).get('/prices/DOESNOTEXIST_XYZ/history').expect(200))
+      const bars = (await request(server).get(`/prices/${SYM}/history`).expect(200))
         .body as OHLCVBar[];
 
       expect(bars).toEqual([]);
