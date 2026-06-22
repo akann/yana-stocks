@@ -661,12 +661,14 @@ jobs:
               manifest="apps/yana-stocks/${svc}/deployment.yaml"
             fi
             if [[ -f "$manifest" ]]; then
-              yq e ".spec.template.spec.containers[0].image = \"${{ env.IMAGE_PREFIX }}/${svc}:${SHA}\"" \
+              # Use select() to target only Deployment/Rollout documents — multi-doc YAML files
+              # also contain a Service, and yq without select() creates stray spec.template blocks there
+              yq e "(select(.kind == \"Deployment\" or .kind == \"Rollout\") | .spec.template.spec.containers[0].image) = \"${{ env.IMAGE_PREFIX }}/${svc}:${SHA}\"" \
                 -i "$manifest"
               # Also update initContainers if any exist in this manifest
-              ic_count=$(yq e '.spec.template.spec.initContainers | length' "$manifest" 2>/dev/null || echo 0)
+              ic_count=$(yq e 'select(.kind == "Deployment" or .kind == "Rollout") | .spec.template.spec.initContainers | length' "$manifest" 2>/dev/null || echo 0)
               if [[ "${ic_count:-0}" -gt 0 ]]; then
-                yq e ".spec.template.spec.initContainers[0].image = \"${{ env.IMAGE_PREFIX }}/${svc}:${SHA}\"" \
+                yq e "(select(.kind == \"Deployment\" or .kind == \"Rollout\") | .spec.template.spec.initContainers[0].image) = \"${{ env.IMAGE_PREFIX }}/${svc}:${SHA}\"" \
                   -i "$manifest"
               fi
               changed=1
