@@ -93,6 +93,7 @@ function ResetPasswordInner(): React.JSX.Element {
             <input
               id="new-password"
               type="password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
@@ -107,6 +108,7 @@ function ResetPasswordInner(): React.JSX.Element {
             <input
               id="confirm-password"
               type="password"
+              autoComplete="new-password"
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               placeholder="••••••••"

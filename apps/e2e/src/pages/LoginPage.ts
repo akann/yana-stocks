@@ -13,8 +13,8 @@ export class LoginPage {
   readonly totpHeading: Locator;
 
   constructor(private readonly page: Page) {
-    this.emailInput = page.locator('input[type="email"]');
-    this.passwordInput = page.locator('input[type="password"]');
+    this.emailInput = page.getByLabel('Email');
+    this.passwordInput = page.getByLabel('Password');
     this.submitButton = page.getByRole('button', { name: /sign in/i });
     this.registerLink = page.getByRole('link', { name: 'Register' });
     this.forgotPasswordLink = page.getByRole('link', { name: /forgot password/i });

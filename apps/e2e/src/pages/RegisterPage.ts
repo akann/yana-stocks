@@ -9,9 +9,9 @@ export class RegisterPage {
   readonly signInLink: Locator;
 
   constructor(private readonly page: Page) {
-    this.emailInput = page.locator('input[type="email"]');
-    this.nameInput = page.locator('input[type="text"]');
-    this.passwordInput = page.locator('input[type="password"]');
+    this.emailInput = page.getByLabel('Email');
+    this.nameInput = page.getByLabel('Name (optional)');
+    this.passwordInput = page.getByLabel('Password');
     this.submitButton = page.getByRole('button', { name: /create account/i });
     this.error = page.getByText(/registration failed|email already registered/i);
     this.signInLink = page

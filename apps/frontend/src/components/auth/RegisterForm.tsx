@@ -56,9 +56,13 @@ export function RegisterForm(): React.JSX.Element {
         <h1 className="text-2xl font-bold text-white mb-6 text-center">Create account</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Email</label>
+            <label htmlFor="register-email" className="block text-sm text-gray-400 mb-1">
+              Email
+            </label>
             <input
+              id="register-email"
               type="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
@@ -67,9 +71,13 @@ export function RegisterForm(): React.JSX.Element {
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Name (optional)</label>
+            <label htmlFor="register-name" className="block text-sm text-gray-400 mb-1">
+              Name (optional)
+            </label>
             <input
+              id="register-name"
               type="text"
+              autoComplete="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Your name"
@@ -77,9 +85,13 @@ export function RegisterForm(): React.JSX.Element {
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Password</label>
+            <label htmlFor="register-password" className="block text-sm text-gray-400 mb-1">
+              Password
+            </label>
             <input
+              id="register-password"
               type="password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"

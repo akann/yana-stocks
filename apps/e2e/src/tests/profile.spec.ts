@@ -22,6 +22,10 @@ const MOCK_PROFILE = {
 };
 
 async function seedAuth(page: import('@playwright/test').Page) {
+  // Await route registration so WebKit processes interceptors before navigation
+  await page.route('**/api/auth/me', (r) =>
+    r.fulfill({ json: { userId: 'user-1', email: 'ada@example.com' } }),
+  );
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
   await page.evaluate(
@@ -34,20 +38,26 @@ async function seedAuth(page: import('@playwright/test').Page) {
   );
 }
 
-function mockProfileRoutes(page: import('@playwright/test').Page, profile = MOCK_PROFILE) {
-  void page.route('**/api/profile/me', (r) => {
+async function mockProfileRoutes(page: import('@playwright/test').Page, profile = MOCK_PROFILE) {
+  await page.route('**/api/profile/me', (r) => {
     if (r.request().method() === 'GET') return r.fulfill({ json: profile });
     return r.fulfill({ json: { ...profile, ...JSON.parse(r.request().postData() ?? '{}') } });
   });
-  void page.route('**/api/auth/password', (r) =>
+  await page.route('**/api/auth/password', (r) =>
     r.fulfill({ json: { message: 'password updated' } }),
   );
-  void page.route('**/api/auth/account', (r) =>
+  await page.route('**/api/auth/account', (r) =>
     r.fulfill({ json: { message: 'account deleted' } }),
   );
+  // Mock MFA status so getMFAStatus() doesn't hit a real server and trigger clearSession
+  await page.route('**/api/auth/mfa', (r) => {
+    if (r.request().method() === 'GET') return r.fulfill({ json: { enabled: false } });
+    if (r.request().method() === 'DELETE') return r.fulfill({ json: { message: 'MFA disabled' } });
+    return r.fulfill({ status: 404, json: {} });
+  });
 }
 
-function mockMFARoutes(
+async function mockMFARoutes(
   page: import('@playwright/test').Page,
   opts: {
     enabled?: boolean;
@@ -56,7 +66,7 @@ function mockMFARoutes(
     disableError?: boolean;
   } = {},
 ) {
-  void page.route('**/api/auth/mfa', (r) => {
+  await page.route('**/api/auth/mfa', (r) => {
     if (r.request().method() === 'GET') {
       return r.fulfill({ json: { enabled: opts.enabled ?? false } });
     }
@@ -68,7 +78,7 @@ function mockMFARoutes(
     }
     return r.fulfill({ status: 404, json: {} });
   });
-  void page.route('**/api/auth/mfa/setup', (r) => {
+  await page.route('**/api/auth/mfa/setup', (r) => {
     if (opts.setupError) {
       return r.fulfill({ status: 500, json: { error: 'failed to generate MFA secret' } });
     }
@@ -80,7 +90,7 @@ function mockMFARoutes(
       },
     });
   });
-  void page.route('**/api/auth/mfa/enable', (r) => {
+  await page.route('**/api/auth/mfa/enable', (r) => {
     if (opts.enableError) {
       return r.fulfill({ status: 400, json: { error: opts.enableError } });
     }
@@ -96,7 +106,7 @@ test.describe('Profile page', () => {
   });
 
   test('renders three tabs for authenticated user', async ({ page }) => {
-    mockProfileRoutes(page);
+    await mockProfileRoutes(page);
     await seedAuth(page);
     await page.goto('/profile');
 
@@ -107,7 +117,7 @@ test.describe('Profile page', () => {
   });
 
   test('Profile tab shows editable fields', async ({ page }) => {
-    mockProfileRoutes(page);
+    await mockProfileRoutes(page);
     await seedAuth(page);
     await page.goto('/profile');
 
@@ -117,7 +127,7 @@ test.describe('Profile page', () => {
   });
 
   test('Change password tab shows password fields', async ({ page }) => {
-    mockProfileRoutes(page);
+    await mockProfileRoutes(page);
     await seedAuth(page);
     await page.goto('/profile');
 
@@ -129,7 +139,7 @@ test.describe('Profile page', () => {
   });
 
   test('Delete account tab shows danger section', async ({ page }) => {
-    mockProfileRoutes(page);
+    await mockProfileRoutes(page);
     await seedAuth(page);
     await page.goto('/profile');
 
@@ -140,7 +150,7 @@ test.describe('Profile page', () => {
   });
 
   test('save profile button submits form and shows success', async ({ page }) => {
-    mockProfileRoutes(page);
+    await mockProfileRoutes(page);
     await seedAuth(page);
     await page.goto('/profile');
 
@@ -153,7 +163,7 @@ test.describe('Profile page', () => {
   test('password validation: shows error when new password is shorter than 8 chars', async ({
     page,
   }) => {
-    mockProfileRoutes(page);
+    await mockProfileRoutes(page);
     await seedAuth(page);
     await page.goto('/profile');
 
@@ -167,7 +177,7 @@ test.describe('Profile page', () => {
   });
 
   test('password validation: shows error when passwords do not match', async ({ page }) => {
-    mockProfileRoutes(page);
+    await mockProfileRoutes(page);
     await seedAuth(page);
     await page.goto('/profile');
 
@@ -181,7 +191,7 @@ test.describe('Profile page', () => {
   });
 
   test('successful password change shows success message and clears fields', async ({ page }) => {
-    mockProfileRoutes(page);
+    await mockProfileRoutes(page);
     await seedAuth(page);
     await page.goto('/profile');
 
@@ -198,8 +208,17 @@ test.describe('Profile page', () => {
   });
 
   test('wrong current password: API 401 shows error message', async ({ page }) => {
-    void page.route('**/api/profile/me', (r) => r.fulfill({ json: MOCK_PROFILE }));
-    void page.route('**/api/auth/password', (r) =>
+    // Mock refresh so fetchWithAuth's 401 retry doesn't call clearSession
+    await page.route('**/api/auth/refresh', (r) =>
+      r.fulfill({ json: { accessToken: MOCK_ACCESS_TOKEN, refreshToken: MOCK_REFRESH_TOKEN } }),
+    );
+    await page.route('**/api/auth/mfa', (r) =>
+      r.request().method() === 'GET'
+        ? r.fulfill({ json: { enabled: false } })
+        : r.fulfill({ status: 404, json: {} }),
+    );
+    await page.route('**/api/profile/me', (r) => r.fulfill({ json: MOCK_PROFILE }));
+    await page.route('**/api/auth/password', (r) =>
       r.fulfill({ status: 401, json: { error: 'current password is incorrect' } }),
     );
 
@@ -216,7 +235,7 @@ test.describe('Profile page', () => {
   });
 
   test('delete account: opens confirmation modal on button click', async ({ page }) => {
-    mockProfileRoutes(page);
+    await mockProfileRoutes(page);
     await seedAuth(page);
     await page.goto('/profile');
 
@@ -228,8 +247,17 @@ test.describe('Profile page', () => {
   });
 
   test('delete account: wrong password shows error in modal', async ({ page }) => {
-    void page.route('**/api/profile/me', (r) => r.fulfill({ json: MOCK_PROFILE }));
-    void page.route('**/api/auth/account', (r) =>
+    // Mock refresh so fetchWithAuth's 401 retry doesn't call clearSession
+    await page.route('**/api/auth/refresh', (r) =>
+      r.fulfill({ json: { accessToken: MOCK_ACCESS_TOKEN, refreshToken: MOCK_REFRESH_TOKEN } }),
+    );
+    await page.route('**/api/auth/mfa', (r) =>
+      r.request().method() === 'GET'
+        ? r.fulfill({ json: { enabled: false } })
+        : r.fulfill({ status: 404, json: {} }),
+    );
+    await page.route('**/api/profile/me', (r) => r.fulfill({ json: MOCK_PROFILE }));
+    await page.route('**/api/auth/account', (r) =>
       r.fulfill({ status: 401, json: { error: 'incorrect password' } }),
     );
 
@@ -245,11 +273,16 @@ test.describe('Profile page', () => {
   });
 
   test('delete account: success redirects to /login', async ({ page }) => {
-    void page.route('**/api/profile/me', (r) => r.fulfill({ json: MOCK_PROFILE }));
-    void page.route('**/api/auth/account', (r) =>
+    await page.route('**/api/auth/mfa', (r) =>
+      r.request().method() === 'GET'
+        ? r.fulfill({ json: { enabled: false } })
+        : r.fulfill({ status: 404, json: {} }),
+    );
+    await page.route('**/api/profile/me', (r) => r.fulfill({ json: MOCK_PROFILE }));
+    await page.route('**/api/auth/account', (r) =>
       r.fulfill({ json: { message: 'account deleted' } }),
     );
-    void page.route('**/api/auth/logout', (r) => r.fulfill({ json: { message: 'logged out' } }));
+    await page.route('**/api/auth/logout', (r) => r.fulfill({ json: { message: 'logged out' } }));
 
     await seedAuth(page);
     await page.goto('/profile');
@@ -266,8 +299,8 @@ test.describe('Profile page', () => {
 
 test.describe('MFA section (Profile tab)', () => {
   test('shows "Disabled" badge and "Set up MFA" button when MFA is off', async ({ page }) => {
-    mockProfileRoutes(page);
-    mockMFARoutes(page, { enabled: false });
+    await mockProfileRoutes(page);
+    await mockMFARoutes(page, { enabled: false });
     await seedAuth(page);
     await page.goto('/profile');
 
@@ -277,8 +310,8 @@ test.describe('MFA section (Profile tab)', () => {
   });
 
   test('shows "Enabled" badge and "Disable MFA" button when MFA is on', async ({ page }) => {
-    mockProfileRoutes(page);
-    mockMFARoutes(page, { enabled: true });
+    await mockProfileRoutes(page);
+    await mockMFARoutes(page, { enabled: true });
     await seedAuth(page);
     await page.goto('/profile');
 
@@ -287,8 +320,8 @@ test.describe('MFA section (Profile tab)', () => {
   });
 
   test('clicking "Set up MFA" shows QR code section and secret', async ({ page }) => {
-    mockProfileRoutes(page);
-    mockMFARoutes(page, { enabled: false });
+    await mockProfileRoutes(page);
+    await mockMFARoutes(page, { enabled: false });
     await seedAuth(page);
     await page.goto('/profile');
 
@@ -301,8 +334,8 @@ test.describe('MFA section (Profile tab)', () => {
   });
 
   test('"Enable MFA" button is disabled until 6 digits are entered', async ({ page }) => {
-    mockProfileRoutes(page);
-    mockMFARoutes(page, { enabled: false });
+    await mockProfileRoutes(page);
+    await mockMFARoutes(page, { enabled: false });
     await seedAuth(page);
     await page.goto('/profile');
 
@@ -317,8 +350,8 @@ test.describe('MFA section (Profile tab)', () => {
   });
 
   test('valid code enables MFA and shows "Enabled" state', async ({ page }) => {
-    mockProfileRoutes(page);
-    mockMFARoutes(page, { enabled: false });
+    await mockProfileRoutes(page);
+    await mockMFARoutes(page, { enabled: false });
     await seedAuth(page);
     await page.goto('/profile');
 
@@ -331,8 +364,8 @@ test.describe('MFA section (Profile tab)', () => {
   });
 
   test('invalid code shows error and stays on setup step', async ({ page }) => {
-    mockProfileRoutes(page);
-    mockMFARoutes(page, { enabled: false, enableError: 'invalid TOTP code' });
+    await mockProfileRoutes(page);
+    await mockMFARoutes(page, { enabled: false, enableError: 'invalid TOTP code' });
     await seedAuth(page);
     await page.goto('/profile');
 
@@ -345,8 +378,8 @@ test.describe('MFA section (Profile tab)', () => {
   });
 
   test('"Cancel" hides setup form and returns to disabled state', async ({ page }) => {
-    mockProfileRoutes(page);
-    mockMFARoutes(page, { enabled: false });
+    await mockProfileRoutes(page);
+    await mockMFARoutes(page, { enabled: false });
     await seedAuth(page);
     await page.goto('/profile');
 
@@ -360,8 +393,8 @@ test.describe('MFA section (Profile tab)', () => {
   });
 
   test('"Disable MFA" reverts to disabled state', async ({ page }) => {
-    mockProfileRoutes(page);
-    mockMFARoutes(page, { enabled: true });
+    await mockProfileRoutes(page);
+    await mockMFARoutes(page, { enabled: true });
     await seedAuth(page);
     await page.goto('/profile');
 
@@ -372,8 +405,8 @@ test.describe('MFA section (Profile tab)', () => {
   });
 
   test('disable MFA failure shows error', async ({ page }) => {
-    mockProfileRoutes(page);
-    mockMFARoutes(page, { enabled: true, disableError: true });
+    await mockProfileRoutes(page);
+    await mockMFARoutes(page, { enabled: true, disableError: true });
     await seedAuth(page);
     await page.goto('/profile');
 

@@ -29,6 +29,20 @@ test.describe('Login', () => {
     await page.route('**/api/auth/login', (r) =>
       r.fulfill({ json: { accessToken: MOCK_ACCESS_TOKEN, refreshToken: MOCK_REFRESH_TOKEN } }),
     );
+    await page.route('**/api/auth/me', (r) =>
+      r.fulfill({ json: { userId: 'user-1', email: 'user@example.com' } }),
+    );
+    await page.route('**/api/profile/me', (r) =>
+      r.fulfill({
+        json: {
+          userId: 'user-1',
+          displayName: 'Test User',
+          avatar: '',
+          bio: '',
+          preferences: { theme: 'dark', defaultCurrency: 'USD', emailNotifications: true },
+        },
+      }),
+    );
     await page.route('**/api/portfolio/portfolios', (r) => r.fulfill({ json: [] }));
 
     const login = new LoginPage(page);
@@ -117,6 +131,20 @@ test.describe('MFA login', () => {
     );
     await page.route('**/api/auth/mfa/verify', (r) =>
       r.fulfill({ json: { accessToken: MOCK_ACCESS_TOKEN, refreshToken: MOCK_REFRESH_TOKEN } }),
+    );
+    await page.route('**/api/auth/me', (r) =>
+      r.fulfill({ json: { userId: 'user-1', email: 'user@example.com' } }),
+    );
+    await page.route('**/api/profile/me', (r) =>
+      r.fulfill({
+        json: {
+          userId: 'user-1',
+          displayName: 'Test User',
+          avatar: '',
+          bio: '',
+          preferences: { theme: 'dark', defaultCurrency: 'USD', emailNotifications: true },
+        },
+      }),
     );
     await page.route('**/api/portfolio/portfolios', (r) => r.fulfill({ json: [] }));
 
@@ -259,6 +287,20 @@ test.describe('Auth guards', () => {
 
 test.describe('Logout', () => {
   test('clears session and redirects to login', async ({ page }) => {
+    await page.route('**/api/auth/me', (r) =>
+      r.fulfill({ json: { userId: 'user-1', email: 'user@example.com' } }),
+    );
+    await page.route('**/api/profile/me', (r) =>
+      r.fulfill({
+        json: {
+          userId: 'user-1',
+          displayName: 'Test User',
+          avatar: '',
+          bio: '',
+          preferences: { theme: 'dark', defaultCurrency: 'USD', emailNotifications: true },
+        },
+      }),
+    );
     await page.route('**/api/portfolio/portfolios', (r) => r.fulfill({ json: [] }));
     await page.route('**/api/auth/logout', (r) =>
       r.fulfill({ json: { message: 'Logged out successfully' } }),

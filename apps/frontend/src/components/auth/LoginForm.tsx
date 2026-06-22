@@ -90,9 +90,13 @@ export function LoginForm(): React.JSX.Element {
         <h1 className="text-2xl font-bold text-white mb-6 text-center">Sign in</h1>
         <form onSubmit={handleCredentialsSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Email</label>
+            <label htmlFor="login-email" className="block text-sm text-gray-400 mb-1">
+              Email
+            </label>
             <input
+              id="login-email"
               type="email"
+              autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
@@ -102,13 +106,17 @@ export function LoginForm(): React.JSX.Element {
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-sm text-gray-400">Password</label>
+              <label htmlFor="login-password" className="text-sm text-gray-400">
+                Password
+              </label>
               <Link href="/forgot-password" className="text-xs text-blue-400 hover:text-blue-300">
                 Forgot password?
               </Link>
             </div>
             <input
+              id="login-password"
               type="password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
