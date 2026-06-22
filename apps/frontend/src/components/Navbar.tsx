@@ -104,7 +104,7 @@ export function Navbar(): React.JSX.Element {
                 href="/register"
                 className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md transition-colors"
               >
-                Get started
+                Sign up
               </Link>
             </>
           )}

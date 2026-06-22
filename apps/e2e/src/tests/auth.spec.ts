@@ -202,10 +202,10 @@ test.describe('Logout', () => {
     expect(rt).toBeNull();
   });
 
-  test('navbar shows Sign in / Get started when logged out', async ({ page }) => {
+  test('navbar shows Sign in / Sign up when logged out', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Get started' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Sign up' })).toBeVisible();
   });
 });
 
