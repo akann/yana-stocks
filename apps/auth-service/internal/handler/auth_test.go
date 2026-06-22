@@ -56,6 +56,14 @@ func (m *mockAuthService) ResetPassword(ctx context.Context, token, newPassword 
 	}
 	return nil
 }
+func (m *mockAuthService) GetMFAStatus(_ context.Context, _ string) (bool, error) {
+	return false, nil
+}
+func (m *mockAuthService) SetupMFA(_ context.Context, _, _ string) (*service.MFASetupResult, error) {
+	return nil, nil
+}
+func (m *mockAuthService) VerifyAndEnableMFA(_ context.Context, _, _ string) error { return nil }
+func (m *mockAuthService) DisableMFA(_ context.Context, _ string) error             { return nil }
 
 func postJSON(path string, body any) *http.Request {
 	var buf bytes.Buffer
