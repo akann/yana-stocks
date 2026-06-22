@@ -2,7 +2,9 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import QRCode from 'qrcode';
 import { useAuth } from '@/context/AuthContext';
+import type { MFASetupData } from '@/context/AuthContext';
 
 type Tab = 'profile' | 'password' | 'delete';
 
@@ -21,6 +23,10 @@ export function ProfilePage(): React.JSX.Element {
     updateProfile,
     changePassword,
     deleteAccount,
+    getMFAStatus,
+    setupMFA,
+    enableMFA,
+    disableMFA,
   } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('profile');
@@ -63,18 +69,197 @@ export function ProfilePage(): React.JSX.Element {
       </div>
 
       {tab === 'profile' && (
-        <EditProfileForm
-          initialDisplayName={profile?.displayName ?? ''}
-          initialBio={profile?.bio ?? ''}
-          initialAvatar={profile?.avatar ?? ''}
-          initialTheme={profile?.preferences?.theme ?? 'light'}
-          initialCurrency={profile?.preferences?.defaultCurrency ?? 'USD'}
-          initialEmailNotifications={profile?.preferences?.emailNotifications ?? true}
-          onSave={updateProfile}
-        />
+        <>
+          <EditProfileForm
+            initialDisplayName={profile?.displayName ?? ''}
+            initialBio={profile?.bio ?? ''}
+            initialAvatar={profile?.avatar ?? ''}
+            initialTheme={profile?.preferences?.theme ?? 'light'}
+            initialCurrency={profile?.preferences?.defaultCurrency ?? 'USD'}
+            initialEmailNotifications={profile?.preferences?.emailNotifications ?? true}
+            onSave={updateProfile}
+          />
+          <MFASection
+            onGetStatus={getMFAStatus}
+            onSetup={setupMFA}
+            onEnable={enableMFA}
+            onDisable={disableMFA}
+          />
+        </>
       )}
       {tab === 'password' && <ChangePasswordForm onSave={changePassword} />}
       {tab === 'delete' && <DeleteAccountSection onDelete={deleteAccount} />}
+    </div>
+  );
+}
+
+interface MFASectionProps {
+  onGetStatus: () => Promise<boolean>;
+  onSetup: () => Promise<MFASetupData>;
+  onEnable: (code: string) => Promise<void>;
+  onDisable: () => Promise<void>;
+}
+
+function MFASection({
+  onGetStatus,
+  onSetup,
+  onEnable,
+  onDisable,
+}: MFASectionProps): React.JSX.Element {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [setupData, setSetupData] = useState<MFASetupData | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState('');
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    onGetStatus()
+      .then(setEnabled)
+      .catch(() => setEnabled(false));
+  }, [onGetStatus]);
+
+  useEffect(() => {
+    if (!setupData) return;
+    QRCode.toDataURL(setupData.otpAuthURL, { width: 200 })
+      .then(setQrDataUrl)
+      .catch(() => {});
+  }, [setupData]);
+
+  async function handleSetup() {
+    setError('');
+    setLoading(true);
+    try {
+      setSetupData(await onSetup());
+    } catch {
+      setError('Failed to generate MFA setup');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleEnable() {
+    setError('');
+    setLoading(true);
+    try {
+      await onEnable(code);
+      setEnabled(true);
+      setSetupData(null);
+      setQrDataUrl('');
+      setCode('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Invalid code');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDisable() {
+    setError('');
+    setLoading(true);
+    try {
+      await onDisable();
+      setEnabled(false);
+    } catch {
+      setError('Failed to disable MFA');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function cancelSetup() {
+    setSetupData(null);
+    setQrDataUrl('');
+    setCode('');
+    setError('');
+  }
+
+  return (
+    <div className="border-t border-gray-700 pt-5 mt-5">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <p className="text-sm font-medium text-white">Two-factor authentication</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {enabled
+              ? 'Your account is protected with TOTP.'
+              : 'Add an extra layer of security using an authenticator app.'}
+          </p>
+        </div>
+        {enabled === null ? null : enabled ? (
+          <span className="text-xs text-green-400 font-medium">Enabled</span>
+        ) : (
+          <span className="text-xs text-gray-500">Disabled</span>
+        )}
+      </div>
+
+      {enabled === null && <div className="animate-pulse bg-gray-800 rounded h-9 w-28" />}
+
+      {enabled === false && !setupData && (
+        <button type="button" onClick={() => void handleSetup()} disabled={loading} className={BTN}>
+          {loading ? 'Generating…' : 'Set up MFA'}
+        </button>
+      )}
+
+      {enabled === false && setupData && (
+        <div className="space-y-4">
+          <p className="text-xs text-gray-400">
+            Scan with your authenticator app (Google Authenticator, Authy, etc.).
+          </p>
+          {qrDataUrl && (
+            <img src={qrDataUrl} alt="MFA QR code" className="bg-white p-2 rounded-lg w-48 h-48" />
+          )}
+          <div>
+            <p className="text-xs text-gray-500 mb-1">Or enter this key manually:</p>
+            <code className="text-xs text-gray-300 font-mono bg-gray-800 px-2 py-1 rounded break-all block">
+              {setupData.secret}
+            </code>
+          </div>
+          <div>
+            <label className={LABEL}>Verification code</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+              placeholder="123456"
+              className={INPUT}
+            />
+          </div>
+          {error && <p className="text-red-400 text-sm">{error}</p>}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => void handleEnable()}
+              disabled={loading || code.length !== 6}
+              className={BTN}
+            >
+              {loading ? 'Verifying…' : 'Enable MFA'}
+            </button>
+            <button
+              type="button"
+              onClick={cancelSetup}
+              className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {enabled === true && (
+        <div>
+          {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
+          <button
+            type="button"
+            onClick={() => void handleDisable()}
+            disabled={loading}
+            className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Disabling…' : 'Disable MFA'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

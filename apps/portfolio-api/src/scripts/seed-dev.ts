@@ -921,10 +921,16 @@ async function seedAuthUser(): Promise<void> {
         email              TEXT        NOT NULL UNIQUE,
         is_verified        BOOLEAN     NOT NULL DEFAULT false,
         verification_token TEXT,
+        mfa_secret         TEXT,
+        mfa_enabled        BOOLEAN     NOT NULL DEFAULT FALSE,
         created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
+    await pg.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_secret TEXT`);
+    await pg.query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN NOT NULL DEFAULT FALSE`,
+    );
     await pg.query(`
       CREATE TABLE IF NOT EXISTS user_credentials (
         user_id       UUID        PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,

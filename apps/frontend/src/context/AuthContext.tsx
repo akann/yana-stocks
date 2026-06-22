@@ -33,6 +33,11 @@ export interface UpdateProfileInput {
   preferences?: Partial<UserPreferences>;
 }
 
+export interface MFASetupData {
+  otpAuthURL: string;
+  secret: string;
+}
+
 interface AuthContextValue {
   accessToken: string | null;
   isAuthenticated: boolean;
@@ -45,6 +50,10 @@ interface AuthContextValue {
   updateProfile: (dto: UpdateProfileInput) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
+  getMFAStatus: () => Promise<boolean>;
+  setupMFA: () => Promise<MFASetupData>;
+  enableMFA: (code: string) => Promise<void>;
+  disableMFA: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -180,6 +189,46 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
     }
   }
 
+  async function getMFAStatus(): Promise<boolean> {
+    if (!accessToken) throw new Error('Not authenticated');
+    const res = await fetch(`${API_URL}/auth/mfa`, { headers: authHeaders(accessToken) });
+    if (!res.ok) throw new Error('Failed to get MFA status');
+    const body = (await res.json()) as { enabled: boolean };
+    return body.enabled;
+  }
+
+  async function setupMFA(): Promise<MFASetupData> {
+    if (!accessToken) throw new Error('Not authenticated');
+    const res = await fetch(`${API_URL}/auth/mfa/setup`, {
+      method: 'POST',
+      headers: authHeaders(accessToken),
+    });
+    if (!res.ok) throw new Error('Failed to generate MFA secret');
+    return (await res.json()) as MFASetupData;
+  }
+
+  async function enableMFA(code: string): Promise<void> {
+    if (!accessToken) throw new Error('Not authenticated');
+    const res = await fetch(`${API_URL}/auth/mfa/enable`, {
+      method: 'POST',
+      headers: authHeaders(accessToken),
+      body: JSON.stringify({ code }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error ?? 'Invalid code');
+    }
+  }
+
+  async function disableMFA(): Promise<void> {
+    if (!accessToken) throw new Error('Not authenticated');
+    const res = await fetch(`${API_URL}/auth/mfa`, {
+      method: 'DELETE',
+      headers: authHeaders(accessToken),
+    });
+    if (!res.ok) throw new Error('Failed to disable MFA');
+  }
+
   async function deleteAccount(password: string): Promise<void> {
     if (!accessToken) throw new Error('Not authenticated');
     const res = await fetch(`${API_URL}/auth/account`, {
@@ -212,6 +261,10 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
         updateProfile,
         changePassword,
         deleteAccount,
+        getMFAStatus,
+        setupMFA,
+        enableMFA,
+        disableMFA,
       }}
     >
       {children}

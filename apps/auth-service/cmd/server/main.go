@@ -86,6 +86,10 @@ func main() {
 			r.Get("/me", authHandler.Me)
 			r.Put("/password", authHandler.ChangePassword)
 			r.Delete("/account", authHandler.DeleteAccount)
+			r.Get("/mfa", authHandler.GetMFAStatus)
+			r.Post("/mfa/setup", authHandler.SetupMFA)
+			r.Post("/mfa/enable", authHandler.EnableMFA)
+			r.Delete("/mfa", authHandler.DisableMFA)
 		})
 	})
 

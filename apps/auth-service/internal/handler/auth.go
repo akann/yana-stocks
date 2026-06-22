@@ -21,6 +21,10 @@ type authServicer interface {
 	DeleteAccount(ctx context.Context, userID, password string) error
 	RequestPasswordReset(ctx context.Context, email string) error
 	ResetPassword(ctx context.Context, token, newPassword string) error
+	GetMFAStatus(ctx context.Context, userID string) (bool, error)
+	SetupMFA(ctx context.Context, userID, email string) (*service.MFASetupResult, error)
+	VerifyAndEnableMFA(ctx context.Context, userID, code string) error
+	DisableMFA(ctx context.Context, userID string) error
 }
 
 type AuthHandler struct {
@@ -262,6 +266,68 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonOK(w, map[string]string{"message": "password reset successfully"}, http.StatusOK)
+}
+
+func (h *AuthHandler) GetMFAStatus(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value(middleware.ContextKeyUserID).(string)
+	if userID == "" {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	enabled, err := h.svc.GetMFAStatus(r.Context(), userID)
+	if err != nil {
+		jsonError(w, "failed to get MFA status", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]bool{"enabled": enabled}, http.StatusOK)
+}
+
+func (h *AuthHandler) SetupMFA(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value(middleware.ContextKeyUserID).(string)
+	email, _ := r.Context().Value(middleware.ContextKeyEmail).(string)
+	if userID == "" {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	result, err := h.svc.SetupMFA(r.Context(), userID, email)
+	if err != nil {
+		jsonError(w, "failed to generate MFA secret", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]string{"otpAuthURL": result.OTPAuthURL, "secret": result.Secret}, http.StatusOK)
+}
+
+func (h *AuthHandler) EnableMFA(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Code == "" {
+		jsonError(w, "code is required", http.StatusBadRequest)
+		return
+	}
+	userID, _ := r.Context().Value(middleware.ContextKeyUserID).(string)
+	if userID == "" {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if err := h.svc.VerifyAndEnableMFA(r.Context(), userID, body.Code); err != nil {
+		jsonError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	jsonOK(w, map[string]string{"message": "MFA enabled"}, http.StatusOK)
+}
+
+func (h *AuthHandler) DisableMFA(w http.ResponseWriter, r *http.Request) {
+	userID, _ := r.Context().Value(middleware.ContextKeyUserID).(string)
+	if userID == "" {
+		jsonError(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if err := h.svc.DisableMFA(r.Context(), userID); err != nil {
+		jsonError(w, "failed to disable MFA", http.StatusInternalServerError)
+		return
+	}
+	jsonOK(w, map[string]string{"message": "MFA disabled"}, http.StatusOK)
 }
 
 func jsonOK(w http.ResponseWriter, body any, status int) {

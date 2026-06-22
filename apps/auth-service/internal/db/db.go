@@ -20,6 +20,8 @@ type User struct {
 	Email             string
 	IsVerified        bool
 	VerificationToken *string
+	MFAEnabled        bool
+	MFASecret         *string
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
 }
@@ -74,7 +76,7 @@ func (q *Queries) CreateUserWithCredential(ctx context.Context, email, passwordH
 	row := tx.QueryRow(ctx, `
 		INSERT INTO users (email, verification_token)
 		VALUES ($1, $2)
-		RETURNING id, email, is_verified, verification_token, created_at, updated_at
+		RETURNING id, email, is_verified, verification_token, mfa_enabled, mfa_secret, created_at, updated_at
 	`, email, verificationToken)
 	user, err := scanUser(row)
 	if err != nil {
@@ -93,7 +95,7 @@ func (q *Queries) CreateUserWithCredential(ctx context.Context, email, passwordH
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (*User, error) {
 	row := q.pool.QueryRow(ctx, `
-		SELECT id, email, is_verified, verification_token, created_at, updated_at
+		SELECT id, email, is_verified, verification_token, mfa_enabled, mfa_secret, created_at, updated_at
 		FROM users WHERE email = $1
 	`, email)
 	return scanUser(row)
@@ -102,7 +104,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (*User, erro
 // GetUserByEmailWithCredential returns the user and their password hash for login.
 func (q *Queries) GetUserByEmailWithCredential(ctx context.Context, email string) (*UserWithCredential, error) {
 	row := q.pool.QueryRow(ctx, `
-		SELECT u.id, u.email, u.is_verified, u.verification_token, u.created_at, u.updated_at,
+		SELECT u.id, u.email, u.is_verified, u.verification_token, u.mfa_enabled, u.mfa_secret, u.created_at, u.updated_at,
 		       uc.password_hash
 		FROM users u
 		JOIN user_credentials uc ON uc.user_id = u.id
@@ -110,7 +112,7 @@ func (q *Queries) GetUserByEmailWithCredential(ctx context.Context, email string
 	`, email)
 	u := &UserWithCredential{}
 	err := row.Scan(
-		&u.ID, &u.Email, &u.IsVerified, &u.VerificationToken,
+		&u.ID, &u.Email, &u.IsVerified, &u.VerificationToken, &u.MFAEnabled, &u.MFASecret,
 		&u.CreatedAt, &u.UpdatedAt, &u.PasswordHash,
 	)
 	if err != nil {
@@ -121,7 +123,7 @@ func (q *Queries) GetUserByEmailWithCredential(ctx context.Context, email string
 
 func (q *Queries) GetUserByID(ctx context.Context, id string) (*User, error) {
 	row := q.pool.QueryRow(ctx, `
-		SELECT id, email, is_verified, verification_token, created_at, updated_at
+		SELECT id, email, is_verified, verification_token, mfa_enabled, mfa_secret, created_at, updated_at
 		FROM users WHERE id = $1
 	`, id)
 	return scanUser(row)
@@ -129,7 +131,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id string) (*User, error) {
 
 func (q *Queries) GetUserByVerificationToken(ctx context.Context, token string) (*User, error) {
 	row := q.pool.QueryRow(ctx, `
-		SELECT id, email, is_verified, verification_token, created_at, updated_at
+		SELECT id, email, is_verified, verification_token, mfa_enabled, mfa_secret, created_at, updated_at
 		FROM users WHERE verification_token = $1
 	`, token)
 	return scanUser(row)
@@ -145,7 +147,7 @@ func (q *Queries) VerifyUser(ctx context.Context, id string) error {
 
 func (q *Queries) GetUserWithCredentialByID(ctx context.Context, userID string) (*UserWithCredential, error) {
 	row := q.pool.QueryRow(ctx, `
-		SELECT u.id, u.email, u.is_verified, u.verification_token, u.created_at, u.updated_at,
+		SELECT u.id, u.email, u.is_verified, u.verification_token, u.mfa_enabled, u.mfa_secret, u.created_at, u.updated_at,
 		       uc.password_hash
 		FROM users u
 		JOIN user_credentials uc ON uc.user_id = u.id
@@ -153,7 +155,7 @@ func (q *Queries) GetUserWithCredentialByID(ctx context.Context, userID string) 
 	`, userID)
 	u := &UserWithCredential{}
 	err := row.Scan(
-		&u.ID, &u.Email, &u.IsVerified, &u.VerificationToken,
+		&u.ID, &u.Email, &u.IsVerified, &u.VerificationToken, &u.MFAEnabled, &u.MFASecret,
 		&u.CreatedAt, &u.UpdatedAt, &u.PasswordHash,
 	)
 	if err != nil {
@@ -174,13 +176,33 @@ func (q *Queries) DeleteUser(ctx context.Context, id string) error {
 	return err
 }
 
+func (q *Queries) GetMFAStatus(ctx context.Context, userID string) (bool, error) {
+	var enabled bool
+	err := q.pool.QueryRow(ctx, `SELECT mfa_enabled FROM users WHERE id = $1`, userID).Scan(&enabled)
+	return enabled, err
+}
+
+func (q *Queries) SetMFASecret(ctx context.Context, userID, secret string) error {
+	_, err := q.pool.Exec(ctx, `
+		UPDATE users SET mfa_secret = $1, mfa_enabled = TRUE, updated_at = NOW() WHERE id = $2
+	`, secret, userID)
+	return err
+}
+
+func (q *Queries) ClearMFA(ctx context.Context, userID string) error {
+	_, err := q.pool.Exec(ctx, `
+		UPDATE users SET mfa_secret = NULL, mfa_enabled = FALSE, updated_at = NOW() WHERE id = $1
+	`, userID)
+	return err
+}
+
 type scanner interface {
 	Scan(dest ...any) error
 }
 
 func scanUser(row scanner) (*User, error) {
 	u := &User{}
-	err := row.Scan(&u.ID, &u.Email, &u.IsVerified, &u.VerificationToken, &u.CreatedAt, &u.UpdatedAt)
+	err := row.Scan(&u.ID, &u.Email, &u.IsVerified, &u.VerificationToken, &u.MFAEnabled, &u.MFASecret, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}

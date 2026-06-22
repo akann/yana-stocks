@@ -16,6 +16,7 @@ import (
 	kafkapub "github.com/akann/yana-stocks/auth-service/internal/kafka"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
+	"github.com/pquerna/otp/totp"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -215,10 +216,11 @@ func (s *AuthService) signJWT(userID, emailAddr string) (string, error) {
 func (s *AuthService) RequestPasswordReset(ctx context.Context, emailAddr string) error {
 	user, err := s.queries.GetUserByEmail(ctx, emailAddr)
 	if err != nil {
-		// Don't reveal whether the email exists.
+		log.Printf("password reset requested for unknown email: %s", emailAddr)
 		return nil
 	}
 	if !user.IsVerified {
+		log.Printf("password reset requested for unverified email: %s", emailAddr)
 		return nil
 	}
 
@@ -231,9 +233,12 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, emailAddr string
 		return err
 	}
 
+	log.Printf("password reset token issued for: %s", emailAddr)
 	go func() {
 		if err := s.emailer.SendPasswordReset(emailAddr, s.cfg.FrontendURL, token); err != nil {
 			log.Printf("password reset email failed for %s: %v", emailAddr, err)
+		} else {
+			log.Printf("password reset email sent to: %s", emailAddr)
 		}
 	}()
 
@@ -244,6 +249,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 	key := passwordResetKey(token)
 	userID, err := s.redis.Get(ctx, key).Result()
 	if err != nil {
+		log.Printf("password reset failed: invalid or expired token")
 		return ErrInvalidToken
 	}
 
@@ -257,7 +263,66 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 	}
 
 	s.redis.Del(ctx, key)
+	log.Printf("password reset completed for user: %s", userID)
 	return nil
+}
+
+// --- MFA ---
+
+type MFASetupResult struct {
+	OTPAuthURL string
+	Secret     string
+}
+
+func (s *AuthService) GetMFAStatus(ctx context.Context, userID string) (bool, error) {
+	return s.queries.GetMFAStatus(ctx, userID)
+}
+
+func (s *AuthService) SetupMFA(ctx context.Context, userID, email string) (*MFASetupResult, error) {
+	key, err := totp.Generate(totp.GenerateOpts{
+		Issuer:      "yana-stocks",
+		AccountName: email,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.redis.Set(ctx, mfaPendingKey(userID), key.Secret(), 10*time.Minute).Err(); err != nil {
+		return nil, err
+	}
+
+	return &MFASetupResult{OTPAuthURL: key.URL(), Secret: key.Secret()}, nil
+}
+
+func (s *AuthService) VerifyAndEnableMFA(ctx context.Context, userID, code string) error {
+	secret, err := s.redis.Get(ctx, mfaPendingKey(userID)).Result()
+	if err != nil {
+		return errors.New("MFA setup session expired — please start over")
+	}
+
+	if !totp.Validate(code, secret) {
+		return errors.New("invalid code")
+	}
+
+	if err := s.queries.SetMFASecret(ctx, userID, secret); err != nil {
+		return err
+	}
+
+	s.redis.Del(ctx, mfaPendingKey(userID))
+	log.Printf("MFA enabled for user: %s", userID)
+	return nil
+}
+
+func (s *AuthService) DisableMFA(ctx context.Context, userID string) error {
+	if err := s.queries.ClearMFA(ctx, userID); err != nil {
+		return err
+	}
+	log.Printf("MFA disabled for user: %s", userID)
+	return nil
+}
+
+func mfaPendingKey(userID string) string {
+	return fmt.Sprintf("mfa_pending:%s", userID)
 }
 
 func refreshKey(token string) string {
