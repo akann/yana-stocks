@@ -6,6 +6,8 @@
 import { test, expect } from '@playwright/test';
 import { LoginPage } from '../pages/LoginPage';
 import { RegisterPage } from '../pages/RegisterPage';
+import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
+import { ResetPasswordPage } from '../pages/ResetPasswordPage';
 import {
   MOCK_ACCESS_TOKEN,
   MOCK_REFRESH_TOKEN,
@@ -67,6 +69,13 @@ test.describe('Login', () => {
     await login.goto();
     await login.registerLink.click();
     await expect(page).toHaveURL('/register');
+  });
+
+  test('has "Forgot password?" link that navigates to /forgot-password', async ({ page }) => {
+    const login = new LoginPage(page);
+    await login.goto();
+    await login.forgotPasswordLink.click();
+    await expect(page).toHaveURL('/forgot-password');
   });
 });
 
@@ -197,5 +206,111 @@ test.describe('Logout', () => {
     await page.goto('/');
     await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Get started' })).toBeVisible();
+  });
+});
+
+test.describe('Forgot password', () => {
+  test('renders heading and email input', async ({ page }) => {
+    const fp = new ForgotPasswordPage(page);
+    await fp.goto();
+    await expect(page.getByRole('heading', { name: 'Forgot password' })).toBeVisible();
+    await expect(fp.emailInput).toBeVisible();
+    await expect(fp.submitButton).toBeVisible();
+  });
+
+  test('shows confirmation after submitting email', async ({ page }) => {
+    await page.route('**/api/auth/password/reset-request', (r) =>
+      r.fulfill({ json: { message: 'if that email is registered you will receive a reset link' } }),
+    );
+
+    const fp = new ForgotPasswordPage(page);
+    await fp.goto();
+    await fp.submit('user@example.com');
+
+    await expect(page.getByText(/check your inbox/i)).toBeVisible();
+  });
+
+  test('shows confirmation even when email is not registered (no enumeration)', async ({
+    page,
+  }) => {
+    await page.route('**/api/auth/password/reset-request', (r) =>
+      r.fulfill({ json: { message: 'if that email is registered you will receive a reset link' } }),
+    );
+
+    const fp = new ForgotPasswordPage(page);
+    await fp.goto();
+    await fp.submit('notregistered@example.com');
+
+    await expect(page.getByText(/check your inbox/i)).toBeVisible();
+  });
+
+  test('has "Back to sign in" link', async ({ page }) => {
+    const fp = new ForgotPasswordPage(page);
+    await fp.goto();
+    await fp.backToSignInLink.click();
+    await expect(page).toHaveURL('/login');
+  });
+});
+
+test.describe('Reset password', () => {
+  test('shows error when token param is missing', async ({ page }) => {
+    await page.goto('/reset-password');
+    await expect(page.getByText(/invalid or missing reset link/i)).toBeVisible();
+    await expect(page.getByRole('link', { name: /request a new one/i })).toBeVisible();
+  });
+
+  test('shows password form when token is present', async ({ page }) => {
+    const rp = new ResetPasswordPage(page);
+    await rp.goto('some-token');
+    await expect(page.getByRole('heading', { name: 'Set new password' })).toBeVisible();
+    await expect(rp.newPasswordInput).toBeVisible();
+    await expect(rp.confirmPasswordInput).toBeVisible();
+    await expect(rp.submitButton).toBeVisible();
+  });
+
+  test('shows error when passwords do not match', async ({ page }) => {
+    const rp = new ResetPasswordPage(page);
+    await rp.goto('some-token');
+    await rp.newPasswordInput.fill('NewPass1!');
+    await rp.confirmPasswordInput.fill('DifferentPass1!');
+    await rp.submitButton.click();
+
+    await expect(page.getByText(/do not match/i)).toBeVisible();
+  });
+
+  test('shows error when password is shorter than 8 characters', async ({ page }) => {
+    const rp = new ResetPasswordPage(page);
+    await rp.goto('some-token');
+    await rp.newPasswordInput.fill('short');
+    await rp.confirmPasswordInput.fill('short');
+    await rp.submitButton.click();
+
+    await expect(page.getByText(/at least 8 characters/i)).toBeVisible();
+  });
+
+  test('shows error for invalid or expired token', async ({ page }) => {
+    await page.route('**/api/auth/password/reset', (r) =>
+      r.fulfill({ status: 400, json: { error: 'invalid or expired reset link' } }),
+    );
+
+    const rp = new ResetPasswordPage(page);
+    await rp.goto('expired-token');
+    await rp.reset('NewPass1!');
+
+    await expect(page.getByText(/invalid or expired reset link/i)).toBeVisible();
+  });
+
+  test('shows success and redirects to /login on valid reset', async ({ page }) => {
+    await page.route('**/api/auth/password/reset', (r) =>
+      r.fulfill({ json: { message: 'password reset successfully' } }),
+    );
+
+    const rp = new ResetPasswordPage(page);
+    await rp.goto('valid-token');
+    await rp.reset('NewPass1!');
+
+    await expect(page.getByText(/password updated/i)).toBeVisible();
+    await page.waitForURL('/login');
+    await expect(page).toHaveURL('/login');
   });
 });

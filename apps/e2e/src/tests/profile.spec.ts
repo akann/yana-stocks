@@ -28,7 +28,6 @@ async function seedAuth(page: import('@playwright/test').Page) {
     ({ at, rt, jwt }) => {
       sessionStorage.setItem('access_token', at);
       sessionStorage.setItem('refresh_token', rt);
-      // Some contexts check the decoded user id from the token
       sessionStorage.setItem('fake_jwt', jwt);
     },
     { at: MOCK_ACCESS_TOKEN, rt: MOCK_REFRESH_TOKEN, jwt: FAKE_JWT },
@@ -38,11 +37,13 @@ async function seedAuth(page: import('@playwright/test').Page) {
 function mockProfileRoutes(page: import('@playwright/test').Page, profile = MOCK_PROFILE) {
   void page.route('**/api/profile/me', (r) => {
     if (r.request().method() === 'GET') return r.fulfill({ json: profile });
-    // PUT
     return r.fulfill({ json: { ...profile, ...JSON.parse(r.request().postData() ?? '{}') } });
   });
   void page.route('**/api/auth/password', (r) =>
     r.fulfill({ json: { message: 'password updated' } }),
+  );
+  void page.route('**/api/auth/account', (r) =>
+    r.fulfill({ json: { message: 'account deleted' } }),
   );
 }
 
@@ -53,14 +54,15 @@ test.describe('Profile page', () => {
     await expect(page).toHaveURL('/login');
   });
 
-  test('renders Profile tab and Security tab for authenticated user', async ({ page }) => {
+  test('renders three tabs for authenticated user', async ({ page }) => {
     mockProfileRoutes(page);
     await seedAuth(page);
     await page.goto('/profile');
 
     await expect(page.getByRole('heading', { name: 'Account' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Profile' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Security' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Change password' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Delete account' })).toBeVisible();
   });
 
   test('Profile tab shows editable fields', async ({ page }) => {
@@ -73,16 +75,27 @@ test.describe('Profile page', () => {
     await expect(page.getByPlaceholder(/example.com\/avatar/)).toBeVisible();
   });
 
-  test('Security tab shows password fields after clicking tab', async ({ page }) => {
+  test('Change password tab shows password fields', async ({ page }) => {
     mockProfileRoutes(page);
     await seedAuth(page);
     await page.goto('/profile');
 
-    await page.getByRole('button', { name: 'Security' }).click();
+    await page.getByRole('button', { name: 'Change password' }).click();
 
     await expect(page.getByLabel('Current password')).toBeVisible();
     await expect(page.getByLabel('New password', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Confirm new password')).toBeVisible();
+  });
+
+  test('Delete account tab shows danger section', async ({ page }) => {
+    mockProfileRoutes(page);
+    await seedAuth(page);
+    await page.goto('/profile');
+
+    await page.getByRole('button', { name: 'Delete account' }).click();
+
+    await expect(page.getByRole('button', { name: 'Delete my account' })).toBeVisible();
+    await expect(page.getByText(/permanently delete/i)).toBeVisible();
   });
 
   test('save profile button submits form and shows success', async ({ page }) => {
@@ -103,7 +116,7 @@ test.describe('Profile page', () => {
     await seedAuth(page);
     await page.goto('/profile');
 
-    await page.getByRole('button', { name: 'Security' }).click();
+    await page.getByRole('button', { name: 'Change password' }).click();
     await page.getByLabel('Current password').fill('OldPass1!');
     await page.getByLabel('New password', { exact: true }).fill('short');
     await page.getByLabel('Confirm new password').fill('short');
@@ -117,7 +130,7 @@ test.describe('Profile page', () => {
     await seedAuth(page);
     await page.goto('/profile');
 
-    await page.getByRole('button', { name: 'Security' }).click();
+    await page.getByRole('button', { name: 'Change password' }).click();
     await page.getByLabel('Current password').fill('OldPass1!');
     await page.getByLabel('New password', { exact: true }).fill('NewPass1!');
     await page.getByLabel('Confirm new password').fill('DifferentPass1!');
@@ -131,15 +144,13 @@ test.describe('Profile page', () => {
     await seedAuth(page);
     await page.goto('/profile');
 
-    await page.getByRole('button', { name: 'Security' }).click();
+    await page.getByRole('button', { name: 'Change password' }).click();
     await page.getByLabel('Current password').fill('OldPass1!');
     await page.getByLabel('New password', { exact: true }).fill('NewPass1!');
     await page.getByLabel('Confirm new password').fill('NewPass1!');
     await page.getByRole('button', { name: 'Update password' }).click();
 
     await expect(page.getByText('Password updated.')).toBeVisible();
-
-    // Fields should be cleared after success
     await expect(page.getByLabel('Current password')).toHaveValue('');
     await expect(page.getByLabel('New password', { exact: true })).toHaveValue('');
     await expect(page.getByLabel('Confirm new password')).toHaveValue('');
@@ -154,12 +165,60 @@ test.describe('Profile page', () => {
     await seedAuth(page);
     await page.goto('/profile');
 
-    await page.getByRole('button', { name: 'Security' }).click();
+    await page.getByRole('button', { name: 'Change password' }).click();
     await page.getByLabel('Current password').fill('WrongPass1!');
     await page.getByLabel('New password', { exact: true }).fill('NewPass1!');
     await page.getByLabel('Confirm new password').fill('NewPass1!');
     await page.getByRole('button', { name: 'Update password' }).click();
 
     await expect(page.getByText(/current password is incorrect/i)).toBeVisible();
+  });
+
+  test('delete account: opens confirmation modal on button click', async ({ page }) => {
+    mockProfileRoutes(page);
+    await seedAuth(page);
+    await page.goto('/profile');
+
+    await page.getByRole('button', { name: 'Delete account' }).click();
+    await page.getByRole('button', { name: 'Delete my account' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Delete account' })).toBeVisible();
+    await expect(page.getByPlaceholder('••••••••')).toBeVisible();
+  });
+
+  test('delete account: wrong password shows error in modal', async ({ page }) => {
+    void page.route('**/api/profile/me', (r) => r.fulfill({ json: MOCK_PROFILE }));
+    void page.route('**/api/auth/account', (r) =>
+      r.fulfill({ status: 401, json: { error: 'incorrect password' } }),
+    );
+
+    await seedAuth(page);
+    await page.goto('/profile');
+
+    await page.getByRole('button', { name: 'Delete account' }).click();
+    await page.getByRole('button', { name: 'Delete my account' }).click();
+    await page.getByPlaceholder('••••••••').fill('wrongpass');
+    await page.getByRole('button', { name: 'Delete my account' }).last().click();
+
+    await expect(page.getByText(/incorrect password/i)).toBeVisible();
+  });
+
+  test('delete account: success redirects to /login', async ({ page }) => {
+    void page.route('**/api/profile/me', (r) => r.fulfill({ json: MOCK_PROFILE }));
+    void page.route('**/api/auth/account', (r) =>
+      r.fulfill({ json: { message: 'account deleted' } }),
+    );
+    void page.route('**/api/auth/logout', (r) => r.fulfill({ json: { message: 'logged out' } }));
+
+    await seedAuth(page);
+    await page.goto('/profile');
+
+    await page.getByRole('button', { name: 'Delete account' }).click();
+    await page.getByRole('button', { name: 'Delete my account' }).click();
+    await page.getByPlaceholder('••••••••').fill('correctpass');
+    await page.getByRole('button', { name: 'Delete my account' }).last().click();
+
+    await page.waitForURL('/login');
+    await expect(page).toHaveURL('/login');
   });
 });
