@@ -1,15 +1,14 @@
 [project]
 name = "price-ingestor"
 version = "0.0.1"
-description = "Polls Alpaca API for real-time stock prices and publishes to Kafka"
+description = "Massive (Polygon.io) WebSocket ingestor — publishes OHLCV minute bars to Kafka"
 requires-python = ">=3.12"
 dependencies = [
-    "alpaca-py>=0.36.0",
+    "polygon-api-client>=1.16.0",
     "confluent-kafka>=2.6.0",
     "pymongo>=4.10.0",
     "pydantic>=2.10.0",
     "pydantic-settings>=2.7.0",
-    "yfinance>=0.2.0",
     "opentelemetry-sdk>=1.42.1",
     "opentelemetry-exporter-otlp-proto-http>=1.42.1",
     "opentelemetry-instrumentation-pymongo>=0.63b1",
@@ -17,7 +16,6 @@ dependencies = [
 
 [project.scripts]
 price-ingestor = "price_ingestor.main:main"
-backfill-history = "price_ingestor.backfill:main"
 
 [dependency-groups]
 dev = [
@@ -57,7 +55,7 @@ disallow_untyped_defs = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["alpaca.*", "confluent_kafka.*", "yfinance.*", "opentelemetry.*"]
+module = ["polygon.*", "confluent_kafka.*", "opentelemetry.*"]
 ignore_missing_imports = true
 disallow_untyped_defs = false
 

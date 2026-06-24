@@ -1,53 +1,18 @@
 import logging
 import os
 import signal
-import time
 import types
+from datetime import UTC, datetime
 
-from .alpaca_client import AlpacaClient
+from polygon import WebSocketClient
+from polygon.websocket.models.common import Feed, Market
+from polygon.websocket.models.models import EquityAgg
+
 from .config import Settings
 from .kafka_producer import KafkaProducer
+from .models import RawPriceMessage
 
 logger = logging.getLogger(__name__)
-
-
-def run(settings: Settings) -> None:
-    client = AlpacaClient(
-        api_key=settings.alpaca_api_key,
-        api_secret=settings.alpaca_api_secret,
-        base_url=settings.alpaca_base_url,
-        feed=settings.alpaca_feed,
-    )
-    producer = KafkaProducer(brokers=settings.kafka_brokers)
-
-    logger.info(
-        "Starting poll loop: symbols=%s interval=%ss feed=%s",
-        settings.symbols,
-        settings.poll_interval_seconds,
-        settings.alpaca_feed.value,
-    )
-
-    running = True
-
-    def _shutdown(sig: int, _frame: types.FrameType | None) -> None:
-        nonlocal running
-        logger.info("Received signal %d, shutting down", sig)
-        running = False
-
-    signal.signal(signal.SIGTERM, _shutdown)
-    signal.signal(signal.SIGINT, _shutdown)
-
-    while running:
-        try:
-            snapshots = client.get_snapshots(settings.symbols)
-            for message in snapshots.values():
-                producer.publish(message)
-            producer.flush()
-            logger.debug("Published %d snapshots", len(snapshots))
-        except Exception as exc:
-            logger.error("Poll error: %s", exc, exc_info=True)
-
-        time.sleep(settings.poll_interval_seconds)
 
 
 def _configure_tracing() -> None:
@@ -58,11 +23,69 @@ def _configure_tracing() -> None:
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-    resource = Resource.create({"service.name": os.environ.get("OTEL_SERVICE_NAME", "price-ingestor")})
+    resource = Resource.create(
+        {"service.name": os.environ.get("OTEL_SERVICE_NAME", "price-ingestor")}
+    )
     provider = TracerProvider(resource=resource)
     provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     trace.set_tracer_provider(provider)
     PymongoInstrumentor().instrument()
+
+
+def run(settings: Settings) -> None:
+    producer = KafkaProducer(brokers=settings.kafka_brokers)
+
+    # Subscribe strings for all configured symbols, e.g. "AM.AAPL"
+    subscriptions = [f"AM.{s}" for s in settings.symbols]
+
+    logger.info(
+        "Starting Massive WebSocket ingestor: symbols=%s feed=StarterFeed",
+        settings.symbols,
+    )
+
+    stopping = False
+
+    def _shutdown(sig: int, _frame: types.FrameType | None) -> None:
+        nonlocal stopping
+        logger.info("Received signal %d, shutting down", sig)
+        stopping = True
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+
+    def handle_msg(msgs: list) -> None:
+        for msg in msgs:
+            if not isinstance(msg, EquityAgg) or msg.event_type != "AM":
+                continue
+            if msg.symbol is None or msg.start_timestamp is None:
+                continue
+            if None in (msg.open, msg.high, msg.low, msg.close, msg.volume):
+                continue
+
+            bar = RawPriceMessage(
+                symbol=msg.symbol,
+                open=float(msg.open),
+                high=float(msg.high),
+                low=float(msg.low),
+                close=float(msg.close),
+                volume=float(msg.volume),
+                timestamp=datetime.fromtimestamp(
+                    msg.start_timestamp / 1000, tz=UTC
+                ).isoformat(),
+            )
+            producer.publish(bar)
+            logger.debug("Published bar: %s close=%.2f", bar.symbol, bar.close)
+
+        producer.flush()
+
+    client = WebSocketClient(
+        api_key=settings.massive_api_key,
+        feed=Feed.StarterFeed,
+        market=Market.Stocks,
+    )
+    client.subscribe(*subscriptions)
+    # run() blocks and auto-reconnects on disconnect (up to max_reconnects=5 by default)
+    client.run(handle_msg)
 
 
 def main() -> None:

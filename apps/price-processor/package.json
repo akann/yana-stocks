@@ -22,17 +22,17 @@
     "@nestjs/mongoose": "^11.0.3",
     "@nestjs/platform-express": "^11.1.26",
     "@nestjs/swagger": "^11.4.4",
+    "@opentelemetry/auto-instrumentations-node": "^0.77.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
+    "@opentelemetry/sdk-node": "^0.219.0",
+    "@polygon.io/client-js": "^8.2.0",
     "@yana-stocks/kafka-client": "workspace:*",
     "@yana-stocks/shared-types": "workspace:*",
     "ioredis": "^5.11.1",
     "kafkajs": "^2.2.4",
     "mongoose": "^8.15.1",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2",
-    "yahoo-finance2": "^3.15.3",
-    "@opentelemetry/sdk-node": "^0.219.0",
-    "@opentelemetry/auto-instrumentations-node": "^0.77.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.219.0"
+    "rxjs": "^7.8.2"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",
@@ -59,6 +59,9 @@
     ],
     "rootDir": "src",
     "testRegex": "(?<!\\.int)\\.spec\\.ts$",
+    "moduleNameMapper": {
+      "^@polygon\\.io/client-js$": "<rootDir>/__stubs__/@polygon.io/client-js.js"
+    },
     "transform": {
       "^.+\\.ts$": "ts-jest"
     },

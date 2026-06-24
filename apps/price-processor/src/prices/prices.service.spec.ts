@@ -1,16 +1,28 @@
-// ── yahoo-finance2 mock ──────────────────────────────────────────────────
-// The chart/quote mocks live inside the factory so no external variable
-// is referenced across the jest.mock hoisting boundary. They are attached to
-// the constructor so tests can reach them via MockYahooFinance._chart / _quote.
-jest.mock('yahoo-finance2', () => {
-  const chart = jest.fn();
-  const quote = jest.fn();
+// ── @polygon.io/client-js mock ────────────────────────────────────────────
+// Attach shared jest.fn() instances to the constructor so tests can reach
+// them via MockDefaultApi._aggregates / _snapshot after hoisting.
+jest.mock('@polygon.io/client-js', () => {
+  const getStocksAggregates = jest.fn();
+  const getStocksSnapshotTicker = jest.fn();
   return {
     __esModule: true,
-    default: Object.assign(
-      jest.fn(() => ({ chart, quote })),
-      { _chart: chart, _quote: quote },
+    DefaultApi: Object.assign(
+      jest.fn(() => ({ getStocksAggregates, getStocksSnapshotTicker })),
+      { _aggregates: getStocksAggregates, _snapshot: getStocksSnapshotTicker },
     ),
+    Configuration: jest.fn(),
+    // The service imports this enum at module level; provide real values so the
+    // service initialises correctly even when the whole package is mocked.
+    GetStocksAggregatesTimespanEnum: {
+      Second: 'second',
+      Minute: 'minute',
+      Hour: 'hour',
+      Day: 'day',
+      Week: 'week',
+      Month: 'month',
+      Quarter: 'quarter',
+      Year: 'year',
+    },
   };
 });
 
@@ -19,16 +31,15 @@ import { getModelToken } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
 import type { ProcessedPriceMessage, RawPriceMessage } from '@yana-stocks/shared-types';
 import { KAFKA_TOPICS } from '@yana-stocks/kafka-client';
-import YahooFinance from 'yahoo-finance2';
+import { DefaultApi } from '@polygon.io/client-js';
 import { RedisService } from '../redis/redis.service';
 import { KafkaProducerService } from './kafka-producer.service';
 import { PricesService } from './prices.service';
 import { PriceBar } from './schemas/price-bar.schema';
 
-// Typed handle to the mocked YF constructor + its shared chart/quote functions.
-const MockYahooFinance = YahooFinance as unknown as jest.Mock & {
-  _chart: jest.Mock;
-  _quote: jest.Mock;
+const MockDefaultApi = DefaultApi as unknown as jest.Mock & {
+  _aggregates: jest.Mock;
+  _snapshot: jest.Mock;
 };
 
 // ── fixtures ──────────────────────────────────────────────────────────────
@@ -46,50 +57,38 @@ const mockBar: PriceBar = {
 
 const rawMsg: RawPriceMessage = {
   symbol: 'AAPL',
-  price: 151.0,
-  bid: 150.9,
-  ask: 151.1,
+  open: 150.0,
+  high: 151.5,
+  low: 149.5,
+  close: 151.0,
   volume: 500,
-  timestamp: '2024-01-01T10:30:45.000Z',
+  timestamp: '2024-01-01T10:30:00.000Z', // bar start — already a minute boundary
 };
 
-// Yahoo Finance chart() response shapes
-const yfDailyChart = {
-  quotes: [
+// Massive aggregates response shapes — matches GetStocksAggregates200Response directly (no .data wrapper)
+const massiveAggSuccess = {
+  ticker: 'SHOP',
+  results: [
     {
-      date: new Date('2024-01-02T00:00:00Z'),
-      open: 150,
-      high: 155,
-      low: 148,
-      close: 152,
-      volume: 1_000_000,
+      t: new Date('2024-01-02T14:30:00Z').getTime(),
+      o: 150,
+      h: 151,
+      l: 149.5,
+      c: 150.5,
+      v: 10_000,
     },
   ],
 };
-const yfMinuteChart = {
-  quotes: [
-    {
-      date: new Date('2024-01-02T14:30:00Z'),
-      open: 150,
-      high: 151,
-      low: 149.5,
-      close: 150.5,
-      volume: 10_000,
-    },
-  ],
-};
-const emptyChart = { quotes: [] };
+const massiveAggEmpty = { ticker: 'SHOP', results: [] };
 
-// Alpaca API response
-const alpacaSuccess = {
-  ok: true,
-  json: () =>
-    Promise.resolve({
-      bars: [{ t: '2024-01-02T14:30:00Z', o: 150, h: 151, l: 149.5, c: 150.5, v: 10_000 }],
-    }),
+// Massive snapshot response — matches GetStocksSnapshotTicker200Response directly (no .data wrapper)
+const massiveSnapSuccess = {
+  ticker: {
+    day: { c: 151.0, v: 5_000_000 },
+    prevDay: { c: 148.0 },
+  },
 };
-const alpacaEmpty = { ok: true, json: () => Promise.resolve({ bars: [] }) };
-const alpacaError = { ok: false, status: 422 };
+const massiveSnapEmpty = { ticker: null };
 
 // ── module factory ────────────────────────────────────────────────────────
 
@@ -111,7 +110,7 @@ function makeFindChain(result: PriceBar[] = []) {
   };
 }
 
-async function buildModule(alpacaKey = '', alpacaSecret = ''): Promise<Fixture> {
+async function buildModule(): Promise<Fixture> {
   const model = {
     findOneAndUpdate: jest.fn().mockReturnValue({
       lean: () => ({ exec: () => Promise.resolve(mockBar) }),
@@ -131,16 +130,12 @@ async function buildModule(alpacaKey = '', alpacaSecret = ''): Promise<Fixture> 
         provide: RedisService,
         useValue: { get: redisGet, setex: redisSetex } satisfies Partial<RedisService>,
       },
-      {
-        provide: KafkaProducerService,
-        useValue: { emit } satisfies Partial<KafkaProducerService>,
-      },
+      { provide: KafkaProducerService, useValue: { emit } satisfies Partial<KafkaProducerService> },
       {
         provide: ConfigService,
         useValue: {
           get: jest.fn().mockImplementation((key: string) => {
-            if (key === 'alpaca.apiKey') return alpacaKey;
-            if (key === 'alpaca.apiSecret') return alpacaSecret;
+            if (key === 'massive.apiKey') return 'test-key';
             return '';
           }),
         },
@@ -162,7 +157,6 @@ async function buildModule(alpacaKey = '', alpacaSecret = ''): Promise<Fixture> 
 describe('PricesService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (global as typeof globalThis & { fetch: jest.Mock }).fetch = jest.fn();
   });
 
   // ── process ──────────────────────────────────────────────────────────────
@@ -181,28 +175,39 @@ describe('PricesService', () => {
       expect(service).toBeDefined();
     });
 
-    it('upserts the minute bar with correct operators', async () => {
+    it('upserts the complete OHLCV bar using $setOnInsert', async () => {
       await service.process(rawMsg);
 
       expect(model.findOneAndUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ symbol: 'AAPL' }),
+        expect.objectContaining({ symbol: 'AAPL', interval: '1m' }),
         expect.objectContaining({
-          $setOnInsert: expect.objectContaining({ open: 151.0 }) as unknown,
-          $max: { high: 151.0 },
-          $min: { low: 151.0 },
-          $set: { close: 151.0 },
-          $inc: { volume: 500 },
+          $setOnInsert: expect.objectContaining({
+            open: 150.0,
+            high: 151.5,
+            low: 149.5,
+            close: 151.0,
+            volume: 500,
+          }) as unknown,
         }),
         { upsert: true, new: true },
       );
     });
 
-    it('caches the latest price in Redis with 5s TTL', async () => {
+    it('does not use $max/$min/$set/$inc operators (tick aggregation is gone)', async () => {
+      await service.process(rawMsg);
+
+      const [, update] = model.findOneAndUpdate.mock.calls[0] as [unknown, Record<string, unknown>];
+      expect(update).not.toHaveProperty('$max');
+      expect(update).not.toHaveProperty('$min');
+      expect(update).not.toHaveProperty('$inc');
+    });
+
+    it('caches msg.close (not msg.price) in Redis with 5s TTL', async () => {
       await service.process(rawMsg);
       expect(redisSetex).toHaveBeenCalledWith('price:latest:AAPL', 5, '151');
     });
 
-    it('emits ProcessedPriceMessage to the processed topic', async () => {
+    it('emits ProcessedPriceMessage with price = msg.close', async () => {
       await service.process(rawMsg);
 
       expect(producer.emit).toHaveBeenCalledWith(
@@ -218,217 +223,161 @@ describe('PricesService', () => {
         }),
       );
     });
-
-    it('truncates the timestamp to the current minute', async () => {
-      await service.process(rawMsg);
-
-      const [query] = model.findOneAndUpdate.mock.calls[0] as [{ timestamp: Date }];
-      expect(query.timestamp.getSeconds()).toBe(0);
-      expect(query.timestamp.getMilliseconds()).toBe(0);
-    });
   });
 
   // ── getHistory ────────────────────────────────────────────────────────────
 
   describe('getHistory', () => {
-    describe('predefined symbols', () => {
-      it('queries the DB directly without any on-demand fetch', async () => {
-        const { service, redisGet } = await buildModule();
+    it('returns DB bars without fetching when hist:fetched flag is set', async () => {
+      const { service, redisGet } = await buildModule();
+      redisGet.mockImplementation((key: string) =>
+        Promise.resolve(key === 'hist:fetched:SHOP:1m' ? '1' : null),
+      );
 
-        await service.getHistory('AAPL', { limit: 60, interval: '1m' });
+      await service.getHistory('SHOP', { limit: 60, interval: '1m' });
 
-        // hist:fetched check must never be made for predefined symbols
-        expect(redisGet).not.toHaveBeenCalledWith(expect.stringContaining('hist:fetched'));
-        expect(MockYahooFinance._chart).not.toHaveBeenCalled();
-      });
+      expect(MockDefaultApi._aggregates).not.toHaveBeenCalled();
     });
 
-    describe('non-predefined symbols — freshness flag isolation', () => {
-      it('skips fetch when hist:fetched:<symbol>:1m is set', async () => {
-        const { service, redisGet } = await buildModule();
-        redisGet.mockImplementation((key: string) =>
-          Promise.resolve(key === 'hist:fetched:SHOP:1m' ? '1' : null),
-        );
+    it('calls Massive getStocksAggregates on cache miss', async () => {
+      const { service } = await buildModule();
+      MockDefaultApi._aggregates.mockResolvedValue(massiveAggEmpty);
 
-        await service.getHistory('SHOP', { limit: 60, interval: '1m' });
+      await service.getHistory('SHOP', { limit: 60, interval: '1m' });
 
-        expect(MockYahooFinance._chart).not.toHaveBeenCalled();
-      });
-
-      it('does NOT skip 1m fetch when only hist:fetched:<symbol>:1d is set', async () => {
-        // This is the regression test for the shared-flag bug: a completed daily
-        // fetch must not suppress subsequent minute fetches.
-        const { service, redisGet } = await buildModule();
-        MockYahooFinance._chart.mockResolvedValue(emptyChart);
-        redisGet.mockImplementation((key: string) =>
-          Promise.resolve(key === 'hist:fetched:SHOP:1d' ? '1' : null),
-        );
-
-        await service.getHistory('SHOP', { limit: 60, interval: '1m' });
-
-        // With separated flags, a fresh 1d flag must not block the 1m fetch.
-        // Since there are no Alpaca credentials, it falls through to Yahoo Finance.
-        expect(MockYahooFinance._chart).toHaveBeenCalled();
-      });
-
-      it('skips fetch when hist:no-data-min:<symbol> is set', async () => {
-        const { service, redisGet } = await buildModule();
-        redisGet.mockImplementation((key: string) =>
-          Promise.resolve(key === 'hist:no-data-min:SHOP' ? '1' : null),
-        );
-
-        await service.getHistory('SHOP', { limit: 60, interval: '1m' });
-
-        expect(MockYahooFinance._chart).not.toHaveBeenCalled();
-      });
+      expect(MockDefaultApi._aggregates).toHaveBeenCalledWith(
+        'SHOP',
+        1,
+        'minute',
+        expect.any(String),
+        expect.any(String),
+        true,
+        undefined,
+        50000,
+      );
     });
 
-    // ── minute history — no Alpaca credentials (Yahoo Finance path) ─────────
+    it('uses timespan=day for 1d interval', async () => {
+      const { service } = await buildModule();
+      MockDefaultApi._aggregates.mockResolvedValue(massiveAggEmpty);
 
-    describe('fetchAndStoreMinuteHistory — no Alpaca credentials', () => {
-      it('calls Yahoo Finance chart when credentials are absent', async () => {
-        const { service } = await buildModule(); // alpacaKey = ''
-        MockYahooFinance._chart.mockResolvedValue(emptyChart);
+      await service.getHistory('SHOP', { limit: 21, interval: '1d' });
 
-        await service.getHistory('SHOP', { limit: 60, interval: '1m' });
-
-        expect(MockYahooFinance._chart).toHaveBeenCalledWith(
-          'SHOP',
-          expect.objectContaining({ interval: '1m' }),
-        );
-      });
-
-      it('stores returned bars and sets hist:fetched:<symbol>:1m on success', async () => {
-        const { service, model, redisSetex } = await buildModule();
-        MockYahooFinance._chart.mockResolvedValue(yfMinuteChart);
-
-        await service.getHistory('SHOP', { limit: 60, interval: '1m' });
-
-        expect(model.bulkWrite).toHaveBeenCalled();
-        expect(redisSetex).toHaveBeenCalledWith('hist:fetched:SHOP:1m', 900, '1');
-      });
-
-      it('sets hist:no-data-min with 24h TTL when Yahoo returns no bars', async () => {
-        const { service, redisSetex } = await buildModule();
-        MockYahooFinance._chart.mockResolvedValue(emptyChart);
-
-        await service.getHistory('SHOP', { limit: 60, interval: '1m' });
-
-        expect(redisSetex).toHaveBeenCalledWith('hist:no-data-min:SHOP', 86_400, '1');
-      });
-
-      it('sets hist:no-data-min with 1h TTL when Yahoo throws', async () => {
-        const { service, redisSetex } = await buildModule();
-        MockYahooFinance._chart.mockRejectedValue(new Error('network error'));
-
-        await service.getHistory('SHOP', { limit: 60, interval: '1m' });
-
-        expect(redisSetex).toHaveBeenCalledWith('hist:no-data-min:SHOP', 3_600, '1');
-      });
+      expect(MockDefaultApi._aggregates).toHaveBeenCalledWith(
+        'SHOP',
+        1,
+        'day',
+        expect.any(String),
+        expect.any(String),
+        true,
+        undefined,
+        50000,
+      );
     });
 
-    // ── minute history — with Alpaca credentials ─────────────────────────────
+    it('stores bars and sets hist:fetched flag on success', async () => {
+      const { service, model, redisSetex } = await buildModule();
+      MockDefaultApi._aggregates.mockResolvedValue(massiveAggSuccess);
 
-    describe('fetchAndStoreMinuteHistory — with Alpaca credentials', () => {
-      const KEY = 'KEY';
-      const SECRET = 'SECRET';
+      await service.getHistory('SHOP', { limit: 60, interval: '1m' });
 
-      it('fetches from Alpaca and sets hist:fetched:<symbol>:1m on success', async () => {
-        const { service, model, redisSetex } = await buildModule(KEY, SECRET);
-        (global as typeof globalThis & { fetch: jest.Mock }).fetch.mockResolvedValue(alpacaSuccess);
-
-        await service.getHistory('UBER', { limit: 60, interval: '1m' });
-
-        expect(global.fetch).toHaveBeenCalledWith(
-          expect.stringContaining('data.alpaca.markets'),
-          expect.objectContaining({
-            headers: expect.objectContaining({ 'APCA-API-KEY-ID': KEY }) as unknown,
-          }),
-        );
-        expect(model.bulkWrite).toHaveBeenCalled();
-        expect(redisSetex).toHaveBeenCalledWith('hist:fetched:UBER:1m', 900, '1');
-        // Yahoo Finance must NOT be called when Alpaca succeeds
-        expect(MockYahooFinance._chart).not.toHaveBeenCalled();
-      });
-
-      it('falls back to Yahoo Finance when Alpaca returns 0 bars', async () => {
-        const { service } = await buildModule(KEY, SECRET);
-        (global as typeof globalThis & { fetch: jest.Mock }).fetch.mockResolvedValue(alpacaEmpty);
-        MockYahooFinance._chart.mockResolvedValue(emptyChart);
-
-        await service.getHistory('SHOP', { limit: 60, interval: '1m' });
-
-        expect(MockYahooFinance._chart).toHaveBeenCalled();
-      });
-
-      it('falls back to Yahoo Finance on Alpaca HTTP error', async () => {
-        const { service } = await buildModule(KEY, SECRET);
-        (global as typeof globalThis & { fetch: jest.Mock }).fetch.mockResolvedValue(alpacaError);
-        MockYahooFinance._chart.mockResolvedValue(emptyChart);
-
-        await service.getHistory('SHOP', { limit: 60, interval: '1m' });
-
-        expect(MockYahooFinance._chart).toHaveBeenCalled();
-      });
-
-      it('falls back to Yahoo Finance when Alpaca fetch throws', async () => {
-        const { service } = await buildModule(KEY, SECRET);
-        (global as typeof globalThis & { fetch: jest.Mock }).fetch.mockRejectedValue(
-          new Error('timeout'),
-        );
-        MockYahooFinance._chart.mockResolvedValue(emptyChart);
-
-        await service.getHistory('SHOP', { limit: 60, interval: '1m' });
-
-        expect(MockYahooFinance._chart).toHaveBeenCalled();
-      });
+      expect(model.bulkWrite).toHaveBeenCalled();
+      expect(redisSetex).toHaveBeenCalledWith('hist:fetched:SHOP:1m', 900, '1');
     });
 
-    // ── daily history ─────────────────────────────────────────────────────────
+    it('sets no-data flag with 24h TTL when Massive returns empty results', async () => {
+      const { service, redisSetex } = await buildModule();
+      MockDefaultApi._aggregates.mockResolvedValue(massiveAggEmpty);
 
-    describe('fetchAndStoreDailyHistory', () => {
-      it('sets hist:fetched:<symbol>:1d (not :1m) on success', async () => {
-        const { service, redisSetex } = await buildModule();
-        MockYahooFinance._chart.mockResolvedValue(yfDailyChart);
+      await service.getHistory('SHOP', { limit: 60, interval: '1m' });
 
-        await service.getHistory('SHOP', { limit: 21, interval: '1d' });
+      expect(redisSetex).toHaveBeenCalledWith('hist:no-data:SHOP:1m', 86400, '1');
+    });
 
-        expect(redisSetex).toHaveBeenCalledWith('hist:fetched:SHOP:1d', 900, '1');
-        expect(redisSetex).not.toHaveBeenCalledWith(
-          'hist:fetched:SHOP:1m',
-          expect.anything(),
-          expect.anything(),
-        );
+    it('sets no-data flag with 1h TTL when Massive throws', async () => {
+      const { service, redisSetex } = await buildModule();
+      MockDefaultApi._aggregates.mockRejectedValue(new Error('network error'));
+
+      await service.getHistory('SHOP', { limit: 60, interval: '1m' });
+
+      expect(redisSetex).toHaveBeenCalledWith('hist:no-data:SHOP:1m', 3600, '1');
+    });
+
+    it('skips fetch when no-data flag is already set', async () => {
+      const { service, redisGet } = await buildModule();
+      redisGet.mockImplementation((key: string) =>
+        Promise.resolve(key === 'hist:no-data:SHOP:1m' ? '1' : null),
+      );
+
+      await service.getHistory('SHOP', { limit: 60, interval: '1m' });
+
+      expect(MockDefaultApi._aggregates).not.toHaveBeenCalled();
+    });
+
+    it('1d and 1m freshness flags are independent', async () => {
+      const { service, redisGet } = await buildModule();
+      MockDefaultApi._aggregates.mockResolvedValue(massiveAggEmpty);
+      // only the 1d flag is set — 1m should still fetch
+      redisGet.mockImplementation((key: string) =>
+        Promise.resolve(key === 'hist:fetched:SHOP:1d' ? '1' : null),
+      );
+
+      await service.getHistory('SHOP', { limit: 60, interval: '1m' });
+
+      expect(MockDefaultApi._aggregates).toHaveBeenCalled();
+    });
+  });
+
+  // ── getQuote ──────────────────────────────────────────────────────────────
+
+  describe('getQuote', () => {
+    it('returns cached entry from Redis without calling Massive', async () => {
+      const { service, redisGet } = await buildModule();
+      const cached = JSON.stringify({
+        price: 150,
+        prevPrice: 148,
+        change: 2,
+        changePercent: 1.35,
+        volume: 1000,
+        timestamp: '2024-01-01T10:00:00Z',
       });
+      redisGet.mockResolvedValue(cached);
 
-      it('skips fetch when hist:no-data:<symbol> is set', async () => {
-        const { service, redisGet } = await buildModule();
-        redisGet.mockImplementation((key: string) =>
-          Promise.resolve(key === 'hist:no-data:SHOP' ? '1' : null),
-        );
+      const result = await service.getQuote('AAPL');
 
-        await service.getHistory('SHOP', { limit: 21, interval: '1d' });
+      expect(MockDefaultApi._snapshot).not.toHaveBeenCalled();
+      expect(result?.price).toBe(150);
+    });
 
-        expect(MockYahooFinance._chart).not.toHaveBeenCalled();
-      });
+    it('calls Massive snapshot and maps the response on cache miss', async () => {
+      const { service, redisSetex } = await buildModule();
+      MockDefaultApi._snapshot.mockResolvedValue(massiveSnapSuccess);
 
-      it('sets hist:no-data with 24h TTL when Yahoo returns no bars', async () => {
-        const { service, redisSetex } = await buildModule();
-        MockYahooFinance._chart.mockResolvedValue(emptyChart);
+      const result = await service.getQuote('AAPL');
 
-        await service.getHistory('SHOP', { limit: 21, interval: '1d' });
+      expect(MockDefaultApi._snapshot).toHaveBeenCalledWith('AAPL');
+      expect(result?.price).toBe(151.0);
+      expect(result?.prevPrice).toBe(148.0);
+      expect(result?.change).toBeCloseTo(3.0);
+      expect(redisSetex).toHaveBeenCalledWith('price:quote:AAPL', 900, expect.any(String));
+    });
 
-        expect(redisSetex).toHaveBeenCalledWith('hist:no-data:SHOP', 86_400, '1');
-      });
+    it('returns null when Massive snapshot has no data', async () => {
+      const { service } = await buildModule();
+      MockDefaultApi._snapshot.mockResolvedValue(massiveSnapEmpty);
 
-      it('sets hist:no-data with 1h TTL when Yahoo throws', async () => {
-        const { service, redisSetex } = await buildModule();
-        MockYahooFinance._chart.mockRejectedValue(new Error('YF down'));
+      const result = await service.getQuote('AAPL');
 
-        await service.getHistory('SHOP', { limit: 21, interval: '1d' });
+      expect(result).toBeNull();
+    });
 
-        expect(redisSetex).toHaveBeenCalledWith('hist:no-data:SHOP', 3_600, '1');
-      });
+    it('returns null when Massive throws', async () => {
+      const { service } = await buildModule();
+      MockDefaultApi._snapshot.mockRejectedValue(new Error('timeout'));
+
+      const result = await service.getQuote('AAPL');
+
+      expect(result).toBeNull();
     });
   });
 });

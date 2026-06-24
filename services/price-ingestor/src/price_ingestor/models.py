@@ -5,11 +5,12 @@ from typing import Any
 @dataclass
 class RawPriceMessage:
     symbol: str
-    price: float
-    bid: float
-    ask: float
+    open: float
+    high: float
+    low: float
+    close: float
     volume: float
-    timestamp: str
+    timestamp: str  # bar start (UTC ISO)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

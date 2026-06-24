@@ -66,8 +66,8 @@ describe('PricesService / PricesController (integration)', () => {
     await rawRedis.del(`price:latest:${SYM}`);
     await rawRedis.del(`hist:fetched:${SYM}:1m`);
     await rawRedis.del(`hist:fetched:${SYM}:1d`);
-    await rawRedis.del(`hist:no-data-min:${SYM}`);
-    await rawRedis.del(`hist:no-data:${SYM}`);
+    await rawRedis.del(`hist:no-data:${SYM}:1m`);
+    await rawRedis.del(`hist:no-data:${SYM}:1d`);
     jest.clearAllMocks();
   });
 
@@ -76,11 +76,13 @@ describe('PricesService / PricesController (integration)', () => {
     await app.close();
   });
 
-  const rawMsg = (price: number, ts?: string): RawPriceMessage => ({
+  // Massive sends complete bars, not individual ticks — a single price becomes open/high/low/close.
+  const rawMsg = (close: number, ts?: string): RawPriceMessage => ({
     symbol: SYM,
-    price,
-    bid: price - 0.01,
-    ask: price + 0.01,
+    open: close,
+    high: close,
+    low: close,
+    close,
     volume: 500,
     timestamp: ts ?? new Date().toISOString(),
   });
@@ -99,44 +101,53 @@ describe('PricesService / PricesController (integration)', () => {
       expect(bar!.volume).toBe(500);
     });
 
-    it('accumulates volume and updates high/low/close across ticks in the same minute', async () => {
-      const baseTs = '2025-01-01T10:00:30.000Z';
-      await pricesService.process(rawMsg(100.0, baseTs));
-      await pricesService.process(rawMsg(105.0, '2025-01-01T10:00:45.000Z'));
-      await pricesService.process(rawMsg(98.0, '2025-01-01T10:00:55.000Z'));
+    it('second process() call with same timestamp does not overwrite the bar ($setOnInsert is idempotent)', async () => {
+      const ts = '2025-01-01T10:00:00.000Z';
+      await pricesService.process({
+        symbol: SYM,
+        open: 100,
+        high: 110,
+        low: 95,
+        close: 105,
+        volume: 1000,
+        timestamp: ts,
+      });
+      // A duplicate bar with different values should be ignored (upsert, not update)
+      await pricesService.process({
+        symbol: SYM,
+        open: 200,
+        high: 210,
+        low: 195,
+        close: 205,
+        volume: 9999,
+        timestamp: ts,
+      });
 
-      const bar = await priceBarModel.findOne({ symbol: SYM }).lean<PriceBar>().exec();
-      expect(bar!.open).toBe(100.0); // $setOnInsert — first tick wins
-      expect(bar!.high).toBe(105.0);
-      expect(bar!.low).toBe(98.0);
-      expect(bar!.close).toBe(98.0); // last tick
-      expect(bar!.volume).toBe(1500); // 500 * 3
+      const bars = await priceBarModel.find({ symbol: SYM }).lean<PriceBar[]>().exec();
+      expect(bars).toHaveLength(1);
+      expect(bars[0]!.close).toBe(105); // original value preserved
     });
 
-    it('stores the timestamp truncated to the minute', async () => {
-      await pricesService.process(rawMsg(150.0, '2025-06-01T14:37:22.500Z'));
+    it('stores the bar timestamp exactly as provided by Massive (no truncation)', async () => {
+      const ts = '2025-06-01T14:37:00.000Z'; // Massive sends minute-boundary timestamps
+      await pricesService.process(rawMsg(150.0, ts));
 
       const bar = await priceBarModel.findOne({ symbol: SYM }).lean<PriceBar>().exec();
-      expect(bar!.timestamp.getSeconds()).toBe(0);
-      expect(bar!.timestamp.getMilliseconds()).toBe(0);
+      expect(bar!.timestamp.toISOString()).toBe(ts);
     });
 
-    it('caches the latest price in Redis', async () => {
+    it('caches msg.close in Redis with 5-second TTL', async () => {
       await pricesService.process(rawMsg(151.5));
 
       const cached = await rawRedis.get(`price:latest:${SYM}`);
-      expect(cached).toBe('151.5');
-    });
-
-    it('sets a 5-second TTL on the Redis cache key', async () => {
-      await pricesService.process(rawMsg(200.0));
-
       const ttl = await rawRedis.ttl(`price:latest:${SYM}`);
+
+      expect(cached).toBe('151.5');
       expect(ttl).toBeGreaterThan(0);
       expect(ttl).toBeLessThanOrEqual(5);
     });
 
-    it('calls the Kafka producer with the processed message', async () => {
+    it('emits a ProcessedPriceMessage to Kafka with price = msg.close', async () => {
       await pricesService.process(rawMsg(160.0));
 
       expect(kafkaProducerMock.emit).toHaveBeenCalledTimes(1);
@@ -150,8 +161,7 @@ describe('PricesService / PricesController (integration)', () => {
 
   describe('GET /prices/:symbol/history', () => {
     beforeEach(async () => {
-      // Mark data as fresh so getHistory skips the on-demand external fetch
-      // for this non-predefined test symbol.
+      // Mark data as fresh so getHistory skips the on-demand Massive fetch.
       await rawRedis.setex(`hist:fetched:${SYM}:1m`, 900, '1');
     });
 

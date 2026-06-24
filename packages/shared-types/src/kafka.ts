@@ -9,11 +9,12 @@ export interface KafkaMessage<T = unknown> {
 
 export interface RawPriceMessage {
   symbol: string;
-  price: number;
-  bid: number;
-  ask: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
   volume: number;
-  timestamp: string;
+  timestamp: string; // bar start (UTC ISO)
 }
 
 export interface ProcessedPriceMessage {
