@@ -17,7 +17,7 @@ COPY packages/prettier-config/package.json ./packages/prettier-config/
 COPY packages/shared-dto/package.json ./packages/shared-dto/
 COPY packages/shared-types/package.json ./packages/shared-types/
 COPY packages/typescript-config/package.json ./packages/typescript-config/
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile || (pnpm approve-builds --all && pnpm install --frozen-lockfile)
 
 FROM base AS builder
 WORKDIR /app
