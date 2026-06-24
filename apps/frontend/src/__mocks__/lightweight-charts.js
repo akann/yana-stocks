@@ -7,14 +7,10 @@ const mockSeries = {
 
 const mockChart = {
   addSeries: jest.fn(() => mockSeries),
-  addPane: jest.fn(() => ({
-    setStretchFactor: jest.fn(),
-    priceScale: jest.fn(() => ({ applyOptions: jest.fn() })),
-  })),
-  panes: jest.fn(() => [{ setStretchFactor: jest.fn() }]),
   remove: jest.fn(),
   removeSeries: jest.fn(),
   timeScale: jest.fn(() => ({ fitContent: jest.fn() })),
+  priceScale: jest.fn(() => ({ applyOptions: jest.fn() })),
   applyOptions: jest.fn(),
 };
 
