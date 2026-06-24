@@ -19,13 +19,13 @@
 
 | What                                                                          | Why                                                       |
 | ----------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `price-ingestor/src/price_ingestor/alpaca_client.py`                          | Replaced by Polygon WebSocket client                      |
+| `price-ingestor/src/price_ingestor/alpaca_client.py`                          | Replaced by Massive WebSocket client                      |
 | `price-ingestor/src/price_ingestor/main.py` poll loop                         | Replaced by WebSocket push handler                        |
-| `price-processor` tick aggregation (`$max`/`$min`/`$inc` logic)               | Polygon sends complete bars — aggregation has no purpose  |
-| `price-processor` Yahoo Finance fallback (`yahoo-finance2`)                   | Replaced by Polygon REST (US) and Twelve Data (UK)        |
+| `price-processor` tick aggregation (`$max`/`$min`/`$inc` logic)               | Massive sends complete bars — aggregation has no purpose  |
+| `price-processor` Yahoo Finance fallback (`yahoo-finance2`)                   | Replaced by Massive REST (US) and Twelve Data (UK)        |
 | `price-processor` Alpaca REST history calls                                   | Same as above                                             |
-| `sentiment-analyzer/src/sentiment_analyzer/news_client.py` (AlpacaNewsClient) | Replaced by FMP news client                               |
-| `portfolio-api` Alpaca asset listing (`fetchFromAlpaca()`)                    | Replaced by Polygon ticker reference                      |
+| `sentiment-analyzer/src/sentiment_analyzer/news_client.py` (AlpacaNewsClient) | Replaced by FMP news client (Step 8)                      |
+| `portfolio-api` Alpaca asset listing (`fetchFromAlpaca()`)                    | Replaced by Massive ticker reference (Step 7)             |
 | KEDA `ScaledObject` on `price-ingestor`                                       | WebSocket connection must be exactly 1 replica            |
 | `StockBrowser.tsx` (the flat 10,000-row Alpaca dump)                          | Replaced by `MarketBrowser.tsx` (Step 7)                  |
 | `PriceChart.tsx` (Recharts area chart)                                        | Replaced by `StockChart.tsx` (lightweight-charts, Step 1) |
@@ -46,27 +46,27 @@
 
 | Need                             | Source                                   | Cost               | Notes                                                                                                                           |
 | -------------------------------- | ---------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| US real-time prices + history    | **Polygon.io**                           | $29/mo (Starter)   | WebSocket minute aggregates (push, not poll); REST for full history up to 2 years; official ticker reference with ETFs natively |
+| US real-time prices + history    | **Massive (formerly Polygon.io)**        | $29/mo (Starter)   | WebSocket minute aggregates (push, not poll); REST for full history up to 2 years; official ticker reference with ETFs natively |
 | UK / international prices        | **Twelve Data**                          | Free (800 req/day) | Official REST API covering UK, EU, global markets; on-demand only (no streaming needed)                                         |
 | News (all markets)               | **Financial Modeling Prep (FMP)**        | Free (250 req/day) | Single provider for US + international; finance-specific; same key as analyst ratings                                           |
 | Analyst ratings + price targets  | **FMP** `/analyst-stock-recommendations` | Free (250 req/day) | Ratings, consensus, price targets                                                                                               |
 | Sector performance               | **FMP** `/sector-performance`            | Free (250 req/day) | Same account, no extra key                                                                                                      |
 | Index values (^FTSE, ^GSPC etc.) | **Twelve Data**                          | Free (800 req/day) | Covers major global indices                                                                                                     |
 
-### What Polygon replaces — component by component
+### What Massive replaces — component by component
 
-| Current component                     | Current behaviour                                                        | Polygon replacement                                                                                      |
+| Current component                     | Current behaviour                                                        | Massive replacement                                                                                      |
 | ------------------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `price-ingestor` Alpaca poll          | Snapshots latest trade every 30s; publishes single price point           | WebSocket `AM.*` subscription — Polygon **pushes** a complete OHLCV bar the moment each minute closes    |
-| `price-processor` bar-building        | Aggregates raw ticks into OHLCV via MongoDB `$max`/`$min`/`$inc` upserts | **Eliminated** — Polygon bars arrive complete; processor stores them directly                            |
-| `price-processor` Alpaca REST history | Last 3 days of minute bars                                               | Polygon `/v2/aggs/ticker/{t}/range/1/minute/{from}/{to}` — up to 2 years                                 |
-| `price-processor` Yahoo Finance       | Daily + minute fallback history; on-demand quotes                        | Polygon REST aggregates + Polygon snapshot API                                                           |
-| `portfolio-api` Alpaca asset listing  | US equity list via `/v2/assets`                                          | Polygon `/v3/reference/tickers` — richer (ETFs native, market cap, SIC code for future sector work)      |
+| `price-ingestor` Alpaca poll          | Snapshots latest trade every 30s; publishes single price point           | WebSocket `AM.*` subscription — Massive **pushes** a complete OHLCV bar the moment each minute closes    |
+| `price-processor` bar-building        | Aggregates raw ticks into OHLCV via MongoDB `$max`/`$min`/`$inc` upserts | **Eliminated** — Massive bars arrive complete; processor stores them directly                            |
+| `price-processor` Alpaca REST history | Last 3 days of minute bars                                               | Massive `/v2/aggs/ticker/{t}/range/1/minute/{from}/{to}` — up to 2 years                                 |
+| `price-processor` Yahoo Finance       | Daily + minute fallback history; on-demand quotes                        | Massive REST aggregates + Massive snapshot API                                                           |
+| `portfolio-api` Alpaca asset listing  | US equity list via `/v2/assets`                                          | Massive `/v3/reference/tickers` — richer (ETFs native, market cap, SIC code for future sector work)      |
 | KEDA ScaledObject on `price-ingestor` | Scales 0→N on Kafka lag                                                  | **Removed** — WebSocket requires exactly 1 persistent replica; standard Deployment replaces ScaledObject |
 
 ### Kafka message format change (ingestor → processor)
 
-Currently `RawPriceMessage` is a single tick (latest trade price). Polygon
+Currently `RawPriceMessage` is a single tick (latest trade price). Massive
 minute aggregates are complete OHLCV bars. The shared Kafka contract changes:
 
 ```typescript
@@ -82,7 +82,7 @@ export interface RawPriceMessage {
   timestamp: string;
 }
 
-// After — complete OHLCV bar from Polygon WebSocket
+// After — complete OHLCV bar from Massive WebSocket
 export interface RawPriceMessage {
   symbol: string;
   open: number;
@@ -93,6 +93,12 @@ export interface RawPriceMessage {
   timestamp: string; // bar start (UTC ISO)
 }
 ```
+
+> **Deployment atomicity:** `price-ingestor` and `price-processor` both read
+> `RawPriceMessage`. They must be deployed in the same ArgoCD sync — if
+> `price-ingestor` lands first with the new OHLCV shape while `price-processor`
+> still expects the old tick format, Kafka messages will fail to deserialize.
+> Update both image tags in `k8s-apps` in a single commit.
 
 `price-processor.process()` simplifies from complex MongoDB aggregation to a
 straight upsert.
@@ -107,7 +113,7 @@ while running:
         producer.publish(msg)
     time.sleep(30)
 
-# After — Polygon WebSocket push (polygon-api-client Python library)
+# After — Massive WebSocket push (polygon-api-client Python library)
 async def on_agg(msgs):
     for msg in msgs:
         if msg.event_type == 'AM':      # minute aggregate
@@ -121,7 +127,7 @@ async def on_agg(msgs):
                 ).isoformat(),
             ))
 
-client = WebSocketClient(api_key=settings.polygon_api_key, market=Market.Stocks)
+client = WebSocketClient(api_key=settings.massive_api_key, market=Market.Stocks)
 client.subscribe("AM.*", on_agg)    # all symbols' minute aggregates
 client.run()                         # blocking; auto-reconnects
 ```
@@ -155,37 +161,31 @@ from scratch.
 
 ### New keys required
 
-| Key                   | Service                                        | Used by                                                                                                        | Infisical path                     | Sign up                   |
-| --------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------- |
-| `MASSIVE_API_KEY`     | Massive (formerly Polygon.io) Starter ($29/mo) | `price-ingestor` (WebSocket), `price-processor` (REST history + snapshots), `portfolio-api` (ticker reference) | `/yana-stocks/MASSIVE_API_KEY`     | massive.com               |
-| `FMP_API_KEY`         | Financial Modeling Prep (free)                 | `portfolio-api` (analyst ratings, sector performance), `sentiment-analyzer` (news)                             | `/yana-stocks/FMP_API_KEY`         | financialmodelingprep.com |
-| `TWELVE_DATA_API_KEY` | Twelve Data (free, 800 req/day)                | `price-processor` (UK/international on-demand history + quotes)                                                | `/yana-stocks/TWELVE_DATA_API_KEY` | twelvedata.com            |
+| Key                   | Service                                        | Used by                                                                                                        | Infisical path                     | Status         |
+| --------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------- |
+| `MASSIVE_API_KEY`     | Massive (formerly Polygon.io) Starter ($29/mo) | `price-ingestor` (WebSocket), `price-processor` (REST history + snapshots), `portfolio-api` (ticker reference) | `/yana-stocks/MASSIVE_API_KEY`     | ✓ in Infisical |
+| `FMP_API_KEY`         | Financial Modeling Prep (free)                 | `portfolio-api` (analyst ratings, sector performance), `sentiment-analyzer` (news)                             | `/yana-stocks/FMP_API_KEY`         | ✓ in Infisical |
+| `TWELVE_DATA_API_KEY` | Twelve Data (free, 800 req/day)                | `price-processor` (UK/international on-demand history + quotes)                                                | `/yana-stocks/TWELVE_DATA_API_KEY` | ✓ in Infisical |
 
-### Keys being retired (Step 0 — Polygon migration)
+### Keys being retired
 
-| Key                 | Currently used by                                      | Reason                                                          |
-| ------------------- | ------------------------------------------------------ | --------------------------------------------------------------- |
-| `ALPACA_API_KEY`    | `price-ingestor`, `price-processor` (Alpaca REST bars) | Replaced by Massive (formerly Polygon.io) for all US price data |
-| `ALPACA_API_SECRET` | Same as above                                          | Same as above                                                   |
+| Key                 | Currently used by                                      | Retire when                                    |
+| ------------------- | ------------------------------------------------------ | ---------------------------------------------- |
+| `ALPACA_API_KEY`    | `price-ingestor`, `price-processor` (Alpaca REST bars) | After Step 0 verified in production            |
+| `ALPACA_API_SECRET` | Same + `sentiment-analyzer` (Alpaca News)              | After Step 8 (FMP news) verified in production |
 
-> Alpaca keys remain active in Infisical until the Massive migration (Step 0) is
-> complete and verified in production. Remove them after.
-
-### Keys staying unchanged
-
-| Key                                    | Service         | Used by                                                                                          |
-| -------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------ |
-| `ALPACA_API_KEY` / `ALPACA_API_SECRET` | Alpaca News API | `sentiment-analyzer` — **until Step 8** when FMP News replaces Alpaca News; retire at that point |
-
-> After Step 8 (FMP news consolidation), all Alpaca keys can be fully retired.
+> Keep both Alpaca keys active in Infisical until their respective steps are
+> verified in production. `ALPACA_API_KEY` can be retired after Step 0;
+> `ALPACA_API_SECRET` stays until Step 8 replaces `sentiment-analyzer`'s news
+> source.
 
 ### k8s / Infisical changes per step
 
-| Step                 | Action                                                                                                                                 |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| 0 (Massive)          | `MASSIVE_API_KEY` already in Infisical ✓; update `price-ingestor` and `price-processor` ExternalSecrets to reference it                |
-| 8 (FMP)              | Add `FMP_API_KEY` to Infisical; update `portfolio-api` ExternalSecret; retire Alpaca News key from `sentiment-analyzer` ExternalSecret |
-| 9 (UK / Twelve Data) | Add `TWELVE_DATA_API_KEY` to Infisical; update `price-processor` ExternalSecret                                                        |
+| Step                 | Action                                                                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 (Massive)          | `MASSIVE_API_KEY` ✓ already in Infisical; update `price-ingestor` and `price-processor` ExternalSecrets to reference it; remove Alpaca refs from both               |
+| 8 (FMP)              | `FMP_API_KEY` ✓ already in Infisical; update `portfolio-api` ExternalSecret to add it; update `sentiment-analyzer` ExternalSecret (remove Alpaca keys, add FMP key) |
+| 9 (UK / Twelve Data) | `TWELVE_DATA_API_KEY` ✓ already in Infisical; update `price-processor` ExternalSecret to reference it                                                               |
 
 ---
 
@@ -193,24 +193,80 @@ from scratch.
 
 Sequenced to deliver value early, deferring items that need new integrations:
 
-| #   | Feature                                                                 | Effort  | New data source?                                     |
-| --- | ----------------------------------------------------------------------- | ------- | ---------------------------------------------------- |
-| 0   | **Polygon.io migration** — replace Alpaca + Yahoo Finance for US prices | Medium  | Polygon.io ($29/mo)                                  |
-| 1   | Candlestick chart (switch to lightweight-charts)                        | Medium  | No                                                   |
-| 2   | Volume histogram pane below price chart                                 | Low     | No                                                   |
-| 3   | Moving average overlays (SMA/EMA)                                       | Low     | No                                                   |
-| 4   | RSI sub-chart                                                           | Medium  | No                                                   |
-| 5   | MACD sub-chart + buy/sell signal badges                                 | Medium  | No                                                   |
-| 6   | Watchlist `+` button across all ticker appearances                      | Low     | No — backend already exists                          |
-| 7   | ETF support in asset browser                                            | Trivial | No — Polygon ticker reference includes ETFs natively |
-| 8   | Analyst ratings (FMP) + news consolidation (FMP replaces Alpaca News)   | Medium  | Financial Modeling Prep                              |
-| 9   | Location-specific defaults + UK data (Twelve Data)                      | Medium  | Twelve Data                                          |
-| 10  | Home screen with indices & sectors                                      | High    | FMP + Twelve Data                                    |
-| 11  | Stock screener                                                          | High    | FMP + Twelve Data                                    |
+| #   | Feature                                                               | Effort  | New data source?                                     |
+| --- | --------------------------------------------------------------------- | ------- | ---------------------------------------------------- |
+| 0   | **Massive migration** — replace Alpaca + Yahoo Finance for US prices  | Medium  | Massive/Polygon.io ($29/mo)                          |
+| 1   | Candlestick chart (switch to lightweight-charts)                      | Medium  | No                                                   |
+| 2   | Volume histogram pane below price chart                               | Low     | No                                                   |
+| 3   | Moving average overlays (SMA/EMA)                                     | Low     | No                                                   |
+| 4   | RSI sub-chart                                                         | Medium  | No                                                   |
+| 5   | MACD sub-chart + buy/sell signal badges                               | Medium  | No                                                   |
+| 6   | Watchlist `+` button across all ticker appearances                    | Low     | No — backend already exists                          |
+| 7   | ETF support in asset browser                                          | Trivial | No — Massive ticker reference includes ETFs natively |
+| 8   | Analyst ratings (FMP) + news consolidation (FMP replaces Alpaca News) | Medium  | Financial Modeling Prep                              |
+| 9   | Location-specific defaults + UK data (Twelve Data)                    | Medium  | Twelve Data                                          |
+| 10  | Home screen with indices & sectors                                    | High    | FMP + Twelve Data                                    |
+| 11  | Stock screener                                                        | High    | FMP + Twelve Data                                    |
 
-> Step 0 (Polygon) is a prerequisite for Steps 1–7 to have accurate, real-time
+> Step 0 (Massive) is a prerequisite for Steps 1–7 to have accurate, real-time
 > data underneath them. Steps 1–6 are pure frontend and can be done
-> independently, but Polygon should land before or alongside them in production.
+> independently of Step 0, but Massive should land before or alongside them in
+> production.
+
+---
+
+## Step 0 — Massive Migration
+
+Replaces all Alpaca and Yahoo Finance dependencies for US price data. This is
+the only step that touches Python services and shared Kafka types.
+
+### Files to change
+
+#### `yana-stocks` repo
+
+| File                                                          | Action                                                                                                                                                  |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/shared-types/src/kafka.ts`                          | Update `RawPriceMessage` to OHLCV shape (see schema above)                                                                                              |
+| `services/price-ingestor/src/price_ingestor/config.py`        | Remove `alpaca_api_key`, `alpaca_api_secret`, `alpaca_base_url`, `alpaca_feed`, `poll_interval_seconds`; add `massive_api_key: str`                     |
+| `services/price-ingestor/src/price_ingestor/alpaca_client.py` | **Delete**                                                                                                                                              |
+| `services/price-ingestor/src/price_ingestor/main.py`          | Rewrite: replace poll loop with Massive WebSocket handler (see code above)                                                                              |
+| `services/price-ingestor/pyproject.toml`                      | Remove `alpaca-py`; add `polygon-api-client`                                                                                                            |
+| `apps/price-processor/src/prices/prices.service.ts`           | Remove Yahoo Finance import + history fallback + tick aggregation logic; add Massive REST client for history (`/v2/aggs`) and snapshot (`/v2/snapshot`) |
+| `apps/price-processor/package.json`                           | Remove `yahoo-finance2`; add `@polygon.io/client-js`                                                                                                    |
+
+> **Note:** `portfolio-api/src/stocks/stocks.service.ts` still calls
+> `fetchFromAlpaca()` after Step 0 — this is intentional. Alpaca keys remain
+> active and that endpoint continues working. It is replaced in Step 7 when the
+> Massive ticker reference lands.
+
+#### `k8s-apps` repo
+
+| File                                                     | Action                                                                                           |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `apps/yana-stocks/price-ingestor/keda-scaledobject.yaml` | **Delete** (WebSocket requires exactly 1 replica)                                                |
+| `apps/yana-stocks/price-ingestor/kustomization.yaml`     | Remove `keda-scaledobject.yaml` from resources list                                              |
+| `apps/yana-stocks/price-ingestor/deployment.yaml`        | Set `replicas: 1`; add `MASSIVE_API_KEY` env var from ExternalSecret; remove `ALPACA_*` env vars |
+| `apps/yana-stocks/price-ingestor/external-secret.yaml`   | Replace Alpaca key refs with `MASSIVE_API_KEY` from `/yana-stocks/MASSIVE_API_KEY`               |
+| `apps/yana-stocks/price-processor/external-secret.yaml`  | Add `MASSIVE_API_KEY`; remove `ALPACA_*` refs                                                    |
+| `apps/yana-stocks/price-processor/deployment.yaml`       | Add `MASSIVE_API_KEY` env var; remove `ALPACA_*` env vars                                        |
+
+### npm / pip packages
+
+```bash
+# price-processor (NestJS)
+pnpm --filter @yana-stocks/price-processor add @polygon.io/client-js
+pnpm --filter @yana-stocks/price-processor remove yahoo-finance2
+
+# price-ingestor (Python — pyproject.toml)
+# remove: alpaca-py
+# add:    polygon-api-client
+```
+
+### Deployment
+
+> Deploy `price-ingestor` and `price-processor` image tags in the same
+> `k8s-apps` commit — the `RawPriceMessage` format change is a breaking
+> wire-format change between these two services.
 
 ---
 
@@ -223,8 +279,11 @@ elsewhere (movers cards, portfolio).
 ### Install
 
 ```bash
-pnpm --filter @yana-stocks/frontend add lightweight-charts
+pnpm --filter @yana-stocks/frontend add lightweight-charts@5
 ```
+
+> Must install v5 specifically — `createSeriesMarkers()` and the pane layout API
+> used below are v5-only. v4 has a different API and will fail at runtime.
 
 ### Replace `PriceChart.tsx` → `StockChart.tsx`
 
@@ -403,20 +462,31 @@ multiple watchlists get a small dropdown to select which one.
 
 **File:** `apps/portfolio-api/src/stocks/stocks.service.ts`
 
-The Alpaca asset listing is gone after Step 0. The Polygon ticker reference
-(`/v3/reference/tickers`) returns equities _and_ ETFs in one feed — no parallel
-call needed. Filter by `type=CS` (common stock) or `type=ETF` when building the
-curated lists.
+The Alpaca asset listing (`fetchFromAlpaca()`) is replaced. The Massive ticker
+reference (`/v3/reference/tickers`) returns equities _and_ ETFs in one feed — no
+parallel call needed. Filter by `type=CS` (common stock) or `type=ETF` when
+building the curated lists.
+
+```bash
+# Add to portfolio-api
+pnpm --filter @yana-stocks/portfolio-api add @polygon.io/client-js
+```
 
 ```typescript
-// Polygon ticker reference — replaces fetchFromAlpaca() entirely
-const resp = await polygonClient.reference.tickers({
+import { polygonClient } from '@polygon.io/client-js';
+
+const client = polygonClient(config.get('massive.apiKey'));
+
+// Replaces fetchFromAlpaca() entirely
+const resp = await client.reference.tickers({
   market: 'stocks',
   type: 'ETF',
   active: true,
   limit: 1000,
 });
 ```
+
+Add `MASSIVE_API_KEY` to `portfolio-api`'s ExternalSecret in `k8s-apps`.
 
 Add `assetClass: 'us_equity' | 'us_etf' | 'uk_equity'` to `AssetEntry` and
 `packages/shared-types/src/stock.ts`.
@@ -448,9 +518,9 @@ the new spec. Replace with a tabbed Market Browser:
 
 ---
 
-## Step 8 — Analyst Ratings (FMP)
+## Step 8 — Analyst Ratings (FMP) + News Consolidation
 
-### Backend
+### Backend — `portfolio-api`: Analyst ratings
 
 **New module:** `apps/portfolio-api/src/analyst/`
 
@@ -461,11 +531,33 @@ the new spec. Replace with a tabbed Market Browser:
 - Redis cache: `papi:analyst:${symbol}`, 24h TTL
 - New env var: `FMP_API_KEY`
 
-**k8s changes (`k8s-apps` repo):**
+### Backend — `sentiment-analyzer`: News consolidation
 
-- Add `FMP_API_KEY` to Infisical at `/yana-stocks/FMP_API_KEY`
-- Update `apps/yana-stocks/portfolio-api/external-secret.yaml`
-- No Kong change needed — covered by existing `/api/stocks/*` prefix route
+FMP News replaces Alpaca News. The FinBERT pipeline (`analyzer.py`,
+`storage.py`, `kafka_producer.py`) is unchanged — only the news fetching layer
+changes.
+
+| File                                                                    | Action                                                               |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `services/sentiment-analyzer/src/sentiment_analyzer/news_client.py`     | **Delete** (AlpacaNewsClient)                                        |
+| `services/sentiment-analyzer/src/sentiment_analyzer/fmp_news_client.py` | **Create** — FMP `/article/list?tickers={symbol}` client             |
+| `services/sentiment-analyzer/src/sentiment_analyzer/config.py`          | Remove `alpaca_api_key`, `alpaca_api_secret`; add `fmp_api_key: str` |
+| `services/sentiment-analyzer/src/sentiment_analyzer/worker.py`          | Replace `AlpacaNewsClient` import with `FmpNewsClient`               |
+| `services/sentiment-analyzer/pyproject.toml`                            | Remove `alpaca-py` news dependency if present                        |
+
+### k8s changes (`k8s-apps` repo)
+
+- `FMP_API_KEY` ✓ already in Infisical at `/yana-stocks/FMP_API_KEY`
+- Update `apps/yana-stocks/portfolio-api/external-secret.yaml` — add
+  `FMP_API_KEY`
+- Update `apps/yana-stocks/portfolio-api/deployment.yaml` — add `FMP_API_KEY`
+  env var
+- Update `apps/yana-stocks/sentiment-analyzer/external-secret.yaml` — add
+  `FMP_API_KEY`, remove `ALPACA_API_KEY` and `ALPACA_API_SECRET`
+- Update `apps/yana-stocks/sentiment-analyzer/deployment.yaml` — swap env vars
+  accordingly
+- No Kong change needed — `GET /stocks/:symbol/analyst` is covered by existing
+  `/api/stocks/*` prefix route
 
 ### Frontend
 
@@ -485,28 +577,50 @@ Placed below `SignalsPanel` in the right column of the stock detail page.
 ### Data source: Twelve Data
 
 Twelve Data provides an official REST API covering UK, EU, and international
-markets. Free tier: 800 requests/day. UK stocks use standard tickers without
-suffix in Twelve Data (e.g., `BP`, exchange `LSE`), or with `.L` suffix in their
-format.
+markets. Free tier: 800 requests/day.
 
 New env var: `TWELVE_DATA_API_KEY`
+
+### UK symbol detection
+
+`price-processor` determines a symbol is UK/international by one of two signals:
+
+1. Symbol has `.L` suffix (e.g., `BP.L`, `SHEL.L`) — standard London Stock
+   Exchange format
+2. The requesting client passes an explicit `exchange=LSE` query parameter
+
+Twelve Data accepts `.L` suffixed symbols natively. Route any symbol matching
+`/\.L$/` (or explicit `exchange=LSE`) to `TwelveDataService`; all others go to
+the Massive path.
 
 ### Extend price-processor with Twelve Data adapter
 
 **New file:** `apps/price-processor/src/prices/twelve-data.service.ts`
 
 ```typescript
-// On-demand fetch of OHLCV history + current quote for non-Alpaca symbols.
+// On-demand fetch of OHLCV history + current quote for non-Massive symbols.
 // Calls Twelve Data REST API.
 // Stores results in same MongoDB price_bars collection and Redis cache.
-// Same OHLCV[] response shape as Alpaca data.
+// Same OHLCV[] response shape as Massive data.
 ```
 
 **Modified:** `apps/price-processor/src/prices/prices.service.ts`
 
-- Detect UK/international symbol: exchange is `LSE`, or symbol is in known UK
-  set
-- Route to `TwelveDataService` instead of Alpaca/MongoDB cache on cache miss
+- Detect UK/international symbol: `.L` suffix or `exchange=LSE` param
+- Route to `TwelveDataService` instead of Massive on cache miss
+
+```bash
+pnpm --filter @yana-stocks/price-processor add twelvedata.js
+```
+
+### k8s changes (`k8s-apps` repo)
+
+- `TWELVE_DATA_API_KEY` ✓ already in Infisical at
+  `/yana-stocks/TWELVE_DATA_API_KEY`
+- Update `apps/yana-stocks/price-processor/external-secret.yaml` — add
+  `TWELVE_DATA_API_KEY`
+- Update `apps/yana-stocks/price-processor/deployment.yaml` — add
+  `TWELVE_DATA_API_KEY` env var
 
 ### Profile: market preference
 
