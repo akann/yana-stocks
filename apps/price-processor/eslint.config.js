@@ -3,7 +3,7 @@ const { base } = require('@yana-stocks/eslint-config');
 const tseslint = require('typescript-eslint');
 
 module.exports = tseslint.config(
-  { ignores: ['dist/**'] },
+  { ignores: ['dist/**', 'src/__stubs__/**'] },
   ...base,
   {
     languageOptions: {
