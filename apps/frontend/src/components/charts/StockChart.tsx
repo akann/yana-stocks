@@ -14,10 +14,9 @@ import {
   type IChartApi,
   type ISeriesApi,
   type IPriceLine,
-  type Time,
 } from 'lightweight-charts';
-import { SMA, EMA } from 'technicalindicators';
 import { api } from '@/lib/api';
+import { computeMA, sortBars, toTime } from '@/lib/chart-utils';
 import type { OHLCVBar } from '@/types';
 
 const RANGES = [
@@ -44,34 +43,6 @@ type MAKey = (typeof MA_CONFIGS)[number]['key'];
 interface Props {
   symbol: string;
   currentPrice?: number | null;
-}
-
-function toTime(timestamp: string, isDaily: boolean): Time {
-  if (isDaily) return timestamp.slice(0, 10) as Time;
-  return Math.floor(new Date(timestamp).getTime() / 1000) as Time;
-}
-
-function sortBars(bars: OHLCVBar[]): OHLCVBar[] {
-  return [...bars].sort(
-    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-  );
-}
-
-function computeMA(
-  bars: OHLCVBar[],
-  type: 'sma' | 'ema',
-  period: number,
-  isDaily: boolean,
-): { time: Time; value: number }[] {
-  if (bars.length < period) return [];
-  const closes = bars.map((b) => b.close);
-  const values =
-    type === 'sma'
-      ? SMA.calculate({ period, values: closes })
-      : EMA.calculate({ period, values: closes });
-  const offset = period - 1;
-  // bars[offset + i] is always defined: values.length === bars.length - period + 1
-  return values.map((v, i) => ({ time: toTime(bars[offset + i]!.timestamp, isDaily), value: v }));
 }
 
 export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
