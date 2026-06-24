@@ -76,13 +76,15 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    // Capture the map reference so the cleanup closure uses a stable value
+    const maSeriesMap = maSeriesMapRef.current;
 
     chartRef.current?.remove();
     chartRef.current = null;
     updateDataRef.current = null;
     updateMAsRef.current = null;
     priceLineRef.current = null;
-    maSeriesMapRef.current.clear();
+    maSeriesMap.clear();
 
     const chart = createChart(el, {
       width: el.clientWidth,
@@ -270,9 +272,9 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
       updateDataRef.current = null;
       updateMAsRef.current = null;
       priceLineRef.current = null;
-      maSeriesMapRef.current.clear();
+      maSeriesMap.clear();
     };
-  }, [chartType, isDaily]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chartType, isDaily]);
 
   // Data, price, and MA update — all driven by the same effect to keep series in sync
   useEffect(() => {

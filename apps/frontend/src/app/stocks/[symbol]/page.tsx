@@ -26,16 +26,14 @@ function formatVolume(v: number): string {
 
 export default function StockPage(): React.JSX.Element | null {
   const params = useParams<{ symbol: string }>();
-  const symbol = params?.symbol;
-  const upperSymbol = symbol?.toUpperCase() ?? '';
+  const upperSymbol = (params?.symbol ?? '').toUpperCase();
 
-  // Guard against missing params during SSR hydration
-  if (!upperSymbol) return null;
-
+  // All hooks must be called unconditionally before any early return
   const { data: stock, isLoading: priceLoading } = useQuery<StockAggregate>({
     queryKey: ['stock', upperSymbol],
     queryFn: () => api.get<StockAggregate>(`/stocks/${upperSymbol}`).then((r) => r.data),
     refetchInterval: 10_000,
+    enabled: !!upperSymbol,
   });
 
   // Intraday minute bars for live stocks (open, running high/low, cumulative volume)
@@ -48,6 +46,7 @@ export default function StockPage(): React.JSX.Element | null {
     refetchInterval: 60_000,
     staleTime: 30_000,
     retry: false,
+    enabled: !!upperSymbol,
   });
 
   // Daily bars — fires immediately on page load to populate day stats panel
@@ -59,6 +58,7 @@ export default function StockPage(): React.JSX.Element | null {
         .then((r) => r.data),
     staleTime: 300_000,
     retry: false,
+    enabled: !!upperSymbol,
   });
 
   const dayStats = useMemo(() => {
@@ -87,6 +87,10 @@ export default function StockPage(): React.JSX.Element | null {
     }
     return null;
   }, [historyMin, historyDay]);
+
+  // Guard after all hooks — useParams always returns the symbol for this route,
+  // but defend against the edge case during SSR hydration
+  if (!upperSymbol) return null;
 
   const price = stock?.price ?? null;
   const change = stock?.change ?? null;
