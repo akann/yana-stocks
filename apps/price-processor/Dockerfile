@@ -1,4 +1,4 @@
-FROM node:24-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 ENV HUSKY=0
 
@@ -21,7 +21,7 @@ RUN pnpm --filter "@yana-stocks/shared-types" build && \
     pnpm --filter "@yana-stocks/kafka-client" build && \
     pnpm --filter "@yana-stocks/price-processor" build
 
-FROM node:24-alpine
+FROM node:22-alpine
 WORKDIR /app
 ENV HUSKY=0
 

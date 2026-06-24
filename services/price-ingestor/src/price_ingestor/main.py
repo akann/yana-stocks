@@ -36,11 +36,11 @@ def run(settings: Settings) -> None:
     producer = KafkaProducer(brokers=settings.kafka_brokers)
 
     # Subscribe strings for all configured symbols, e.g. "AM.AAPL"
-    subscriptions = [f"AM.{s}" for s in settings.symbols]
+    subscriptions = [f"AM.{s}" for s in settings.symbol_list]
 
     logger.info(
         "Starting Massive WebSocket ingestor: symbols=%s feed=StarterFeed",
-        settings.symbols,
+        settings.symbol_list,
     )
 
     stopping = False

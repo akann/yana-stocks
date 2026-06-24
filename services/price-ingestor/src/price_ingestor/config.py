@@ -1,4 +1,3 @@
-from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,22 +10,10 @@ class Settings(BaseSettings):
 
     kafka_brokers: str = "localhost:9092"
 
-    symbols: list[str] = [
-        "AAPL",
-        "GOOGL",
-        "MSFT",
-        "AMZN",
-        "TSLA",
-        "NVDA",
-        "META",
-        "JPM",
-        "V",
-        "JNJ",
-    ]
+    # Stored as a plain string so pydantic-settings doesn't attempt JSON
+    # pre-parsing (which fails on comma-separated values and empty strings).
+    symbols: str = "AAPL,GOOGL,MSFT,AMZN,TSLA,NVDA,META,JPM,V,JNJ"
 
-    @field_validator("symbols", mode="before")
-    @classmethod
-    def parse_symbols(cls, v: object) -> object:
-        if isinstance(v, str):
-            return [s.strip() for s in v.split(",") if s.strip()]
-        return v
+    @property
+    def symbol_list(self) -> list[str]:
+        return [s.strip() for s in self.symbols.split(",") if s.strip()]
