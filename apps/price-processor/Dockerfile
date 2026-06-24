@@ -1,3 +1,4 @@
+# node:22 — @polygon.io/client-js@8.x lacks exports field; Node 24 rejects it
 FROM node:22-alpine AS builder
 WORKDIR /app
 ENV HUSKY=0
