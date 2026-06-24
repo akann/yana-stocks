@@ -53,7 +53,7 @@ def run(settings: Settings) -> None:
     signal.signal(signal.SIGTERM, _shutdown)
     signal.signal(signal.SIGINT, _shutdown)
 
-    def handle_msg(msgs: list) -> None:
+    def handle_msg(msgs: list[object]) -> None:
         for msg in msgs:
             if not isinstance(msg, EquityAgg) or msg.event_type != "AM":
                 continue
