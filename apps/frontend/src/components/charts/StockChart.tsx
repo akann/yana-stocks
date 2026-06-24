@@ -108,23 +108,19 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
     });
     chartRef.current = chart;
 
-    // Volume pane (pane index 1) — 20% height relative to price pane
-    const volumePane = chart.addPane();
-    volumePane.setStretchFactor(1);
-    chart.panes()[0]?.setStretchFactor(4);
-
-    volumePane.priceScale('right').applyOptions({ visible: false });
-    volumePane.priceScale('left').applyOptions({ visible: false });
-
-    const volumeSeries = chart.addSeries(
-      HistogramSeries,
-      {
-        color: 'rgba(148, 163, 184, 0.5)',
-        priceFormat: { type: 'volume' },
-        priceScaleId: 'right',
-      },
-      1,
-    );
+    // Volume overlay in main pane — bottom 20% via scaleMargins.
+    // addPane() nulls the per-pane right axis widget when visible:false is set,
+    // hitting an ensureNotNull assertion in v5.2.0 _adjustSizeImpl. Using a
+    // custom priceScaleId ('vol') in the main pane avoids that code path.
+    const volumeSeries = chart.addSeries(HistogramSeries, {
+      color: 'rgba(148, 163, 184, 0.5)',
+      priceFormat: { type: 'volume' },
+      priceScaleId: 'vol',
+    });
+    chart.priceScale('vol').applyOptions({
+      scaleMargins: { top: 0.8, bottom: 0 },
+      visible: false,
+    });
 
     // MA series management — called from the data/MA effects
     updateMAsRef.current = (sorted: OHLCVBar[], enabled: Set<MAKey>) => {
