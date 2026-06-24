@@ -45,8 +45,8 @@ export function SignalsPanel({ symbol }: { symbol: string }): React.JSX.Element 
   return (
     <div className="space-y-4">
       {/* Sentiment */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
           Sentiment
         </h3>
         {sentiment ? (
@@ -54,16 +54,16 @@ export function SignalsPanel({ symbol }: { symbol: string }): React.JSX.Element 
             <div className="flex items-center justify-between">
               <span
                 className={clsx('text-sm font-semibold capitalize px-2 py-0.5 rounded', {
-                  'bg-green-900 text-green-400': sentiment.label === 'positive',
-                  'bg-red-900 text-red-400': sentiment.label === 'negative',
-                  'bg-gray-700 text-gray-400': sentiment.label === 'neutral',
+                  'bg-green-50 text-green-600': sentiment.label === 'positive',
+                  'bg-red-50 text-red-600': sentiment.label === 'negative',
+                  'bg-gray-200 text-gray-500': sentiment.label === 'neutral',
                 })}
               >
                 {sentiment.label}
               </span>
               <span className="text-xs text-gray-500">score: {sentiment.score.toFixed(3)}</span>
             </div>
-            <p className="text-sm text-gray-300 leading-snug">{sentiment.headline}</p>
+            <p className="text-sm text-gray-500 leading-snug">{sentiment.headline}</p>
             <p className="text-xs text-gray-500">{sentiment.source}</p>
           </div>
         ) : (
@@ -72,8 +72,8 @@ export function SignalsPanel({ symbol }: { symbol: string }): React.JSX.Element 
       </div>
 
       {/* Predictions */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
           Predictions
         </h3>
         {predList.length > 0 ? (
@@ -83,15 +83,15 @@ export function SignalsPanel({ symbol }: { symbol: string }): React.JSX.Element 
               const pct = (delta / p.currentPrice) * 100;
               const positive = delta >= 0;
               return (
-                <div key={p.horizon} className="bg-gray-800 rounded-lg p-3">
-                  <div className="text-xs text-gray-400 mb-1">{HORIZON_LABELS[p.horizon]}</div>
-                  <div className="text-base font-semibold text-white">
+                <div key={p.horizon} className="bg-gray-100 rounded-lg p-3">
+                  <div className="text-xs text-gray-500 mb-1">{HORIZON_LABELS[p.horizon]}</div>
+                  <div className="text-base font-semibold text-gray-900">
                     ${p.predictedPrice.toFixed(2)}
                   </div>
                   <div
                     className={clsx(
                       'text-xs font-medium',
-                      positive ? 'text-green-400' : 'text-red-400',
+                      positive ? 'text-green-600' : 'text-red-600',
                     )}
                   >
                     {positive ? '+' : ''}

@@ -19,9 +19,9 @@ function SentimentBadge({ label }: { label: string }) {
   return (
     <span
       className={clsx('text-xs px-1.5 py-0.5 rounded font-medium', {
-        'bg-green-900/60 text-green-400': label === 'positive',
-        'bg-red-900/60 text-red-400': label === 'negative',
-        'bg-gray-700 text-gray-400': label === 'neutral',
+        'bg-green-50 text-green-600': label === 'positive',
+        'bg-red-50 text-red-600': label === 'negative',
+        'bg-gray-200 text-gray-500': label === 'neutral',
       })}
     >
       {label}
@@ -53,32 +53,32 @@ export function WatchlistCard({
   }
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
       {/* ── Header ── */}
-      <div className="px-5 py-3.5 border-b border-gray-800 flex items-center justify-between gap-4">
+      <div className="px-5 py-3.5 border-b border-gray-200 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <h3 className="font-semibold text-white truncate">{watchlist.name}</h3>
-          <span className="text-xs text-gray-600 shrink-0">
+          <h3 className="font-semibold text-gray-900 truncate">{watchlist.name}</h3>
+          <span className="text-xs text-gray-500 shrink-0">
             {watchlist.symbols.length} symbol{watchlist.symbols.length !== 1 ? 's' : ''}
           </span>
         </div>
 
         {confirmDelete ? (
           <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs text-gray-400">Delete?</span>
+            <span className="text-xs text-gray-500">Delete?</span>
             <button
               onClick={() => {
                 onDelete();
                 setConfirmDelete(false);
               }}
               disabled={isDeleting}
-              className="text-xs text-red-400 hover:text-red-300 font-medium disabled:opacity-50"
+              className="text-xs text-red-600 hover:text-red-300 font-medium disabled:opacity-50"
             >
               {isDeleting ? 'Deleting…' : 'Yes'}
             </button>
             <button
               onClick={() => setConfirmDelete(false)}
-              className="text-xs text-gray-500 hover:text-gray-300"
+              className="text-xs text-gray-500 hover:text-gray-500"
             >
               No
             </button>
@@ -86,7 +86,7 @@ export function WatchlistCard({
         ) : (
           <button
             onClick={() => setConfirmDelete(true)}
-            className="text-gray-600 hover:text-red-400 transition-colors shrink-0"
+            className="text-gray-500 hover:text-red-600 transition-colors shrink-0"
             title="Delete watchlist"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -106,7 +106,7 @@ export function WatchlistCard({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-gray-800">
+              <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-gray-200">
                 <th className="text-left px-5 py-2.5 font-medium">Symbol</th>
                 <th className="text-right px-4 py-2.5 font-medium">Price</th>
                 <th className="text-right px-4 py-2.5 font-medium">Change</th>
@@ -126,10 +126,10 @@ export function WatchlistCard({
                 return (
                   <tr
                     key={sym}
-                    className="border-b border-gray-800 last:border-0 hover:bg-gray-800/50 transition-colors"
+                    className="border-b border-gray-200 last:border-0 hover:bg-gray-100/50 transition-colors"
                   >
                     <td
-                      className="px-5 py-3.5 font-semibold text-blue-400 font-mono cursor-pointer"
+                      className="px-5 py-3.5 font-semibold text-blue-600 font-mono cursor-pointer"
                       onClick={() => router.push(`/stocks/${sym}`)}
                     >
                       {sym}
@@ -137,19 +137,19 @@ export function WatchlistCard({
 
                     <td className="px-4 py-3.5 text-right tabular-nums">
                       {agg?.price != null ? (
-                        <span className="text-white font-medium">${agg.price.toFixed(2)}</span>
+                        <span className="text-gray-900 font-medium">${agg.price.toFixed(2)}</span>
                       ) : (
-                        <span className="text-gray-600">—</span>
+                        <span className="text-gray-500">—</span>
                       )}
                     </td>
 
                     <td className="px-4 py-3.5 text-right tabular-nums">
                       {agg?.change != null ? (
-                        <span className={dayPos ? 'text-green-400' : 'text-red-400'}>
+                        <span className={dayPos ? 'text-green-600' : 'text-red-600'}>
                           {dayPos ? '+' : ''}${agg.change.toFixed(2)}
                         </span>
                       ) : (
-                        <span className="text-gray-600">—</span>
+                        <span className="text-gray-500">—</span>
                       )}
                     </td>
 
@@ -158,14 +158,14 @@ export function WatchlistCard({
                         <span
                           className={clsx(
                             'text-xs font-medium',
-                            dayPos ? 'text-green-400' : 'text-red-400',
+                            dayPos ? 'text-green-600' : 'text-red-600',
                           )}
                         >
                           {dayPos ? '+' : ''}
                           {agg.changePercent.toFixed(2)}%
                         </span>
                       ) : (
-                        <span className="text-gray-600 text-xs">—</span>
+                        <span className="text-gray-500 text-xs">—</span>
                       )}
                     </td>
 
@@ -181,7 +181,7 @@ export function WatchlistCard({
                       <button
                         onClick={() => onRemoveSymbol(sym)}
                         disabled={isRemoving}
-                        className="text-gray-600 hover:text-red-400 transition-colors disabled:opacity-30"
+                        className="text-gray-500 hover:text-red-600 transition-colors disabled:opacity-30"
                         title={`Remove ${sym}`}
                       >
                         {isRemoving ? (
@@ -216,7 +216,7 @@ export function WatchlistCard({
       )}
 
       {/* ── Add symbol footer ── */}
-      <div className="px-5 py-3 border-t border-gray-800">
+      <div className="px-5 py-3 border-t border-gray-200">
         {showAdd ? (
           <form onSubmit={handleAddSubmit} className="flex gap-2">
             <input
@@ -226,7 +226,7 @@ export function WatchlistCard({
               onChange={(e) => setAddInput(e.target.value.toUpperCase())}
               placeholder="Symbol (e.g. AAPL)"
               maxLength={10}
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-blue-500 uppercase"
+              className="flex-1 bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:border-blue-500 uppercase"
             />
             <button
               type="button"
@@ -234,13 +234,13 @@ export function WatchlistCard({
                 setShowAdd(false);
                 setAddInput('');
               }}
-              className="text-gray-400 hover:text-gray-300 text-sm px-2"
+              className="text-gray-500 hover:text-gray-500 text-sm px-2"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 text-gray-900 px-3 py-1.5 rounded-lg text-sm transition-colors"
             >
               Add
             </button>
@@ -248,7 +248,7 @@ export function WatchlistCard({
         ) : (
           <button
             onClick={() => setShowAdd(true)}
-            className="text-sm text-blue-400 hover:text-blue-300 font-medium transition-colors"
+            className="text-sm text-blue-600 hover:text-blue-300 font-medium transition-colors"
           >
             + Add Symbol
           </button>

@@ -6,7 +6,7 @@ import Link from 'next/link';
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api';
 
 const INPUT =
-  'w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500';
+  'w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500';
 
 export function ForgotPasswordForm(): React.JSX.Element {
   const [email, setEmail] = useState('');
@@ -40,11 +40,11 @@ export function ForgotPasswordForm(): React.JSX.Element {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="w-full max-w-sm text-center space-y-4">
-          <p className="text-white">Check your inbox</p>
-          <p className="text-gray-400 text-sm">
+          <p className="text-gray-900">Check your inbox</p>
+          <p className="text-gray-500 text-sm">
             If that email is registered you&apos;ll receive a reset link shortly.
           </p>
-          <Link href="/login" className="block text-blue-400 hover:text-blue-300 text-sm">
+          <Link href="/login" className="block text-blue-600 hover:text-blue-300 text-sm">
             Back to sign in
           </Link>
         </div>
@@ -55,13 +55,13 @@ export function ForgotPasswordForm(): React.JSX.Element {
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
       <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-white mb-2 text-center">Forgot password</h1>
-        <p className="text-gray-400 text-sm text-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2 text-center">Forgot password</h1>
+        <p className="text-gray-500 text-sm text-center mb-6">
           Enter your email and we&apos;ll send you a reset link.
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Email</label>
+            <label className="block text-sm text-gray-500 mb-1">Email</label>
             <input
               type="email"
               value={email}
@@ -71,17 +71,17 @@ export function ForgotPasswordForm(): React.JSX.Element {
               className={INPUT}
             />
           </div>
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && <p className="text-red-600 text-sm">{error}</p>}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-lg font-medium transition-colors"
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-gray-900 py-2.5 rounded-lg font-medium transition-colors"
           >
             {loading ? 'Sending…' : 'Send reset link'}
           </button>
         </form>
         <p className="text-center text-sm text-gray-500 mt-4">
-          <Link href="/login" className="text-blue-400 hover:text-blue-300">
+          <Link href="/login" className="text-blue-600 hover:text-blue-300">
             Back to sign in
           </Link>
         </p>

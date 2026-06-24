@@ -24,7 +24,7 @@ function fmtUsd(n: number): string {
 function PnlCell({ pnl, pnlPct }: { pnl: number; pnlPct: number }) {
   const pos = pnl >= 0;
   return (
-    <div className={pos ? 'text-green-400' : 'text-red-400'}>
+    <div className={pos ? 'text-green-600' : 'text-red-600'}>
       <span className="font-medium">
         {pos ? '+' : '−'}${fmtUsd(Math.abs(pnl))}
       </span>
@@ -63,18 +63,18 @@ export function PortfolioTable({
   const totalPnlPct = pct(totalPnl, totalCost);
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
       {/* ── Card header ── */}
-      <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between gap-4">
+      <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between gap-4">
         <div className="flex items-baseline gap-3 min-w-0">
-          <h3 className="font-semibold text-white truncate">{portfolio.name}</h3>
+          <h3 className="font-semibold text-gray-900 truncate">{portfolio.name}</h3>
           {enriched.length > 0 && (
-            <span className="text-sm text-gray-400 shrink-0">
+            <span className="text-sm text-gray-500 shrink-0">
               ${fmtUsd(totalMktValue)}
               <span
                 className={clsx(
                   'ml-2 text-xs font-medium',
-                  totalPnl >= 0 ? 'text-green-400' : 'text-red-400',
+                  totalPnl >= 0 ? 'text-green-600' : 'text-red-600',
                 )}
               >
                 {totalPnl >= 0 ? '+' : '−'}${fmtUsd(Math.abs(totalPnl))} (
@@ -88,20 +88,20 @@ export function PortfolioTable({
         {/* Delete control */}
         {confirmDelete ? (
           <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs text-gray-400">Delete portfolio?</span>
+            <span className="text-xs text-gray-500">Delete portfolio?</span>
             <button
               onClick={() => {
                 onDelete();
                 setConfirmDelete(false);
               }}
               disabled={isDeleting}
-              className="text-xs text-red-400 hover:text-red-300 font-medium disabled:opacity-50"
+              className="text-xs text-red-600 hover:text-red-300 font-medium disabled:opacity-50"
             >
               {isDeleting ? 'Deleting…' : 'Yes'}
             </button>
             <button
               onClick={() => setConfirmDelete(false)}
-              className="text-xs text-gray-500 hover:text-gray-300"
+              className="text-xs text-gray-500 hover:text-gray-500"
             >
               No
             </button>
@@ -109,7 +109,7 @@ export function PortfolioTable({
         ) : (
           <button
             onClick={() => setConfirmDelete(true)}
-            className="text-gray-600 hover:text-red-400 transition-colors shrink-0"
+            className="text-gray-500 hover:text-red-600 transition-colors shrink-0"
             title="Delete portfolio"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -130,7 +130,7 @@ export function PortfolioTable({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-gray-800">
+                <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-gray-200">
                   <th className="text-left px-5 py-2.5 font-medium">Symbol</th>
                   <th className="text-right px-4 py-2.5 font-medium">Shares</th>
                   <th className="text-right px-4 py-2.5 font-medium hidden sm:table-cell">
@@ -149,22 +149,22 @@ export function PortfolioTable({
                   <tr
                     key={h.symbol}
                     onClick={() => router.push(`/stocks/${h.symbol}`)}
-                    className="border-b border-gray-800 last:border-0 hover:bg-gray-800/60 cursor-pointer transition-colors"
+                    className="border-b border-gray-200 last:border-0 hover:bg-gray-100/60 cursor-pointer transition-colors"
                   >
-                    <td className="px-5 py-3.5 font-semibold text-blue-400 font-mono">
+                    <td className="px-5 py-3.5 font-semibold text-blue-600 font-mono">
                       {h.symbol}
                     </td>
-                    <td className="px-4 py-3.5 text-right text-gray-300 tabular-nums">
+                    <td className="px-4 py-3.5 text-right text-gray-500 tabular-nums">
                       {h.shares}
                     </td>
-                    <td className="px-4 py-3.5 text-right text-gray-400 tabular-nums hidden sm:table-cell">
+                    <td className="px-4 py-3.5 text-right text-gray-500 tabular-nums hidden sm:table-cell">
                       ${fmtUsd(h.avgCostBasis)}
                     </td>
                     <td className="px-4 py-3.5 text-right tabular-nums">
                       {h.livePrice != null ? (
-                        <span className="text-white font-medium">${fmtUsd(h.livePrice)}</span>
+                        <span className="text-gray-900 font-medium">${fmtUsd(h.livePrice)}</span>
                       ) : (
-                        <span className="text-gray-600">—</span>
+                        <span className="text-gray-500">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3.5 text-right tabular-nums hidden md:table-cell">
@@ -172,17 +172,17 @@ export function PortfolioTable({
                         <span
                           className={clsx(
                             'text-xs font-medium',
-                            h.changePercent >= 0 ? 'text-green-400' : 'text-red-400',
+                            h.changePercent >= 0 ? 'text-green-600' : 'text-red-600',
                           )}
                         >
                           {h.changePercent >= 0 ? '+' : ''}
                           {h.changePercent.toFixed(2)}%
                         </span>
                       ) : (
-                        <span className="text-gray-600 text-xs">—</span>
+                        <span className="text-gray-500 text-xs">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3.5 text-right text-gray-300 tabular-nums hidden lg:table-cell">
+                    <td className="px-4 py-3.5 text-right text-gray-500 tabular-nums hidden lg:table-cell">
                       ${fmtUsd(h.mktValue)}
                     </td>
                     <td className="px-5 py-3.5 text-right tabular-nums">
@@ -193,13 +193,13 @@ export function PortfolioTable({
               </tbody>
               {/* Totals row */}
               <tfoot>
-                <tr className="border-t border-gray-700 bg-gray-800/30 text-xs text-gray-500">
-                  <td className="px-5 py-2.5 font-medium text-gray-400" colSpan={2}>
+                <tr className="border-t border-gray-200 bg-gray-100/30 text-xs text-gray-500">
+                  <td className="px-5 py-2.5 font-medium text-gray-500" colSpan={2}>
                     Total ({enriched.length} holding{enriched.length !== 1 ? 's' : ''})
                   </td>
                   <td className="hidden sm:table-cell" />
                   <td className="hidden md:table-cell" />
-                  <td className="px-4 py-2.5 text-right text-gray-300 font-medium hidden lg:table-cell">
+                  <td className="px-4 py-2.5 text-right text-gray-500 font-medium hidden lg:table-cell">
                     ${fmtUsd(totalMktValue)}
                   </td>
                   <td />
@@ -216,13 +216,13 @@ export function PortfolioTable({
       )}
 
       {/* ── Add Stock footer ── */}
-      <div className="px-5 py-3 border-t border-gray-800 flex justify-end">
+      <div className="px-5 py-3 border-t border-gray-200 flex justify-end">
         <button
           onClick={(e) => {
             e.stopPropagation();
             onAddStock();
           }}
-          className="text-sm text-blue-400 hover:text-blue-300 font-medium transition-colors"
+          className="text-sm text-blue-600 hover:text-blue-300 font-medium transition-colors"
         >
           + Add Stock
         </button>

@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api';
 
 const INPUT =
-  'w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500';
+  'w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500';
 
 function ResetPasswordInner(): React.JSX.Element {
   const params = useSearchParams();
@@ -24,8 +24,8 @@ function ResetPasswordInner(): React.JSX.Element {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="w-full max-w-sm text-center space-y-4">
-          <p className="text-red-400">Invalid or missing reset link.</p>
-          <Link href="/forgot-password" className="block text-blue-400 hover:text-blue-300 text-sm">
+          <p className="text-red-600">Invalid or missing reset link.</p>
+          <Link href="/forgot-password" className="block text-blue-600 hover:text-blue-300 text-sm">
             Request a new one
           </Link>
         </div>
@@ -37,9 +37,9 @@ function ResetPasswordInner(): React.JSX.Element {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="w-full max-w-sm text-center space-y-4">
-          <p className="text-white">Password updated</p>
-          <p className="text-gray-400 text-sm">You can now sign in with your new password.</p>
-          <Link href="/login" className="block text-blue-400 hover:text-blue-300 text-sm">
+          <p className="text-gray-900">Password updated</p>
+          <p className="text-gray-500 text-sm">You can now sign in with your new password.</p>
+          <Link href="/login" className="block text-blue-600 hover:text-blue-300 text-sm">
             Sign in
           </Link>
         </div>
@@ -83,11 +83,11 @@ function ResetPasswordInner(): React.JSX.Element {
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
       <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-bold text-white mb-2 text-center">Set new password</h1>
-        <p className="text-gray-400 text-sm text-center mb-6">Choose a strong password.</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2 text-center">Set new password</h1>
+        <p className="text-gray-500 text-sm text-center mb-6">Choose a strong password.</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="new-password" className="block text-sm text-gray-400 mb-1">
+            <label htmlFor="new-password" className="block text-sm text-gray-500 mb-1">
               New password
             </label>
             <input
@@ -102,7 +102,7 @@ function ResetPasswordInner(): React.JSX.Element {
             />
           </div>
           <div>
-            <label htmlFor="confirm-password" className="block text-sm text-gray-400 mb-1">
+            <label htmlFor="confirm-password" className="block text-sm text-gray-500 mb-1">
               Confirm password
             </label>
             <input
@@ -116,11 +116,11 @@ function ResetPasswordInner(): React.JSX.Element {
               className={INPUT}
             />
           </div>
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && <p className="text-red-600 text-sm">{error}</p>}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-lg font-medium transition-colors"
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-gray-900 py-2.5 rounded-lg font-medium transition-colors"
           >
             {loading ? 'Resetting…' : 'Reset password'}
           </button>
@@ -135,7 +135,7 @@ export function ResetPasswordForm(): React.JSX.Element {
     <Suspense
       fallback={
         <div className="min-h-[60vh] flex items-center justify-center">
-          <p className="text-gray-400 text-sm">Loading…</p>
+          <p className="text-gray-500 text-sm">Loading…</p>
         </div>
       }
     >

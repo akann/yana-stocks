@@ -5,12 +5,23 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        surface: {
-          '50': '#f8f9fa',
-          '900': '#0f1117',
-          '800': '#1a1d27',
-          '700': '#242736',
+        // Dark navy — used only for the top navigation bar
+        navy: {
+          900: '#0D1A30',
+          800: '#142440',
+          700: '#1E3356',
+          600: '#26437A',
         },
+        // surface tokens for cards / panels
+        surface: {
+          50: '#F8FAFC',
+          100: '#F1F5F9',
+          200: '#E2E8F0',
+        },
+      },
+      fontFamily: {
+        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Menlo', 'monospace'],
       },
     },
   },

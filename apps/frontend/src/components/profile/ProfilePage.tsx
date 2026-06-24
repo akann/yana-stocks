@@ -9,10 +9,10 @@ import type { MFASetupData } from '@/context/AuthContext';
 type Tab = 'profile' | 'password' | 'delete';
 
 const INPUT =
-  'w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500';
-const LABEL = 'block text-sm text-gray-400 mb-1';
+  'w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500';
+const LABEL = 'block text-sm text-gray-500 mb-1';
 const BTN =
-  'bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
+  'bg-blue-600 hover:bg-blue-700 text-gray-900 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
 
 export function ProfilePage(): React.JSX.Element {
   const {
@@ -36,17 +36,17 @@ export function ProfilePage(): React.JSX.Element {
   }, [isAuthenticated, isLoading, router]);
 
   if (isLoading || !isAuthenticated) {
-    return <div className="animate-pulse bg-gray-800 rounded-xl h-32 m-6" />;
+    return <div className="animate-pulse bg-gray-100 rounded-xl h-32 m-6" />;
   }
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">Account</h1>
-        <p className="text-gray-400 text-sm mt-1">{user?.email}</p>
+        <h1 className="text-2xl font-bold text-gray-900">Account</h1>
+        <p className="text-gray-500 text-sm mt-1">{user?.email}</p>
       </div>
 
-      <div className="flex border-b border-gray-700 mb-6">
+      <div className="flex border-b border-gray-200 mb-6">
         {(
           [
             { key: 'profile', label: 'Profile' },
@@ -59,8 +59,8 @@ export function ProfilePage(): React.JSX.Element {
             onClick={() => setTab(key)}
             className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
               tab === key
-                ? 'border-blue-500 text-white'
-                : 'border-transparent text-gray-400 hover:text-white'
+                ? 'border-blue-500 text-gray-900'
+                : 'border-transparent text-gray-500 hover:text-gray-900'
             }`}
           >
             {label}
@@ -175,10 +175,10 @@ function MFASection({
   }
 
   return (
-    <div className="border-t border-gray-700 pt-5 mt-5">
+    <div className="border-t border-gray-200 pt-5 mt-5">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <p className="text-sm font-medium text-white">Two-factor authentication</p>
+          <p className="text-sm font-medium text-gray-900">Two-factor authentication</p>
           <p className="text-xs text-gray-500 mt-0.5">
             {enabled
               ? 'Your account is protected with TOTP.'
@@ -186,13 +186,13 @@ function MFASection({
           </p>
         </div>
         {enabled === null ? null : enabled ? (
-          <span className="text-xs text-green-400 font-medium">Enabled</span>
+          <span className="text-xs text-green-600 font-medium">Enabled</span>
         ) : (
           <span className="text-xs text-gray-500">Disabled</span>
         )}
       </div>
 
-      {enabled === null && <div className="animate-pulse bg-gray-800 rounded h-9 w-28" />}
+      {enabled === null && <div className="animate-pulse bg-gray-100 rounded h-9 w-28" />}
 
       {enabled === false && !setupData && (
         <button type="button" onClick={() => void handleSetup()} disabled={loading} className={BTN}>
@@ -202,7 +202,7 @@ function MFASection({
 
       {enabled === false && setupData && (
         <div className="space-y-4">
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-500">
             Scan with your authenticator app (Google Authenticator, Authy, etc.).
           </p>
           {qrDataUrl && (
@@ -210,7 +210,7 @@ function MFASection({
           )}
           <div>
             <p className="text-xs text-gray-500 mb-1">Or enter this key manually:</p>
-            <code className="text-xs text-gray-300 font-mono bg-gray-800 px-2 py-1 rounded break-all block">
+            <code className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded break-all block">
               {setupData.secret}
             </code>
           </div>
@@ -226,7 +226,7 @@ function MFASection({
               className={INPUT}
             />
           </div>
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && <p className="text-red-600 text-sm">{error}</p>}
           <div className="flex gap-3">
             <button
               type="button"
@@ -239,7 +239,7 @@ function MFASection({
             <button
               type="button"
               onClick={cancelSetup}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white transition-colors"
+              className="px-4 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors"
             >
               Cancel
             </button>
@@ -249,12 +249,12 @@ function MFASection({
 
       {enabled === true && (
         <div>
-          {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
+          {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
           <button
             type="button"
             onClick={() => void handleDisable()}
             disabled={loading}
-            className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            className="bg-gray-200 hover:bg-gray-600 text-gray-900 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
           >
             {loading ? 'Disabling…' : 'Disable MFA'}
           </button>
@@ -359,8 +359,8 @@ function EditProfileForm({
         />
       </div>
 
-      <div className="border-t border-gray-700 pt-5">
-        <p className="text-sm font-medium text-gray-300 mb-4">Preferences</p>
+      <div className="border-t border-gray-200 pt-5">
+        <p className="text-sm font-medium text-gray-500 mb-4">Preferences</p>
         <div className="space-y-4">
           <div>
             <label className={LABEL}>Theme</label>
@@ -391,7 +391,7 @@ function EditProfileForm({
 
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-white">Email notifications</p>
+              <p className="text-sm text-gray-900">Email notifications</p>
               <p className="text-xs text-gray-500">Receive price alerts and portfolio updates</p>
             </div>
             <button
@@ -411,8 +411,8 @@ function EditProfileForm({
         </div>
       </div>
 
-      {error && <p className="text-red-400 text-sm">{error}</p>}
-      {success && <p className="text-green-400 text-sm">Profile saved.</p>}
+      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {success && <p className="text-green-600 text-sm">Profile saved.</p>}
 
       <button type="submit" disabled={loading} className={BTN}>
         {loading ? 'Saving…' : 'Save changes'}
@@ -466,13 +466,13 @@ function DeleteAccountSection({ onDelete }: DeleteAccountSectionProps): React.JS
   return (
     <>
       <div className="border border-red-800 rounded-lg p-5">
-        <p className="text-sm text-gray-400 mb-6">
+        <p className="text-sm text-gray-500 mb-6">
           Permanently delete your account and all associated data. This cannot be undone.
         </p>
         <button
           type="button"
           onClick={openModal}
-          className="bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          className="bg-red-700 hover:bg-red-600 text-gray-900 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >
           Delete my account
         </button>
@@ -485,9 +485,9 @@ function DeleteAccountSection({ onDelete }: DeleteAccountSectionProps): React.JS
             if (e.target === e.currentTarget) closeModal();
           }}
         >
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-sm mx-4 shadow-xl">
-            <h2 className="text-lg font-semibold text-white mb-1">Delete account</h2>
-            <p className="text-sm text-gray-400 mb-5">
+          <div className="bg-white border border-gray-200 rounded-xl p-6 w-full max-w-sm mx-4 shadow-xl">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">Delete account</h2>
+            <p className="text-sm text-gray-500 mb-5">
               Enter your password to confirm. This action is permanent and cannot be reversed.
             </p>
 
@@ -506,14 +506,14 @@ function DeleteAccountSection({ onDelete }: DeleteAccountSectionProps): React.JS
               disabled={loading}
             />
 
-            {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
+            {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
 
             <div className="flex gap-3 justify-end">
               <button
                 type="button"
                 onClick={closeModal}
                 disabled={loading}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-300 hover:text-white transition-colors disabled:opacity-50"
+                className="px-4 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -521,7 +521,7 @@ function DeleteAccountSection({ onDelete }: DeleteAccountSectionProps): React.JS
                 type="button"
                 onClick={() => void handleConfirm()}
                 disabled={loading || !password}
-                className="bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-red-700 hover:bg-red-600 text-gray-900 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Deleting…' : 'Delete my account'}
               </button>
@@ -620,8 +620,8 @@ function ChangePasswordForm({ onSave }: ChangePasswordFormProps): React.JSX.Elem
         />
       </div>
 
-      {error && <p className="text-red-400 text-sm">{error}</p>}
-      {success && <p className="text-green-400 text-sm">Password updated.</p>}
+      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {success && <p className="text-green-600 text-sm">Password updated.</p>}
 
       <button type="submit" disabled={loading} className={BTN}>
         {loading ? 'Updating…' : 'Update password'}

@@ -95,19 +95,19 @@ export default function PortfolioPage(): React.JSX.Element {
   });
 
   if (isLoading || !isAuthenticated) {
-    return <div className="animate-pulse bg-gray-800 rounded-xl h-32" />;
+    return <div className="animate-pulse bg-gray-100 rounded-xl h-32" />;
   }
 
-  const pnlColor = (summary?.pnl ?? 0) >= 0 ? 'text-green-400' : 'text-red-400';
+  const pnlColor = (summary?.pnl ?? 0) >= 0 ? 'text-green-600' : 'text-red-600';
 
   return (
     <div className="space-y-6">
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">Portfolios</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Portfolios</h1>
         <button
           onClick={() => setShowCreate(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          className="bg-blue-600 hover:bg-blue-700 text-gray-900 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >
           + New Portfolio
         </button>
@@ -115,8 +115,8 @@ export default function PortfolioPage(): React.JSX.Element {
 
       {/* ── Create form ── */}
       {showCreate && (
-        <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
-          <h2 className="text-sm font-semibold text-white mb-3">Create Portfolio</h2>
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <h2 className="text-sm font-semibold text-gray-900 mb-3">Create Portfolio</h2>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -130,33 +130,33 @@ export default function PortfolioPage(): React.JSX.Element {
               value={newPortfolioName}
               onChange={(e) => setNewPortfolioName(e.target.value)}
               placeholder="e.g. Tech Growth"
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              className="flex-1 bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500"
               required
             />
             <button
               type="button"
               onClick={() => setShowCreate(false)}
-              className="bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-2 rounded-lg text-sm transition-colors"
+              className="bg-gray-100 hover:bg-gray-200 text-gray-500 px-3 py-2 rounded-lg text-sm transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={createMutation.isPending}
-              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-3 py-2 rounded-lg text-sm transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-gray-900 px-3 py-2 rounded-lg text-sm transition-colors"
             >
               {createMutation.isPending ? 'Creating…' : 'Create'}
             </button>
           </form>
           {createMutation.isError && (
-            <p className="text-red-400 text-xs mt-2">Failed to create portfolio.</p>
+            <p className="text-red-600 text-xs mt-2">Failed to create portfolio.</p>
           )}
         </div>
       )}
 
       {/* ── Summary card ── */}
       {summary && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+        <div className="bg-white border border-gray-200 rounded-xl p-5">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
             Overall Summary
           </h2>
@@ -165,11 +165,11 @@ export default function PortfolioPage(): React.JSX.Element {
               <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">
                 Market Value
               </div>
-              <div className="text-xl font-bold text-white">${fmt(summary.totalValue)}</div>
+              <div className="text-xl font-bold text-gray-900">${fmt(summary.totalValue)}</div>
             </div>
             <div>
               <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">Invested</div>
-              <div className="text-xl font-bold text-white">${fmt(summary.totalCost)}</div>
+              <div className="text-xl font-bold text-gray-900">${fmt(summary.totalCost)}</div>
             </div>
             <div>
               <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">
@@ -192,11 +192,11 @@ export default function PortfolioPage(): React.JSX.Element {
       {portfoliosLoading ? (
         <div className="space-y-3">
           {[1, 2].map((i) => (
-            <div key={i} className="animate-pulse bg-gray-800 rounded-xl h-40" />
+            <div key={i} className="animate-pulse bg-gray-100 rounded-xl h-40" />
           ))}
         </div>
       ) : isError ? (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 text-center text-sm text-gray-500">
+        <div className="bg-white border border-gray-200 rounded-xl p-8 text-center text-sm text-gray-500">
           Could not load portfolios — make sure portfolio-service is running on port 3005.
         </div>
       ) : portfolios && portfolios.length > 0 ? (
@@ -213,14 +213,14 @@ export default function PortfolioPage(): React.JSX.Element {
           ))}
         </div>
       ) : (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center space-y-3">
-          <p className="text-gray-400 text-base font-medium">No portfolios yet</p>
-          <p className="text-gray-600 text-sm">
+        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center space-y-3">
+          <p className="text-gray-500 text-base font-medium">No portfolios yet</p>
+          <p className="text-gray-500 text-sm">
             Create your first portfolio to track your holdings.
           </p>
           <button
             onClick={() => setShowCreate(true)}
-            className="mt-2 inline-block bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+            className="mt-2 inline-block bg-blue-600 hover:bg-blue-700 text-gray-900 px-5 py-2 rounded-lg text-sm font-medium transition-colors"
           >
             + New Portfolio
           </button>

@@ -13,7 +13,7 @@ function Stat({ label, value, color }: { label: string; value: string; color?: s
   return (
     <div>
       <div className="text-gray-500 text-xs uppercase tracking-wider mb-0.5">{label}</div>
-      <div className={`font-semibold text-sm ${color ?? 'text-white'}`}>{value}</div>
+      <div className={`font-semibold text-sm ${color ?? 'text-gray-900'}`}>{value}</div>
     </div>
   );
 }
@@ -89,19 +89,19 @@ export default function StockPage(): React.JSX.Element {
   const change = stock?.change ?? null;
   const changePercent = stock?.changePercent ?? null;
   const isPositive = (changePercent ?? 0) >= 0;
-  const changeColor = isPositive ? 'text-green-400' : 'text-red-400';
+  const changeColor = isPositive ? 'text-green-600' : 'text-red-600';
 
   return (
     <div className="space-y-6">
       {/* ── Live price header ── */}
-      <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
+      <div className="bg-white border border-gray-200 rounded-xl p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           {/* Price block */}
           <div className="space-y-1">
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-white">{upperSymbol}</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{upperSymbol}</h1>
               {/* Animated live indicator */}
-              <span className="flex items-center gap-1.5 text-xs font-medium text-green-400">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-green-600">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" />
@@ -111,10 +111,10 @@ export default function StockPage(): React.JSX.Element {
             </div>
 
             {priceLoading ? (
-              <div className="animate-pulse h-9 w-40 bg-gray-800 rounded" />
+              <div className="animate-pulse h-9 w-40 bg-gray-100 rounded" />
             ) : price != null ? (
               <div className="flex items-baseline gap-3 flex-wrap">
-                <span className="text-3xl font-bold text-white tabular-nums">
+                <span className="text-3xl font-bold text-gray-900 tabular-nums">
                   ${price.toFixed(2)}
                 </span>
                 {change != null && changePercent != null && (
@@ -137,9 +137,9 @@ export default function StockPage(): React.JSX.Element {
           {dayStats && (
             <div className="flex flex-wrap gap-x-8 gap-y-3 sm:text-right">
               <Stat label="Open" value={`$${dayStats.open.toFixed(2)}`} />
-              <Stat label="High" value={`$${dayStats.high.toFixed(2)}`} color="text-green-400" />
-              <Stat label="Low" value={`$${dayStats.low.toFixed(2)}`} color="text-red-400" />
-              <Stat label="Volume" value={formatVolume(dayStats.volume)} color="text-gray-300" />
+              <Stat label="High" value={`$${dayStats.high.toFixed(2)}`} color="text-green-600" />
+              <Stat label="Low" value={`$${dayStats.low.toFixed(2)}`} color="text-red-600" />
+              <Stat label="Volume" value={formatVolume(dayStats.volume)} color="text-gray-500" />
             </div>
           )}
         </div>

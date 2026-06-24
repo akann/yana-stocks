@@ -46,19 +46,19 @@ function OHLCVTooltip({ active, payload, label }: TooltipPayload) {
   const d = payload[0]?.payload;
   if (!d) return null;
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs shadow-lg">
-      <div className="text-gray-400 mb-2 font-medium">{label}</div>
+    <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs shadow-lg">
+      <div className="text-gray-500 mb-2 font-medium">{label}</div>
       <div className="grid grid-cols-2 gap-x-5 gap-y-1">
-        <span className="text-gray-400">Open</span>
-        <span className="text-white text-right">${d.open.toFixed(2)}</span>
-        <span className="text-gray-400">High</span>
-        <span className="text-green-400 text-right">${d.high.toFixed(2)}</span>
-        <span className="text-gray-400">Low</span>
-        <span className="text-red-400 text-right">${d.low.toFixed(2)}</span>
-        <span className="text-gray-400">Close</span>
-        <span className="text-white text-right font-semibold">${d.close.toFixed(2)}</span>
-        <span className="text-gray-400">Volume</span>
-        <span className="text-gray-300 text-right">{(d.volume / 1_000).toFixed(0)}K</span>
+        <span className="text-gray-500">Open</span>
+        <span className="text-gray-900 text-right">${d.open.toFixed(2)}</span>
+        <span className="text-gray-500">High</span>
+        <span className="text-green-600 text-right">${d.high.toFixed(2)}</span>
+        <span className="text-gray-500">Low</span>
+        <span className="text-red-600 text-right">${d.low.toFixed(2)}</span>
+        <span className="text-gray-500">Close</span>
+        <span className="text-gray-900 text-right font-semibold">${d.close.toFixed(2)}</span>
+        <span className="text-gray-500">Volume</span>
+        <span className="text-gray-600 text-right">{(d.volume / 1_000).toFixed(0)}K</span>
       </div>
     </div>
   );
@@ -130,13 +130,13 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
   const gradientId = `price-grad-${symbol}`;
 
   if (isLoading) {
-    return <div className="animate-pulse bg-gray-800 rounded-xl h-80" />;
+    return <div className="animate-pulse bg-gray-100 rounded-xl h-80" />;
   }
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+    <div className="bg-white border border-gray-200 rounded-xl p-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
           Price Chart
         </h3>
         <div className="flex gap-1">
@@ -147,7 +147,7 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
               className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
                 range === r.label
                   ? 'bg-blue-600 text-white'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
               }`}
             >
               {r.label}
@@ -170,7 +170,7 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
               </linearGradient>
             </defs>
 
-            <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
 
             <XAxis
               dataKey="time"
@@ -188,7 +188,7 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
               width={52}
             />
 
-            <Tooltip content={<OHLCVTooltip />} cursor={{ stroke: '#374151', strokeWidth: 1 }} />
+            <Tooltip content={<OHLCVTooltip />} cursor={{ stroke: '#d1d5db', strokeWidth: 1 }} />
 
             {currentPrice != null && (
               <ReferenceLine
