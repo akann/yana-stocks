@@ -2,7 +2,17 @@ import { toTime, sortBars, computeMA } from '../chart-utils';
 import type { OHLCVBar } from '@/types';
 
 function makeBar(timestamp: string, close: number, extra: Partial<OHLCVBar> = {}): OHLCVBar {
-  return { timestamp, open: close, high: close, low: close, close, volume: 1000, ...extra };
+  return {
+    symbol: 'TEST',
+    interval: '1d',
+    timestamp,
+    open: close,
+    high: close,
+    low: close,
+    close,
+    volume: 1000,
+    ...extra,
+  };
 }
 
 describe('toTime', () => {

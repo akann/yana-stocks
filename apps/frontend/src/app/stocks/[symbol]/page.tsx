@@ -24,9 +24,13 @@ function formatVolume(v: number): string {
   return String(v);
 }
 
-export default function StockPage(): React.JSX.Element {
-  const { symbol } = useParams<{ symbol: string }>();
-  const upperSymbol = symbol.toUpperCase();
+export default function StockPage(): React.JSX.Element | null {
+  const params = useParams<{ symbol: string }>();
+  const symbol = params?.symbol;
+  const upperSymbol = symbol?.toUpperCase() ?? '';
+
+  // Guard against missing params during SSR hydration
+  if (!upperSymbol) return null;
 
   const { data: stock, isLoading: priceLoading } = useQuery<StockAggregate>({
     queryKey: ['stock', upperSymbol],

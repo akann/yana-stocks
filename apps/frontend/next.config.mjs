@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const config = {
   output: 'standalone',
+  // technicalindicators ESM entry (lib/index.js) has bare imports without .js extensions
+  // which break under strict ESM. Force webpack to bundle it via transpilePackages.
+  transpilePackages: ['technicalindicators'],
   experimental: {
     serverComponentsExternalPackages: [
       '@opentelemetry/sdk-node',
