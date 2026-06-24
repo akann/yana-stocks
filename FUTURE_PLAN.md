@@ -114,9 +114,13 @@ while running:
     time.sleep(30)
 
 # After — Massive WebSocket push (polygon-api-client Python library)
-async def on_agg(msgs):
+from polygon import WebSocketClient
+from polygon.websocket.models.common import Feed, Market
+from polygon.websocket.models.models import EquityAgg
+
+def handle_msg(msgs):
     for msg in msgs:
-        if msg.event_type == 'AM':      # minute aggregate
+        if isinstance(msg, EquityAgg) and msg.event_type == 'AM':  # minute aggregate
             producer.publish(OHLCVBar(
                 symbol=msg.symbol,
                 open=msg.open, high=msg.high,
@@ -127,9 +131,15 @@ async def on_agg(msgs):
                 ).isoformat(),
             ))
 
-client = WebSocketClient(api_key=settings.massive_api_key, market=Market.Stocks)
-client.subscribe("AM.*", on_agg)    # all symbols' minute aggregates
-client.run()                         # blocking; auto-reconnects
+# Feed.StarterFeed = starterfeed.polygon.io — required for the $29/mo Starter plan.
+# Using the wrong feed endpoint causes auth failure even with a valid key.
+client = WebSocketClient(
+    api_key=settings.massive_api_key,
+    feed=Feed.StarterFeed,
+    market=Market.Stocks,
+)
+client.subscribe("AM.*")    # subscribe takes topic strings only
+client.run(handle_msg)      # handler passed to run(), not subscribe(); blocks + auto-reconnects
 ```
 
 ### News consolidation
@@ -224,15 +234,25 @@ the only step that touches Python services and shared Kafka types.
 
 #### `yana-stocks` repo
 
-| File                                                          | Action                                                                                                                                                  |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/shared-types/src/kafka.ts`                          | Update `RawPriceMessage` to OHLCV shape (see schema above)                                                                                              |
-| `services/price-ingestor/src/price_ingestor/config.py`        | Remove `alpaca_api_key`, `alpaca_api_secret`, `alpaca_base_url`, `alpaca_feed`, `poll_interval_seconds`; add `massive_api_key: str`                     |
-| `services/price-ingestor/src/price_ingestor/alpaca_client.py` | **Delete**                                                                                                                                              |
-| `services/price-ingestor/src/price_ingestor/main.py`          | Rewrite: replace poll loop with Massive WebSocket handler (see code above)                                                                              |
-| `services/price-ingestor/pyproject.toml`                      | Remove `alpaca-py`; add `polygon-api-client`                                                                                                            |
-| `apps/price-processor/src/prices/prices.service.ts`           | Remove Yahoo Finance import + history fallback + tick aggregation logic; add Massive REST client for history (`/v2/aggs`) and snapshot (`/v2/snapshot`) |
-| `apps/price-processor/package.json`                           | Remove `yahoo-finance2`; add `@polygon.io/client-js`                                                                                                    |
+| File                                                          | Action                                                                                                                                                                                                                              |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/shared-types/src/kafka.ts`                          | Update `RawPriceMessage` to OHLCV shape (see schema above)                                                                                                                                                                          |
+| `services/price-ingestor/src/price_ingestor/config.py`        | Remove `alpaca_api_key`, `alpaca_api_secret`, `alpaca_base_url`, `alpaca_feed`, `poll_interval_seconds`; add `massive_api_key: str`                                                                                                 |
+| `services/price-ingestor/src/price_ingestor/alpaca_client.py` | **Delete**                                                                                                                                                                                                                          |
+| `services/price-ingestor/src/price_ingestor/main.py`          | Rewrite: replace poll loop with Massive WebSocket handler (see code above)                                                                                                                                                          |
+| `services/price-ingestor/src/price_ingestor/backfill.py`      | **Delete** — used yfinance for one-time seeding; Massive REST history via `price-processor` replaces this need                                                                                                                      |
+| `services/price-ingestor/pyproject.toml`                      | Remove `alpaca-py` and `yfinance`; add `polygon-api-client`                                                                                                                                                                         |
+| `apps/price-processor/src/prices/prices.service.ts`           | Remove Yahoo Finance import + history fallback + tick aggregation logic; add Massive REST client for history (`/v2/aggs`) and snapshot (`/v2/snapshot`); map `close` → `price` in outbound `ProcessedPriceMessage` (see note below) |
+| `apps/price-processor/package.json`                           | Remove `yahoo-finance2`; add `@polygon.io/client-js`                                                                                                                                                                                |
+
+> **`ProcessedPriceMessage.price` mapping:** `portfolio-api`'s Kafka consumer
+> reads `msg.price` from `ProcessedPriceMessage` to compute price change. After
+> Step 0, `price-processor.process()` no longer receives `msg.price` from
+> `RawPriceMessage` — it receives `msg.close`. The outbound
+> `ProcessedPriceMessage` must map `close` → `price`:
+> `processed.price = msg.close`. The Redis cache key `price:latest:${symbol}`
+> must similarly store `msg.close`. `ProcessedPriceMessage` itself is unchanged
+> — only the processor's mapping logic changes.
 
 > **Note:** `portfolio-api/src/stocks/stocks.service.ts` still calls
 > `fetchFromAlpaca()` after Step 0 — this is intentional. Alpaca keys remain
@@ -258,8 +278,32 @@ pnpm --filter @yana-stocks/price-processor add @polygon.io/client-js
 pnpm --filter @yana-stocks/price-processor remove yahoo-finance2
 
 # price-ingestor (Python — pyproject.toml)
-# remove: alpaca-py
+# remove: alpaca-py, yfinance
 # add:    polygon-api-client
+```
+
+The `@polygon.io/client-js` client uses `DefaultApi` + `Configuration` — not a
+`polygonClient()` factory. Usage in `price-processor`:
+
+```typescript
+import { DefaultApi, Configuration } from '@polygon.io/client-js';
+
+const api = new DefaultApi(new Configuration({ apiKey: massiveApiKey }));
+
+// History (replaces Alpaca REST bars + Yahoo Finance daily)
+const resp = await api.getStocksAggregates(
+  symbol, // ticker
+  1, // multiplier
+  'minute', // timespan: 'minute' | 'day'
+  fromDate, // YYYY-MM-DD
+  toDate, // YYYY-MM-DD
+  { limit: 50000, adjusted: true },
+);
+const bars = resp.data.results ?? [];
+
+// Snapshot (replaces Yahoo Finance quote)
+const snap = await api.getStocksSnapshotTicker(symbol);
+const price = snap.data.ticker?.day?.c ?? null; // closing price
 ```
 
 ### Deployment
@@ -473,17 +517,19 @@ pnpm --filter @yana-stocks/portfolio-api add @polygon.io/client-js
 ```
 
 ```typescript
-import { polygonClient } from '@polygon.io/client-js';
+import { DefaultApi, Configuration } from '@polygon.io/client-js';
 
-const client = polygonClient(config.get('massive.apiKey'));
+const api = new DefaultApi(new Configuration({ apiKey: massiveApiKey }));
 
 // Replaces fetchFromAlpaca() entirely
-const resp = await client.reference.tickers({
+// listTickers() paginates — call with cursor until next_url is absent
+const resp = await api.listTickers({
   market: 'stocks',
-  type: 'ETF',
+  type: 'ETF', // or 'CS' for common stock
   active: true,
   limit: 1000,
 });
+const tickers = resp.data.results ?? [];
 ```
 
 Add `MASSIVE_API_KEY` to `portfolio-api`'s ExternalSecret in `k8s-apps`.
