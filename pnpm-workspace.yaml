@@ -5,14 +5,14 @@ allowBuilds:
   '@prisma/engines': true
   '@scarf/scarf': false
   bcrypt: true
-  bufferutil: set this to true or false
-  es5-ext: set this to true or false
+  bufferutil: true
+  es5-ext: true
   esbuild: true
   prisma: true
   protobufjs: true
   sharp: true
   unrs-resolver: true
-  utf-8-validate: set this to true or false
+  utf-8-validate: true
 minimumReleaseAgeExclude:
   - '@turbo/darwin-64@2.9.17'
   - '@turbo/darwin-arm64@2.9.17'
