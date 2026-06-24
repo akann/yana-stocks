@@ -4,11 +4,9 @@ Strategy: mock WebSocketClient so that client.run(handler) immediately calls
 handler with the provided test messages instead of blocking on a real socket.
 """
 
-import json
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
-import pytest
 from polygon.websocket.models.models import EquityAgg
 
 from price_ingestor.config import Settings
