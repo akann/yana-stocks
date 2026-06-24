@@ -46,7 +46,7 @@ export function AddStockModal({ portfolioId, onClose }: Props): React.JSX.Elemen
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Add Stock</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm text-gray-500 mb-1">Symbol</label>
+            <label className="block text-sm text-gray-600 mb-1">Symbol</label>
             <input
               type="text"
               value={symbol}
@@ -56,7 +56,7 @@ export function AddStockModal({ portfolioId, onClose }: Props): React.JSX.Elemen
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-500 mb-1">Shares</label>
+            <label className="block text-sm text-gray-600 mb-1">Shares</label>
             <input
               type="number"
               value={shares}
@@ -68,7 +68,7 @@ export function AddStockModal({ portfolioId, onClose }: Props): React.JSX.Elemen
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-500 mb-1">Purchase Price</label>
+            <label className="block text-sm text-gray-600 mb-1">Purchase Price</label>
             <input
               type="number"
               value={price}
@@ -84,14 +84,14 @@ export function AddStockModal({ portfolioId, onClose }: Props): React.JSX.Elemen
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-500 py-2 rounded-lg transition-colors"
+              className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 py-2 rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={mutation.isPending}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-gray-900 py-2 rounded-lg transition-colors"
+              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 rounded-lg transition-colors"
             >
               {mutation.isPending ? 'Adding…' : 'Add Stock'}
             </button>

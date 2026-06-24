@@ -46,7 +46,7 @@ export function SignalsPanel({ symbol }: { symbol: string }): React.JSX.Element 
     <div className="space-y-4">
       {/* Sentiment */}
       <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+        <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">
           Sentiment
         </h3>
         {sentiment ? (
@@ -56,24 +56,24 @@ export function SignalsPanel({ symbol }: { symbol: string }): React.JSX.Element 
                 className={clsx('text-sm font-semibold capitalize px-2 py-0.5 rounded', {
                   'bg-green-50 text-green-600': sentiment.label === 'positive',
                   'bg-red-50 text-red-600': sentiment.label === 'negative',
-                  'bg-gray-200 text-gray-500': sentiment.label === 'neutral',
+                  'bg-gray-200 text-gray-600': sentiment.label === 'neutral',
                 })}
               >
                 {sentiment.label}
               </span>
-              <span className="text-xs text-gray-500">score: {sentiment.score.toFixed(3)}</span>
+              <span className="text-xs text-gray-600">score: {sentiment.score.toFixed(3)}</span>
             </div>
-            <p className="text-sm text-gray-500 leading-snug">{sentiment.headline}</p>
-            <p className="text-xs text-gray-500">{sentiment.source}</p>
+            <p className="text-sm text-gray-600 leading-snug">{sentiment.headline}</p>
+            <p className="text-xs text-gray-600">{sentiment.source}</p>
           </div>
         ) : (
-          <p className="text-gray-500 text-sm">No sentiment data</p>
+          <p className="text-gray-600 text-sm">No sentiment data</p>
         )}
       </div>
 
       {/* Predictions */}
       <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
-        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+        <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">
           Predictions
         </h3>
         {predList.length > 0 ? (
@@ -84,7 +84,7 @@ export function SignalsPanel({ symbol }: { symbol: string }): React.JSX.Element 
               const positive = delta >= 0;
               return (
                 <div key={p.horizon} className="bg-gray-100 rounded-lg p-3">
-                  <div className="text-xs text-gray-500 mb-1">{HORIZON_LABELS[p.horizon]}</div>
+                  <div className="text-xs text-gray-600 mb-1">{HORIZON_LABELS[p.horizon]}</div>
                   <div className="text-base font-semibold text-gray-900">
                     ${p.predictedPrice.toFixed(2)}
                   </div>
@@ -97,7 +97,7 @@ export function SignalsPanel({ symbol }: { symbol: string }): React.JSX.Element 
                     {positive ? '+' : ''}
                     {pct.toFixed(2)}%
                   </div>
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div className="text-xs text-gray-600 mt-1">
                     conf: {(p.confidence * 100).toFixed(0)}%
                   </div>
                 </div>
@@ -105,7 +105,7 @@ export function SignalsPanel({ symbol }: { symbol: string }): React.JSX.Element 
             })}
           </div>
         ) : (
-          <p className="text-gray-500 text-sm">No predictions available</p>
+          <p className="text-gray-600 text-sm">No predictions available</p>
         )}
       </div>
     </div>

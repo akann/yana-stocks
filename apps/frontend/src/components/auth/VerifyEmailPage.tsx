@@ -43,7 +43,7 @@ function VerifyInner(): React.JSX.Element {
   if (status === 'loading') {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <p className="text-gray-500 text-sm">Verifying your email…</p>
+        <p className="text-gray-600 text-sm">Verifying your email…</p>
       </div>
     );
   }
@@ -66,7 +66,7 @@ export function VerifyEmailPage(): React.JSX.Element {
     <Suspense
       fallback={
         <div className="min-h-[60vh] flex items-center justify-center">
-          <p className="text-gray-500 text-sm">Verifying your email…</p>
+          <p className="text-gray-600 text-sm">Verifying your email…</p>
         </div>
       }
     >

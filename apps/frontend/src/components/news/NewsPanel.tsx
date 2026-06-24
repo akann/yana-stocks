@@ -23,7 +23,7 @@ export function NewsPanel({ symbol }: { symbol: string }): React.JSX.Element {
 
   return (
     <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
-      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
+      <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">
         Recent News
       </h3>
       {isLoading ? (
@@ -48,12 +48,12 @@ export function NewsPanel({ symbol }: { symbol: string }): React.JSX.Element {
                 {a.headline}
               </a>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">{a.source}</span>
+                <span className="text-xs text-gray-600">{a.source}</span>
                 <span
                   className={clsx('text-xs px-1.5 py-0.5 rounded font-medium', {
                     'bg-green-50 text-green-600': a.sentimentLabel === 'positive',
                     'bg-red-50 text-red-600': a.sentimentLabel === 'negative',
-                    'bg-gray-200 text-gray-500': a.sentimentLabel === 'neutral',
+                    'bg-gray-200 text-gray-600': a.sentimentLabel === 'neutral',
                   })}
                 >
                   {a.sentimentLabel}
@@ -63,7 +63,7 @@ export function NewsPanel({ symbol }: { symbol: string }): React.JSX.Element {
           ))}
         </ul>
       ) : (
-        <p className="text-gray-500 text-sm">No news available</p>
+        <p className="text-gray-600 text-sm">No news available</p>
       )}
     </div>
   );

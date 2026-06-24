@@ -47,17 +47,17 @@ function OHLCVTooltip({ active, payload, label }: TooltipPayload) {
   if (!d) return null;
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-3 text-xs shadow-lg">
-      <div className="text-gray-500 mb-2 font-medium">{label}</div>
+      <div className="text-gray-600 mb-2 font-medium">{label}</div>
       <div className="grid grid-cols-2 gap-x-5 gap-y-1">
-        <span className="text-gray-500">Open</span>
+        <span className="text-gray-600">Open</span>
         <span className="text-gray-900 text-right">${d.open.toFixed(2)}</span>
-        <span className="text-gray-500">High</span>
+        <span className="text-gray-600">High</span>
         <span className="text-green-600 text-right">${d.high.toFixed(2)}</span>
-        <span className="text-gray-500">Low</span>
+        <span className="text-gray-600">Low</span>
         <span className="text-red-600 text-right">${d.low.toFixed(2)}</span>
-        <span className="text-gray-500">Close</span>
+        <span className="text-gray-600">Close</span>
         <span className="text-gray-900 text-right font-semibold">${d.close.toFixed(2)}</span>
-        <span className="text-gray-500">Volume</span>
+        <span className="text-gray-600">Volume</span>
         <span className="text-gray-600 text-right">{(d.volume / 1_000).toFixed(0)}K</span>
       </div>
     </div>
@@ -136,7 +136,7 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
   return (
     <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+        <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">
           Price Chart
         </h3>
         <div className="flex gap-1">
@@ -147,7 +147,7 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
               className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
                 range === r.label
                   ? 'bg-blue-600 text-white'
-                  : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
               }`}
             >
               {r.label}
@@ -157,7 +157,7 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
       </div>
 
       {!points.length ? (
-        <div className="h-64 flex items-center justify-center text-gray-500 text-sm">
+        <div className="h-64 flex items-center justify-center text-gray-600 text-sm">
           No price history available
         </div>
       ) : (
@@ -174,14 +174,14 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
 
             <XAxis
               dataKey="time"
-              tick={{ fill: '#6b7280', fontSize: 10 }}
+              tick={{ fill: '#4b5563', fontSize: 10 }}
               axisLine={false}
               tickLine={false}
               interval="preserveStartEnd"
             />
             <YAxis
               domain={domain}
-              tick={{ fill: '#6b7280', fontSize: 11 }}
+              tick={{ fill: '#4b5563', fontSize: 11 }}
               axisLine={false}
               tickLine={false}
               tickFormatter={(v: number) => `$${v.toFixed(0)}`}

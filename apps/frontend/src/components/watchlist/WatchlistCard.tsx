@@ -21,7 +21,7 @@ function SentimentBadge({ label }: { label: string }) {
       className={clsx('text-xs px-1.5 py-0.5 rounded font-medium', {
         'bg-green-50 text-green-600': label === 'positive',
         'bg-red-50 text-red-600': label === 'negative',
-        'bg-gray-200 text-gray-500': label === 'neutral',
+        'bg-gray-200 text-gray-600': label === 'neutral',
       })}
     >
       {label}
@@ -58,14 +58,14 @@ export function WatchlistCard({
       <div className="px-5 py-3.5 border-b border-gray-200 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <h3 className="font-semibold text-gray-900 truncate">{watchlist.name}</h3>
-          <span className="text-xs text-gray-500 shrink-0">
+          <span className="text-xs text-gray-600 shrink-0">
             {watchlist.symbols.length} symbol{watchlist.symbols.length !== 1 ? 's' : ''}
           </span>
         </div>
 
         {confirmDelete ? (
           <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs text-gray-500">Delete?</span>
+            <span className="text-xs text-gray-600">Delete?</span>
             <button
               onClick={() => {
                 onDelete();
@@ -78,7 +78,7 @@ export function WatchlistCard({
             </button>
             <button
               onClick={() => setConfirmDelete(false)}
-              className="text-xs text-gray-500 hover:text-gray-500"
+              className="text-xs text-gray-600 hover:text-gray-600"
             >
               No
             </button>
@@ -86,7 +86,7 @@ export function WatchlistCard({
         ) : (
           <button
             onClick={() => setConfirmDelete(true)}
-            className="text-gray-500 hover:text-red-600 transition-colors shrink-0"
+            className="text-gray-600 hover:text-red-600 transition-colors shrink-0"
             title="Delete watchlist"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -106,7 +106,7 @@ export function WatchlistCard({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-gray-200">
+              <tr className="text-xs text-gray-600 uppercase tracking-wider border-b border-gray-200">
                 <th className="text-left px-5 py-2.5 font-medium">Symbol</th>
                 <th className="text-right px-4 py-2.5 font-medium">Price</th>
                 <th className="text-right px-4 py-2.5 font-medium">Change</th>
@@ -139,7 +139,7 @@ export function WatchlistCard({
                       {agg?.price != null ? (
                         <span className="text-gray-900 font-medium">${agg.price.toFixed(2)}</span>
                       ) : (
-                        <span className="text-gray-500">—</span>
+                        <span className="text-gray-600">—</span>
                       )}
                     </td>
 
@@ -149,7 +149,7 @@ export function WatchlistCard({
                           {dayPos ? '+' : ''}${agg.change.toFixed(2)}
                         </span>
                       ) : (
-                        <span className="text-gray-500">—</span>
+                        <span className="text-gray-600">—</span>
                       )}
                     </td>
 
@@ -165,7 +165,7 @@ export function WatchlistCard({
                           {agg.changePercent.toFixed(2)}%
                         </span>
                       ) : (
-                        <span className="text-gray-500 text-xs">—</span>
+                        <span className="text-gray-600 text-xs">—</span>
                       )}
                     </td>
 
@@ -181,7 +181,7 @@ export function WatchlistCard({
                       <button
                         onClick={() => onRemoveSymbol(sym)}
                         disabled={isRemoving}
-                        className="text-gray-500 hover:text-red-600 transition-colors disabled:opacity-30"
+                        className="text-gray-600 hover:text-red-600 transition-colors disabled:opacity-30"
                         title={`Remove ${sym}`}
                       >
                         {isRemoving ? (
@@ -210,7 +210,7 @@ export function WatchlistCard({
           </table>
         </div>
       ) : (
-        <p className="text-gray-500 text-sm px-5 py-8 text-center">
+        <p className="text-gray-600 text-sm px-5 py-8 text-center">
           No symbols yet — add one below.
         </p>
       )}
@@ -234,13 +234,13 @@ export function WatchlistCard({
                 setShowAdd(false);
                 setAddInput('');
               }}
-              className="text-gray-500 hover:text-gray-500 text-sm px-2"
+              className="text-gray-600 hover:text-gray-600 text-sm px-2"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-gray-900 px-3 py-1.5 rounded-lg text-sm transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm transition-colors"
             >
               Add
             </button>

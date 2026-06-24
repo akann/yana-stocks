@@ -35,15 +35,15 @@ export default function DashboardPage(): React.JSX.Element {
       <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
-          <p className="text-sm text-gray-500">Total Portfolio Value</p>
+          <p className="text-sm text-gray-600">Total Portfolio Value</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">${totalValue.toFixed(2)}</p>
         </div>
         <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
-          <p className="text-sm text-gray-500">Portfolios</p>
+          <p className="text-sm text-gray-600">Portfolios</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{portfolios?.length ?? 0}</p>
         </div>
         <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
-          <p className="text-sm text-gray-500">Holdings</p>
+          <p className="text-sm text-gray-600">Holdings</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{totalHoldings}</p>
         </div>
       </div>
@@ -61,15 +61,15 @@ export default function DashboardPage(): React.JSX.Element {
               <div className="flex items-center justify-between">
                 <h3 className="font-medium text-gray-900">{p.name}</h3>
                 {p.totalValue != null && (
-                  <span className="text-sm text-gray-500">${p.totalValue.toFixed(2)}</span>
+                  <span className="text-sm text-gray-600">${p.totalValue.toFixed(2)}</span>
                 )}
               </div>
-              <p className="text-sm text-gray-500 mt-1">{p.stocks.length} holdings</p>
+              <p className="text-sm text-gray-600 mt-1">{p.stocks.length} holdings</p>
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-gray-500 text-sm">
+        <p className="text-gray-600 text-sm">
           No portfolios yet.{' '}
           <a href="/portfolio" className="text-blue-600 hover:text-blue-300">
             Create one

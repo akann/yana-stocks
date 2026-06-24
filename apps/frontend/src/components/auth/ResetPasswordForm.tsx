@@ -38,7 +38,7 @@ function ResetPasswordInner(): React.JSX.Element {
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="w-full max-w-sm text-center space-y-4">
           <p className="text-gray-900">Password updated</p>
-          <p className="text-gray-500 text-sm">You can now sign in with your new password.</p>
+          <p className="text-gray-600 text-sm">You can now sign in with your new password.</p>
           <Link href="/login" className="block text-blue-600 hover:text-blue-300 text-sm">
             Sign in
           </Link>
@@ -84,10 +84,10 @@ function ResetPasswordInner(): React.JSX.Element {
     <div className="min-h-[60vh] flex items-center justify-center">
       <div className="w-full max-w-sm">
         <h1 className="text-2xl font-bold text-gray-900 mb-2 text-center">Set new password</h1>
-        <p className="text-gray-500 text-sm text-center mb-6">Choose a strong password.</p>
+        <p className="text-gray-600 text-sm text-center mb-6">Choose a strong password.</p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="new-password" className="block text-sm text-gray-500 mb-1">
+            <label htmlFor="new-password" className="block text-sm text-gray-600 mb-1">
               New password
             </label>
             <input
@@ -102,7 +102,7 @@ function ResetPasswordInner(): React.JSX.Element {
             />
           </div>
           <div>
-            <label htmlFor="confirm-password" className="block text-sm text-gray-500 mb-1">
+            <label htmlFor="confirm-password" className="block text-sm text-gray-600 mb-1">
               Confirm password
             </label>
             <input
@@ -120,7 +120,7 @@ function ResetPasswordInner(): React.JSX.Element {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-gray-900 py-2.5 rounded-lg font-medium transition-colors"
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2.5 rounded-lg font-medium transition-colors"
           >
             {loading ? 'Resetting…' : 'Reset password'}
           </button>
@@ -135,7 +135,7 @@ export function ResetPasswordForm(): React.JSX.Element {
     <Suspense
       fallback={
         <div className="min-h-[60vh] flex items-center justify-center">
-          <p className="text-gray-500 text-sm">Loading…</p>
+          <p className="text-gray-600 text-sm">Loading…</p>
         </div>
       }
     >

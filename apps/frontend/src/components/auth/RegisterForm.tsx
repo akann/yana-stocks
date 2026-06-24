@@ -37,7 +37,7 @@ export function RegisterForm(): React.JSX.Element {
         <div className="w-full max-w-sm text-center space-y-4">
           <div className="text-4xl">📧</div>
           <h1 className="text-2xl font-bold text-gray-900">Check your inbox</h1>
-          <p className="text-gray-500 text-sm">
+          <p className="text-gray-600 text-sm">
             We sent a verification link to <span className="text-gray-900">{email}</span>. Click it
             to activate your account, then{' '}
             <Link href="/login" className="text-blue-600 hover:text-blue-300">
@@ -56,7 +56,7 @@ export function RegisterForm(): React.JSX.Element {
         <h1 className="text-2xl font-bold text-gray-900 mb-6 text-center">Create account</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="register-email" className="block text-sm text-gray-500 mb-1">
+            <label htmlFor="register-email" className="block text-sm text-gray-600 mb-1">
               Email
             </label>
             <input
@@ -71,7 +71,7 @@ export function RegisterForm(): React.JSX.Element {
             />
           </div>
           <div>
-            <label htmlFor="register-name" className="block text-sm text-gray-500 mb-1">
+            <label htmlFor="register-name" className="block text-sm text-gray-600 mb-1">
               Name (optional)
             </label>
             <input
@@ -85,7 +85,7 @@ export function RegisterForm(): React.JSX.Element {
             />
           </div>
           <div>
-            <label htmlFor="register-password" className="block text-sm text-gray-500 mb-1">
+            <label htmlFor="register-password" className="block text-sm text-gray-600 mb-1">
               Password
             </label>
             <input
@@ -104,12 +104,12 @@ export function RegisterForm(): React.JSX.Element {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-gray-900 py-2 rounded-lg font-medium transition-colors"
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-2 rounded-lg font-medium transition-colors"
           >
             {loading ? 'Creating account…' : 'Create account'}
           </button>
         </form>
-        <p className="text-center text-sm text-gray-500 mt-4">
+        <p className="text-center text-sm text-gray-600 mt-4">
           Already have an account?{' '}
           <Link href="/login" className="text-blue-600 hover:text-blue-300">
             Sign in

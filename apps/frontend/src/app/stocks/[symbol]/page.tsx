@@ -12,7 +12,7 @@ import type { OHLCVBar, StockAggregate } from '@/types';
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div>
-      <div className="text-gray-500 text-xs uppercase tracking-wider mb-0.5">{label}</div>
+      <div className="text-gray-600 text-xs uppercase tracking-wider mb-0.5">{label}</div>
       <div className={`font-semibold text-sm ${color ?? 'text-gray-900'}`}>{value}</div>
     </div>
   );
@@ -129,7 +129,7 @@ export default function StockPage(): React.JSX.Element {
                 )}
               </div>
             ) : (
-              <p className="text-gray-500 text-sm">No price data available</p>
+              <p className="text-gray-600 text-sm">No price data available</p>
             )}
           </div>
 
@@ -139,7 +139,7 @@ export default function StockPage(): React.JSX.Element {
               <Stat label="Open" value={`$${dayStats.open.toFixed(2)}`} />
               <Stat label="High" value={`$${dayStats.high.toFixed(2)}`} color="text-green-600" />
               <Stat label="Low" value={`$${dayStats.low.toFixed(2)}`} color="text-red-600" />
-              <Stat label="Volume" value={formatVolume(dayStats.volume)} color="text-gray-500" />
+              <Stat label="Volume" value={formatVolume(dayStats.volume)} color="text-gray-600" />
             </div>
           )}
         </div>

@@ -63,7 +63,7 @@ export function StockBrowser(): React.JSX.Element {
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-gray-500 text-xs uppercase tracking-wider border-b border-gray-200">
+            <tr className="text-gray-600 text-xs uppercase tracking-wider border-b border-gray-200">
               <th className="text-left pb-2 pr-4 font-medium">Symbol</th>
               <th className="text-left pb-2 pr-4 font-medium">Name</th>
               <th className="text-left pb-2 font-medium">Exchange</th>
@@ -100,13 +100,13 @@ export function StockBrowser(): React.JSX.Element {
                   <td className="py-2 pr-4 font-mono font-semibold text-blue-600">
                     {asset.symbol}
                   </td>
-                  <td className="py-2 pr-4 text-gray-500 truncate max-w-xs">{asset.name}</td>
-                  <td className="py-2 text-gray-500 text-xs">{asset.exchange}</td>
+                  <td className="py-2 pr-4 text-gray-600 truncate max-w-xs">{asset.name}</td>
+                  <td className="py-2 text-gray-600 text-xs">{asset.exchange}</td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={3} className="py-8 text-center text-gray-500">
+                <td colSpan={3} className="py-8 text-center text-gray-600">
                   No stocks found
                 </td>
               </tr>
@@ -117,24 +117,24 @@ export function StockBrowser(): React.JSX.Element {
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4 text-sm">
-          <span className="text-gray-500">
+          <span className="text-gray-600">
             {data ? `${data.total.toLocaleString()} results` : ''}
           </span>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="px-3 py-1 rounded bg-gray-100 text-gray-500 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Prev
             </button>
-            <span className="text-gray-500">
+            <span className="text-gray-600">
               {page} / {totalPages}
             </span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="px-3 py-1 rounded bg-gray-100 text-gray-500 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-1 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Next
             </button>

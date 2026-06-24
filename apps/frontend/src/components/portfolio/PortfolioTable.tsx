@@ -69,7 +69,7 @@ export function PortfolioTable({
         <div className="flex items-baseline gap-3 min-w-0">
           <h3 className="font-semibold text-gray-900 truncate">{portfolio.name}</h3>
           {enriched.length > 0 && (
-            <span className="text-sm text-gray-500 shrink-0">
+            <span className="text-sm text-gray-600 shrink-0">
               ${fmtUsd(totalMktValue)}
               <span
                 className={clsx(
@@ -88,7 +88,7 @@ export function PortfolioTable({
         {/* Delete control */}
         {confirmDelete ? (
           <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs text-gray-500">Delete portfolio?</span>
+            <span className="text-xs text-gray-600">Delete portfolio?</span>
             <button
               onClick={() => {
                 onDelete();
@@ -101,7 +101,7 @@ export function PortfolioTable({
             </button>
             <button
               onClick={() => setConfirmDelete(false)}
-              className="text-xs text-gray-500 hover:text-gray-500"
+              className="text-xs text-gray-600 hover:text-gray-600"
             >
               No
             </button>
@@ -109,7 +109,7 @@ export function PortfolioTable({
         ) : (
           <button
             onClick={() => setConfirmDelete(true)}
-            className="text-gray-500 hover:text-red-600 transition-colors shrink-0"
+            className="text-gray-600 hover:text-red-600 transition-colors shrink-0"
             title="Delete portfolio"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -130,7 +130,7 @@ export function PortfolioTable({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                <tr className="text-xs text-gray-600 uppercase tracking-wider border-b border-gray-200">
                   <th className="text-left px-5 py-2.5 font-medium">Symbol</th>
                   <th className="text-right px-4 py-2.5 font-medium">Shares</th>
                   <th className="text-right px-4 py-2.5 font-medium hidden sm:table-cell">
@@ -154,17 +154,17 @@ export function PortfolioTable({
                     <td className="px-5 py-3.5 font-semibold text-blue-600 font-mono">
                       {h.symbol}
                     </td>
-                    <td className="px-4 py-3.5 text-right text-gray-500 tabular-nums">
+                    <td className="px-4 py-3.5 text-right text-gray-600 tabular-nums">
                       {h.shares}
                     </td>
-                    <td className="px-4 py-3.5 text-right text-gray-500 tabular-nums hidden sm:table-cell">
+                    <td className="px-4 py-3.5 text-right text-gray-600 tabular-nums hidden sm:table-cell">
                       ${fmtUsd(h.avgCostBasis)}
                     </td>
                     <td className="px-4 py-3.5 text-right tabular-nums">
                       {h.livePrice != null ? (
                         <span className="text-gray-900 font-medium">${fmtUsd(h.livePrice)}</span>
                       ) : (
-                        <span className="text-gray-500">—</span>
+                        <span className="text-gray-600">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3.5 text-right tabular-nums hidden md:table-cell">
@@ -179,10 +179,10 @@ export function PortfolioTable({
                           {h.changePercent.toFixed(2)}%
                         </span>
                       ) : (
-                        <span className="text-gray-500 text-xs">—</span>
+                        <span className="text-gray-600 text-xs">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3.5 text-right text-gray-500 tabular-nums hidden lg:table-cell">
+                    <td className="px-4 py-3.5 text-right text-gray-600 tabular-nums hidden lg:table-cell">
                       ${fmtUsd(h.mktValue)}
                     </td>
                     <td className="px-5 py-3.5 text-right tabular-nums">
@@ -193,13 +193,13 @@ export function PortfolioTable({
               </tbody>
               {/* Totals row */}
               <tfoot>
-                <tr className="border-t border-gray-200 bg-gray-100/30 text-xs text-gray-500">
-                  <td className="px-5 py-2.5 font-medium text-gray-500" colSpan={2}>
+                <tr className="border-t border-gray-200 bg-gray-100/30 text-xs text-gray-600">
+                  <td className="px-5 py-2.5 font-medium text-gray-600" colSpan={2}>
                     Total ({enriched.length} holding{enriched.length !== 1 ? 's' : ''})
                   </td>
                   <td className="hidden sm:table-cell" />
                   <td className="hidden md:table-cell" />
-                  <td className="px-4 py-2.5 text-right text-gray-500 font-medium hidden lg:table-cell">
+                  <td className="px-4 py-2.5 text-right text-gray-600 font-medium hidden lg:table-cell">
                     ${fmtUsd(totalMktValue)}
                   </td>
                   <td />
@@ -212,7 +212,7 @@ export function PortfolioTable({
           </div>
         </>
       ) : (
-        <div className="px-5 py-10 text-center text-gray-500 text-sm">No holdings yet.</div>
+        <div className="px-5 py-10 text-center text-gray-600 text-sm">No holdings yet.</div>
       )}
 
       {/* ── Add Stock footer ── */}

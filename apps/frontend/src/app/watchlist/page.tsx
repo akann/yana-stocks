@@ -96,7 +96,7 @@ export default function WatchlistPage(): React.JSX.Element {
         <h1 className="text-2xl font-bold text-gray-900">Watchlists</h1>
         <button
           onClick={() => setShowCreate(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-gray-900 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >
           + New Watchlist
         </button>
@@ -125,14 +125,14 @@ export default function WatchlistPage(): React.JSX.Element {
             <button
               type="button"
               onClick={() => setShowCreate(false)}
-              className="bg-gray-100 hover:bg-gray-200 text-gray-500 px-3 py-2 rounded-lg text-sm transition-colors"
+              className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-2 rounded-lg text-sm transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={createMutation.isPending}
-              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-gray-900 px-3 py-2 rounded-lg text-sm transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-3 py-2 rounded-lg text-sm transition-colors"
             >
               {createMutation.isPending ? 'Creating…' : 'Create'}
             </button>
@@ -151,7 +151,7 @@ export default function WatchlistPage(): React.JSX.Element {
           ))}
         </div>
       ) : isError ? (
-        <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-8 text-center text-sm text-gray-500">
+        <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-8 text-center text-sm text-gray-600">
           Could not load watchlists — make sure portfolio-service is running on port 3005.
         </div>
       ) : watchlists && watchlists.length > 0 ? (
@@ -171,13 +171,13 @@ export default function WatchlistPage(): React.JSX.Element {
         </div>
       ) : (
         <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-12 text-center space-y-3">
-          <p className="text-gray-500 text-base font-medium">No watchlists yet</p>
-          <p className="text-gray-500 text-sm">
+          <p className="text-gray-600 text-base font-medium">No watchlists yet</p>
+          <p className="text-gray-600 text-sm">
             Create a watchlist to track symbols with live prices and sentiment.
           </p>
           <button
             onClick={() => setShowCreate(true)}
-            className="mt-2 inline-block bg-blue-600 hover:bg-blue-700 text-gray-900 px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+            className="mt-2 inline-block bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
           >
             + New Watchlist
           </button>
