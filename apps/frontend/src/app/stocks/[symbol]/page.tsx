@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { NewsPanel } from '@/components/news/NewsPanel';
-import { PriceChart } from '@/components/charts/PriceChart';
+import { StockChart } from '@/components/charts/StockChart';
 import { SignalsPanel } from '@/components/signals/SignalsPanel';
 import type { OHLCVBar, StockAggregate } from '@/types';
 
@@ -46,8 +46,7 @@ export default function StockPage(): React.JSX.Element {
     retry: false,
   });
 
-  // Daily bars — fires immediately on page load to trigger on-demand Yahoo Finance fetch
-  // before PriceChart mounts; also provides day stats for on-demand stocks
+  // Daily bars — fires immediately on page load to populate day stats panel
   const { data: historyDay } = useQuery<OHLCVBar[]>({
     queryKey: ['history', upperSymbol, 21, '1d'],
     queryFn: () =>
@@ -148,7 +147,7 @@ export default function StockPage(): React.JSX.Element {
       {/* ── Chart + Signals ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-          <PriceChart symbol={upperSymbol} currentPrice={price} />
+          <StockChart symbol={upperSymbol} currentPrice={price} />
         </div>
         <div>
           <SignalsPanel symbol={upperSymbol} />

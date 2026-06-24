@@ -64,7 +64,9 @@ export function Navbar(): React.JSX.Element {
                 onClick={() => setMenuOpen((o) => !o)}
                 className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors px-2 py-1 rounded hover:bg-white/10"
               >
-                <span className="hidden sm:block text-sm">{profile?.name ?? 'My Account'}</span>
+                <span className="hidden sm:block text-sm">
+                  {profile?.displayName ?? 'My Account'}
+                </span>
                 <span className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white shrink-0 overflow-hidden">
                   {profile?.avatar ? (
                     // eslint-disable-next-line @next/next/no-img-element
