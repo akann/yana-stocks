@@ -48,7 +48,7 @@ export function StockBrowser(): React.JSX.Element {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4">
+    <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
       <div className="flex items-center justify-between mb-4 gap-4">
         <h2 className="text-lg font-semibold text-gray-900 shrink-0">All Stocks</h2>
         <input

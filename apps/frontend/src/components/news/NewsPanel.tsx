@@ -22,7 +22,7 @@ export function NewsPanel({ symbol }: { symbol: string }): React.JSX.Element {
   });
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4">
+    <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
         Recent News
       </h3>

@@ -134,7 +134,7 @@ export function PriceChart({ symbol, currentPrice }: Props): React.JSX.Element {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4">
+    <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
           Price Chart

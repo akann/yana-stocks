@@ -104,7 +104,7 @@ export default function WatchlistPage(): React.JSX.Element {
 
       {/* ── Create form ── */}
       {showCreate && (
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
           <h2 className="text-sm font-semibold text-gray-900 mb-3">Create Watchlist</h2>
           <form
             onSubmit={(e) => {
@@ -151,7 +151,7 @@ export default function WatchlistPage(): React.JSX.Element {
           ))}
         </div>
       ) : isError ? (
-        <div className="bg-white border border-gray-200 rounded-xl p-8 text-center text-sm text-gray-500">
+        <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-8 text-center text-sm text-gray-500">
           Could not load watchlists — make sure portfolio-service is running on port 3005.
         </div>
       ) : watchlists && watchlists.length > 0 ? (
@@ -170,7 +170,7 @@ export default function WatchlistPage(): React.JSX.Element {
           ))}
         </div>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center space-y-3">
+        <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-12 text-center space-y-3">
           <p className="text-gray-500 text-base font-medium">No watchlists yet</p>
           <p className="text-gray-500 text-sm">
             Create a watchlist to track symbols with live prices and sentiment.

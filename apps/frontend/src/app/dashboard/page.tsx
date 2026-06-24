@@ -34,15 +34,15 @@ export default function DashboardPage(): React.JSX.Element {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
           <p className="text-sm text-gray-500">Total Portfolio Value</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">${totalValue.toFixed(2)}</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
           <p className="text-sm text-gray-500">Portfolios</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{portfolios?.length ?? 0}</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
           <p className="text-sm text-gray-500">Holdings</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{totalHoldings}</p>
         </div>
@@ -57,7 +57,7 @@ export default function DashboardPage(): React.JSX.Element {
       ) : portfolios && portfolios.length > 0 ? (
         <div className="space-y-3">
           {portfolios.map((p) => (
-            <div key={p.id} className="bg-white border border-gray-200 rounded-xl p-4">
+            <div key={p.id} className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-medium text-gray-900">{p.name}</h3>
                 {p.totalValue != null && (

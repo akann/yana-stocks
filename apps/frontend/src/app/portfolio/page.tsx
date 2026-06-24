@@ -115,7 +115,7 @@ export default function PortfolioPage(): React.JSX.Element {
 
       {/* ── Create form ── */}
       {showCreate && (
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
           <h2 className="text-sm font-semibold text-gray-900 mb-3">Create Portfolio</h2>
           <form
             onSubmit={(e) => {
@@ -156,7 +156,7 @@ export default function PortfolioPage(): React.JSX.Element {
 
       {/* ── Summary card ── */}
       {summary && (
-        <div className="bg-white border border-gray-200 rounded-xl p-5">
+        <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-5">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">
             Overall Summary
           </h2>
@@ -196,7 +196,7 @@ export default function PortfolioPage(): React.JSX.Element {
           ))}
         </div>
       ) : isError ? (
-        <div className="bg-white border border-gray-200 rounded-xl p-8 text-center text-sm text-gray-500">
+        <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-8 text-center text-sm text-gray-500">
           Could not load portfolios — make sure portfolio-service is running on port 3005.
         </div>
       ) : portfolios && portfolios.length > 0 ? (
@@ -213,7 +213,7 @@ export default function PortfolioPage(): React.JSX.Element {
           ))}
         </div>
       ) : (
-        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center space-y-3">
+        <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-12 text-center space-y-3">
           <p className="text-gray-500 text-base font-medium">No portfolios yet</p>
           <p className="text-gray-500 text-sm">
             Create your first portfolio to track your holdings.

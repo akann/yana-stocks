@@ -42,7 +42,7 @@ export function AddStockModal({ portfolioId, onClose }: Props): React.JSX.Elemen
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-white border border-gray-200 rounded-xl p-6 w-full max-w-md mx-4">
+      <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-6 w-full max-w-md mx-4">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Add Stock</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

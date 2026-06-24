@@ -485,7 +485,7 @@ function DeleteAccountSection({ onDelete }: DeleteAccountSectionProps): React.JS
             if (e.target === e.currentTarget) closeModal();
           }}
         >
-          <div className="bg-white border border-gray-200 rounded-xl p-6 w-full max-w-sm mx-4 shadow-xl">
+          <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-6 w-full max-w-sm mx-4 shadow-xl">
             <h2 className="text-lg font-semibold text-gray-900 mb-1">Delete account</h2>
             <p className="text-sm text-gray-500 mb-5">
               Enter your password to confirm. This action is permanent and cannot be reversed.

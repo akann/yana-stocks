@@ -53,7 +53,7 @@ export function WatchlistCard({
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl overflow-hidden">
       {/* ── Header ── */}
       <div className="px-5 py-3.5 border-b border-gray-200 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">

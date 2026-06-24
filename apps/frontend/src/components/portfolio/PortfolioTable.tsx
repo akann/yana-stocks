@@ -63,7 +63,7 @@ export function PortfolioTable({
   const totalPnlPct = pct(totalPnl, totalCost);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl overflow-hidden">
       {/* ── Card header ── */}
       <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between gap-4">
         <div className="flex items-baseline gap-3 min-w-0">

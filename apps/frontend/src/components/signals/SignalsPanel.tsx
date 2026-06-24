@@ -45,7 +45,7 @@ export function SignalsPanel({ symbol }: { symbol: string }): React.JSX.Element 
   return (
     <div className="space-y-4">
       {/* Sentiment */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
+      <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
           Sentiment
         </h3>
@@ -72,7 +72,7 @@ export function SignalsPanel({ symbol }: { symbol: string }): React.JSX.Element 
       </div>
 
       {/* Predictions */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4">
+      <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">
           Predictions
         </h3>
