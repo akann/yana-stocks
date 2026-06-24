@@ -87,7 +87,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
     maSeriesMap.clear();
 
     const chart = createChart(el, {
-      width: el.clientWidth,
+      autoSize: true,
       height: 360,
       layout: {
         background: { type: ColorType.Solid, color: '#f2f5f7' },
@@ -258,15 +258,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
       };
     }
 
-    const ro = new ResizeObserver(() => {
-      if (containerRef.current) {
-        chart.applyOptions({ width: containerRef.current.clientWidth });
-      }
-    });
-    ro.observe(el);
-
     return () => {
-      ro.disconnect();
       chart.remove();
       chartRef.current = null;
       updateDataRef.current = null;
