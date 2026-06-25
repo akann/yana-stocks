@@ -25,8 +25,8 @@
     "@opentelemetry/auto-instrumentations-node": "^0.77.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
     "@opentelemetry/sdk-node": "^0.219.0",
-    "@polygon.io/client-js": "^8.2.0",
     "@yana-stocks/kafka-client": "workspace:*",
+    "axios": "^1.9.0",
     "@yana-stocks/shared-types": "workspace:*",
     "ioredis": "^5.11.1",
     "kafkajs": "^2.2.4",
@@ -59,9 +59,6 @@
     ],
     "rootDir": "src",
     "testRegex": "(?<!\\.int)\\.spec\\.ts$",
-    "moduleNameMapper": {
-      "^@polygon\\.io/client-js$": "<rootDir>/__stubs__/@polygon.io/client-js.js"
-    },
     "transform": {
       "^.+\\.ts$": "ts-jest"
     },

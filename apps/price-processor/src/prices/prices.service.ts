@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import type {
@@ -8,16 +8,33 @@ import type {
   RawPriceMessage,
 } from '@yana-stocks/shared-types';
 import { KAFKA_TOPICS } from '@yana-stocks/kafka-client';
-import {
-  Configuration,
-  DefaultApi,
-  GetStocksAggregatesTimespanEnum,
-  type GetStocksAggregates200ResponseAllOfResultsInner,
-} from '@polygon.io/client-js';
+import type { AxiosInstance } from 'axios';
 import { Model } from 'mongoose';
 import { RedisService } from '../redis/redis.service';
 import { KafkaProducerService } from './kafka-producer.service';
 import { PriceBar } from './schemas/price-bar.schema';
+
+export const POLYGON_HTTP = 'POLYGON_HTTP';
+
+interface PolygonBar {
+  t?: number;
+  o?: number;
+  h?: number;
+  l?: number;
+  c?: number;
+  v?: number;
+}
+
+interface PolygonSnapshotResp {
+  ticker?: {
+    day?: { c?: number; v?: number };
+    prevDay?: { c?: number };
+  } | null;
+}
+
+interface PolygonAggregatesResp {
+  results?: PolygonBar[];
+}
 
 const PRICE_CACHE_TTL = 5;
 const QUOTE_CACHE_TTL = 900;
@@ -35,16 +52,16 @@ export interface QuoteEntry {
 @Injectable()
 export class PricesService {
   private readonly logger = new Logger(PricesService.name);
-  private readonly polygon: DefaultApi;
+  private readonly apiKey: string;
 
   constructor(
     @InjectModel(PriceBar.name) private readonly priceBarsModel: Model<PriceBar>,
     private readonly redis: RedisService,
     private readonly kafkaProducer: KafkaProducerService,
+    @Inject(POLYGON_HTTP) private readonly http: AxiosInstance,
     config: ConfigService,
   ) {
-    const apiKey = config.get<string>('massive.apiKey') ?? '';
-    this.polygon = new DefaultApi(new Configuration({ apiKey }));
+    this.apiKey = config.get<string>('massive.apiKey') ?? '';
   }
 
   async process(msg: RawPriceMessage): Promise<void> {
@@ -132,8 +149,11 @@ export class PricesService {
     if (cached) return JSON.parse(cached) as QuoteEntry;
 
     try {
-      const resp = await this.polygon.getStocksSnapshotTicker(symbol);
-      const ticker = resp.ticker;
+      const resp = await this.http.get<PolygonSnapshotResp>(
+        `/v2/snapshot/locale/us/markets/stocks/tickers/${symbol}`,
+        { params: { apiKey: this.apiKey } },
+      );
+      const ticker = resp.data.ticker;
       const close = ticker?.day?.c;
       const prevClose = ticker?.prevDay?.c;
       const volume = ticker?.day?.v;
@@ -169,10 +189,7 @@ export class PricesService {
     const noDataKey = `hist:no-data:${symbol}:${interval}`;
     if (await this.redis.get(noDataKey)) return [];
 
-    const timespan =
-      interval === '1d'
-        ? GetStocksAggregatesTimespanEnum.Day
-        : GetStocksAggregatesTimespanEnum.Minute;
+    const timespan = interval === '1d' ? 'day' : 'minute';
     const lookbackDays = interval === '1d' ? 730 : 3;
 
     const to = new Date();
@@ -183,18 +200,12 @@ export class PricesService {
     const fromStr = from.toISOString().slice(0, 10);
 
     try {
-      const resp = await this.polygon.getStocksAggregates(
-        symbol,
-        1,
-        timespan,
-        fromStr,
-        toStr,
-        true, // adjusted
-        undefined,
-        50000,
+      const resp = await this.http.get<PolygonAggregatesResp>(
+        `/v2/aggs/ticker/${symbol}/range/1/${timespan}/${fromStr}/${toStr}`,
+        { params: { adjusted: true, limit: 50000, apiKey: this.apiKey } },
       );
 
-      const results = resp.results ?? [];
+      const results = resp.data.results ?? [];
       if (results.length === 0) {
         await this.redis.setex(noDataKey, 86400, '1');
         return [];
@@ -202,7 +213,7 @@ export class PricesService {
 
       this.logger.log('Fetched %d %s bars from Massive for %s', results.length, interval, symbol);
 
-      const ops = results.map((bar: GetStocksAggregates200ResponseAllOfResultsInner) => ({
+      const ops = results.map((bar: PolygonBar) => ({
         updateOne: {
           filter: {
             symbol,

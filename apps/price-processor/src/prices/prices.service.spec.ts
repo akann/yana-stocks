@@ -1,46 +1,12 @@
-// ── @polygon.io/client-js mock ────────────────────────────────────────────
-// Attach shared jest.fn() instances to the constructor so tests can reach
-// them via MockDefaultApi._aggregates / _snapshot after hoisting.
-jest.mock('@polygon.io/client-js', () => {
-  const getStocksAggregates = jest.fn();
-  const getStocksSnapshotTicker = jest.fn();
-  return {
-    __esModule: true,
-    DefaultApi: Object.assign(
-      jest.fn(() => ({ getStocksAggregates, getStocksSnapshotTicker })),
-      { _aggregates: getStocksAggregates, _snapshot: getStocksSnapshotTicker },
-    ),
-    Configuration: jest.fn(),
-    // The service imports this enum at module level; provide real values so the
-    // service initialises correctly even when the whole package is mocked.
-    GetStocksAggregatesTimespanEnum: {
-      Second: 'second',
-      Minute: 'minute',
-      Hour: 'hour',
-      Day: 'day',
-      Week: 'week',
-      Month: 'month',
-      Quarter: 'quarter',
-      Year: 'year',
-    },
-  };
-});
-
 import { ConfigService } from '@nestjs/config';
 import { getModelToken } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
 import type { ProcessedPriceMessage, RawPriceMessage } from '@yana-stocks/shared-types';
 import { KAFKA_TOPICS } from '@yana-stocks/kafka-client';
-import { DefaultApi } from '@polygon.io/client-js';
 import { RedisService } from '../redis/redis.service';
 import { KafkaProducerService } from './kafka-producer.service';
-import { PricesService } from './prices.service';
+import { POLYGON_HTTP, PricesService } from './prices.service';
 import { PriceBar } from './schemas/price-bar.schema';
-
-const MockDefaultApi = DefaultApi as unknown as jest.Mock & {
-  _aggregates: jest.Mock;
-  _snapshot: jest.Mock;
-};
 
 // ── fixtures ──────────────────────────────────────────────────────────────
 
@@ -62,10 +28,10 @@ const rawMsg: RawPriceMessage = {
   low: 149.5,
   close: 151.0,
   volume: 500,
-  timestamp: '2024-01-01T10:30:00.000Z', // bar start — already a minute boundary
+  timestamp: '2024-01-01T10:30:00.000Z',
 };
 
-// Massive aggregates response shapes — matches GetStocksAggregates200Response directly (no .data wrapper)
+// Polygon REST API response shapes (axios wraps body in { data: ... })
 const massiveAggSuccess = {
   ticker: 'SHOP',
   results: [
@@ -81,7 +47,6 @@ const massiveAggSuccess = {
 };
 const massiveAggEmpty = { ticker: 'SHOP', results: [] };
 
-// Massive snapshot response — matches GetStocksSnapshotTicker200Response directly (no .data wrapper)
 const massiveSnapSuccess = {
   ticker: {
     day: { c: 151.0, v: 5_000_000 },
@@ -98,6 +63,7 @@ interface Fixture {
   redisGet: jest.Mock;
   redisSetex: jest.Mock;
   producer: { emit: jest.Mock };
+  mockGet: jest.Mock;
 }
 
 function makeFindChain(result: PriceBar[] = []) {
@@ -111,6 +77,7 @@ function makeFindChain(result: PriceBar[] = []) {
 }
 
 async function buildModule(): Promise<Fixture> {
+  const mockGet = jest.fn();
   const model = {
     findOneAndUpdate: jest.fn().mockReturnValue({
       lean: () => ({ exec: () => Promise.resolve(mockBar) }),
@@ -140,6 +107,7 @@ async function buildModule(): Promise<Fixture> {
           }),
         },
       },
+      { provide: POLYGON_HTTP, useValue: { get: mockGet } },
     ],
   }).compile();
 
@@ -149,6 +117,7 @@ async function buildModule(): Promise<Fixture> {
     redisGet,
     redisSetex,
     producer: { emit },
+    mockGet,
   };
 }
 
@@ -229,55 +198,45 @@ describe('PricesService', () => {
 
   describe('getHistory', () => {
     it('returns DB bars without fetching when hist:fetched flag is set', async () => {
-      const { service, redisGet } = await buildModule();
+      const { service, redisGet, mockGet } = await buildModule();
       redisGet.mockImplementation((key: string) =>
         Promise.resolve(key === 'hist:fetched:SHOP:1m' ? '1' : null),
       );
 
       await service.getHistory('SHOP', { limit: 60, interval: '1m' });
 
-      expect(MockDefaultApi._aggregates).not.toHaveBeenCalled();
+      expect(mockGet).not.toHaveBeenCalled();
     });
 
-    it('calls Massive getStocksAggregates on cache miss', async () => {
-      const { service } = await buildModule();
-      MockDefaultApi._aggregates.mockResolvedValue(massiveAggEmpty);
+    it('calls Polygon aggregates endpoint on cache miss', async () => {
+      const { service, mockGet } = await buildModule();
+      mockGet.mockResolvedValue({ data: massiveAggEmpty });
 
       await service.getHistory('SHOP', { limit: 60, interval: '1m' });
 
-      expect(MockDefaultApi._aggregates).toHaveBeenCalledWith(
-        'SHOP',
-        1,
-        'minute',
-        expect.any(String),
-        expect.any(String),
-        true,
-        undefined,
-        50000,
+      expect(mockGet).toHaveBeenCalledWith(
+        expect.stringContaining('/v2/aggs/ticker/SHOP/range/1/minute/'),
+        expect.objectContaining({
+          params: expect.objectContaining({ adjusted: true, limit: 50000 }) as unknown,
+        }),
       );
     });
 
     it('uses timespan=day for 1d interval', async () => {
-      const { service } = await buildModule();
-      MockDefaultApi._aggregates.mockResolvedValue(massiveAggEmpty);
+      const { service, mockGet } = await buildModule();
+      mockGet.mockResolvedValue({ data: massiveAggEmpty });
 
       await service.getHistory('SHOP', { limit: 21, interval: '1d' });
 
-      expect(MockDefaultApi._aggregates).toHaveBeenCalledWith(
-        'SHOP',
-        1,
-        'day',
-        expect.any(String),
-        expect.any(String),
-        true,
-        undefined,
-        50000,
+      expect(mockGet).toHaveBeenCalledWith(
+        expect.stringContaining('/v2/aggs/ticker/SHOP/range/1/day/'),
+        expect.anything(),
       );
     });
 
     it('stores bars and sets hist:fetched flag on success', async () => {
-      const { service, model, redisSetex } = await buildModule();
-      MockDefaultApi._aggregates.mockResolvedValue(massiveAggSuccess);
+      const { service, model, redisSetex, mockGet } = await buildModule();
+      mockGet.mockResolvedValue({ data: massiveAggSuccess });
 
       await service.getHistory('SHOP', { limit: 60, interval: '1m' });
 
@@ -286,8 +245,8 @@ describe('PricesService', () => {
     });
 
     it('sets no-data flag with 24h TTL when Massive returns empty results', async () => {
-      const { service, redisSetex } = await buildModule();
-      MockDefaultApi._aggregates.mockResolvedValue(massiveAggEmpty);
+      const { service, redisSetex, mockGet } = await buildModule();
+      mockGet.mockResolvedValue({ data: massiveAggEmpty });
 
       await service.getHistory('SHOP', { limit: 60, interval: '1m' });
 
@@ -295,8 +254,8 @@ describe('PricesService', () => {
     });
 
     it('sets no-data flag with 1h TTL when Massive throws', async () => {
-      const { service, redisSetex } = await buildModule();
-      MockDefaultApi._aggregates.mockRejectedValue(new Error('network error'));
+      const { service, redisSetex, mockGet } = await buildModule();
+      mockGet.mockRejectedValue(new Error('network error'));
 
       await service.getHistory('SHOP', { limit: 60, interval: '1m' });
 
@@ -304,27 +263,26 @@ describe('PricesService', () => {
     });
 
     it('skips fetch when no-data flag is already set', async () => {
-      const { service, redisGet } = await buildModule();
+      const { service, redisGet, mockGet } = await buildModule();
       redisGet.mockImplementation((key: string) =>
         Promise.resolve(key === 'hist:no-data:SHOP:1m' ? '1' : null),
       );
 
       await service.getHistory('SHOP', { limit: 60, interval: '1m' });
 
-      expect(MockDefaultApi._aggregates).not.toHaveBeenCalled();
+      expect(mockGet).not.toHaveBeenCalled();
     });
 
     it('1d and 1m freshness flags are independent', async () => {
-      const { service, redisGet } = await buildModule();
-      MockDefaultApi._aggregates.mockResolvedValue(massiveAggEmpty);
-      // only the 1d flag is set — 1m should still fetch
+      const { service, redisGet, mockGet } = await buildModule();
+      mockGet.mockResolvedValue({ data: massiveAggEmpty });
       redisGet.mockImplementation((key: string) =>
         Promise.resolve(key === 'hist:fetched:SHOP:1d' ? '1' : null),
       );
 
       await service.getHistory('SHOP', { limit: 60, interval: '1m' });
 
-      expect(MockDefaultApi._aggregates).toHaveBeenCalled();
+      expect(mockGet).toHaveBeenCalled();
     });
   });
 
@@ -332,7 +290,7 @@ describe('PricesService', () => {
 
   describe('getQuote', () => {
     it('returns cached entry from Redis without calling Massive', async () => {
-      const { service, redisGet } = await buildModule();
+      const { service, redisGet, mockGet } = await buildModule();
       const cached = JSON.stringify({
         price: 150,
         prevPrice: 148,
@@ -345,17 +303,20 @@ describe('PricesService', () => {
 
       const result = await service.getQuote('AAPL');
 
-      expect(MockDefaultApi._snapshot).not.toHaveBeenCalled();
+      expect(mockGet).not.toHaveBeenCalled();
       expect(result?.price).toBe(150);
     });
 
-    it('calls Massive snapshot and maps the response on cache miss', async () => {
-      const { service, redisSetex } = await buildModule();
-      MockDefaultApi._snapshot.mockResolvedValue(massiveSnapSuccess);
+    it('calls Polygon snapshot endpoint and maps the response on cache miss', async () => {
+      const { service, redisSetex, mockGet } = await buildModule();
+      mockGet.mockResolvedValue({ data: massiveSnapSuccess });
 
       const result = await service.getQuote('AAPL');
 
-      expect(MockDefaultApi._snapshot).toHaveBeenCalledWith('AAPL');
+      expect(mockGet).toHaveBeenCalledWith(
+        expect.stringContaining('/v2/snapshot/locale/us/markets/stocks/tickers/AAPL'),
+        expect.anything(),
+      );
       expect(result?.price).toBe(151.0);
       expect(result?.prevPrice).toBe(148.0);
       expect(result?.change).toBeCloseTo(3.0);
@@ -363,8 +324,8 @@ describe('PricesService', () => {
     });
 
     it('returns null when Massive snapshot has no data', async () => {
-      const { service } = await buildModule();
-      MockDefaultApi._snapshot.mockResolvedValue(massiveSnapEmpty);
+      const { service, mockGet } = await buildModule();
+      mockGet.mockResolvedValue({ data: massiveSnapEmpty });
 
       const result = await service.getQuote('AAPL');
 
@@ -372,8 +333,8 @@ describe('PricesService', () => {
     });
 
     it('returns null when Massive throws', async () => {
-      const { service } = await buildModule();
-      MockDefaultApi._snapshot.mockRejectedValue(new Error('timeout'));
+      const { service, mockGet } = await buildModule();
+      mockGet.mockRejectedValue(new Error('timeout'));
 
       const result = await service.getQuote('AAPL');
 
