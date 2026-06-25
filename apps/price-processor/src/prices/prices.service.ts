@@ -128,7 +128,8 @@ export class PricesService {
 
     const isFresh = !!(await this.redis.get(`hist:fetched:${symbol}:${interval}`));
     if (!isFresh) {
-      bars = await this.fetchAndStoreHistory(symbol, interval, opts.limit, filter);
+      const fetched = await this.fetchAndStoreHistory(symbol, interval, opts.limit, filter);
+      if (fetched.length > 0) bars = fetched;
     }
 
     return bars.map((b) => ({
@@ -252,7 +253,6 @@ export class PricesService {
         interval,
         (err as Error).message,
       );
-      await this.redis.setex(noDataKey, 3600, '1');
       return [];
     }
   }
