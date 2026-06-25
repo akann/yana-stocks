@@ -253,13 +253,13 @@ describe('PricesService', () => {
       expect(redisSetex).toHaveBeenCalledWith('hist:no-data:SHOP:1m', 86400, '1');
     });
 
-    it('sets no-data flag with 1h TTL when Massive throws', async () => {
+    it('does not set no-data flag when Massive throws (network error should not poison DB fallback)', async () => {
       const { service, redisSetex, mockGet } = await buildModule();
       mockGet.mockRejectedValue(new Error('network error'));
 
       await service.getHistory('SHOP', { limit: 60, interval: '1m' });
 
-      expect(redisSetex).toHaveBeenCalledWith('hist:no-data:SHOP:1m', 3600, '1');
+      expect(redisSetex).not.toHaveBeenCalledWith('hist:no-data:SHOP:1m', expect.anything(), '1');
     });
 
     it('skips fetch when no-data flag is already set', async () => {
