@@ -72,7 +72,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
     staleTime: isDaily ? 300_000 : 10_000,
   });
 
-  // Chart init — recreate on chart type or interval change (not on data or MAs)
+  // Chart setup — recreate on chart type or interval change (not on data or MAs)
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
