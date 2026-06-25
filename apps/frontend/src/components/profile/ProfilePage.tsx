@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
 import { useAuth } from '@/context/AuthContext';
@@ -206,7 +207,14 @@ function MFASection({
             Scan with your authenticator app (Google Authenticator, Authy, etc.).
           </p>
           {qrDataUrl && (
-            <img src={qrDataUrl} alt="MFA QR code" className="bg-white p-2 rounded-lg w-48 h-48" />
+            <Image
+              src={qrDataUrl}
+              alt="MFA QR code"
+              width={192}
+              height={192}
+              unoptimized
+              className="bg-white p-2 rounded-lg"
+            />
           )}
           <div>
             <p className="text-xs text-gray-600 mb-1">Or enter this key manually:</p>

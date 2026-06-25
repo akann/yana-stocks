@@ -622,6 +622,7 @@ jobs:
           build-args: |
             ${{ matrix.service.name == 'frontend' && 'NEXT_PUBLIC_API_URL=https://api-gateway.yanatech.co.uk/api' || '' }}
             ${{ matrix.service.name == 'frontend' && 'NEXT_PUBLIC_WS_URL=wss://api-gateway.yanatech.co.uk' || '' }}
+          provenance: false
           cache-from: type=registry,ref=${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}:buildcache
           cache-to: type=registry,ref=${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}:buildcache,mode=max
 
