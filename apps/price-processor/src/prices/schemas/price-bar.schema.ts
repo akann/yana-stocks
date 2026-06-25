@@ -31,5 +31,5 @@ export class PriceBar {
 }
 
 export const PriceBarSchema = SchemaFactory.createForClass(PriceBar);
-PriceBarSchema.index({ symbol: 1, timestamp: 1 }, { unique: true });
+PriceBarSchema.index({ symbol: 1, timestamp: 1, interval: 1 }, { unique: true });
 PriceBarSchema.index({ symbol: 1, interval: 1, timestamp: -1 });
