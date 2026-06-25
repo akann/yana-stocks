@@ -11,7 +11,7 @@ a self-hosted Kubernetes cluster managed via ArgoCD GitOps.
 
 ```
 apps/
-├── frontend/           # Next.js 14 (App Router) — dashboard UI
+├── frontend/           # Next.js 16 (App Router) — dashboard UI
 ├── auth-service/       # Go (Chi) — registration, email verification, JWT, refresh tokens (PostgreSQL)
 ├── profile-service/    # NestJS — non-PII display data: displayName, avatar, bio, preferences (MongoDB)
 ├── price-processor/    # NestJS — consume raw prices, store OHLCV, cache
@@ -21,7 +21,7 @@ apps/
 └── e2e/                # Playwright end-to-end tests
 
 services/
-├── price-ingestor/     # Python — poll Alpaca API, publish to Kafka
+├── price-ingestor/     # Python — Massive WebSocket client, publish to Kafka
 ├── sentiment-analyzer/ # Python — FinBERT NLP on news feed
 └── ml-predictor/       # Python — LSTM/Prophet price prediction, REST + Kafka
 
@@ -41,12 +41,12 @@ packages/
 | Monorepo        | Turborepo + pnpm workspaces                                                         |
 | auth-service    | Go (Chi router, pgx, golang-migrate, HS256 JWT)                                     |
 | NestJS services | NestJS, Mongoose, ioredis, KafkaJS, Passport/JWT                                    |
-| Frontend        | Next.js 14 App Router, TailwindCSS, TanStack Query, Recharts                        |
+| Frontend        | Next.js 16 App Router, TailwindCSS, TanStack Query, lightweight-charts v5           |
 | Python services | Python 3.12, FastAPI, HuggingFace Transformers, Facebook Prophet, confluent-kafka   |
 | Databases       | PostgreSQL 16 (auth), MongoDB 8 (OHLCV/portfolios/profiles), Redis 8 (cache/tokens) |
 | Messaging       | Kafka (Redpanda locally, Strimzi in production)                                     |
 | ML storage      | MinIO (`yana-stocks-models` bucket)                                                 |
-| Data source     | Alpaca Markets free tier (paper trading)                                            |
+| Data source     | Massive (Polygon.io) Starter — US prices; FMP — news/analyst; Twelve Data — UK      |
 
 ## Prerequisites
 
@@ -195,7 +195,10 @@ pnpm --filter @yana-stocks/profile-service test
 ```
 
 E2E tests use Playwright with Chromium and iPhone 14 (Page Object Model
-pattern).
+pattern). The suite covers the StockChart component: canvas dimensions,
+all-7-ranges smoke, duplicate-timestamp crash regression, chart-type toggle
+regression (canvas pixel check detects blank charts), and candlestick/line mode
+switching.
 
 ## CI/CD
 

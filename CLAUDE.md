@@ -876,16 +876,38 @@ Do not merge these into a single `playwright install --with-deps` step gated by
 the cache — system libraries are not cached and the browsers will crash at
 runtime with missing `.so` errors.
 
-## Alpaca API
+## Data Sources
 
-- **Free tier:** Real-time US stock data (15min delayed), paper trading
-- **Base URL:** `https://data.alpaca.markets`
-- **Symbols to track:** AAPL, GOOGL, MSFT, AMZN, TSLA, NVDA, META, JPM, V, JNJ
+### Massive (Polygon.io) — US prices
 
-## NewsAPI
+- **Plan:** Starter ($29/mo)
+- **WebSocket feed:** `starterfeed.polygon.io` — `AM.*` minute aggregates (push)
+- **REST:** `/v2/aggs` (history up to 2 years), `/v2/snapshot` (live quote)
+- **Used by:** `price-ingestor` (WebSocket), `price-processor` (REST history +
+  quotes)
+- **Env var:** `MASSIVE_API_KEY`
 
-- **Free tier:** 100 requests/day, headlines only
-- **Use for:** sentiment-analyzer news feed
+### Financial Modeling Prep (FMP) — news + analyst ratings
+
+- **Free tier:** 250 requests/day
+- **Used by:** `portfolio-api` (analyst ratings, sector performance),
+  `sentiment-analyzer` (news)
+- **Env var:** `FMP_API_KEY`
+
+### Twelve Data — UK / international prices
+
+- **Free tier:** 800 requests/day
+- **Used by:** `price-processor` (on-demand UK/international history + quotes)
+- **Env var:** `TWELVE_DATA_API_KEY`
+
+## Known Bugs Fixed
+
+| Bug                                                 | Root cause                                                                                                                  | Fix                                                                                                              |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Chart goes blank when toggling Candle ↔ Line        | `chartType` missing from data effect deps — new series created but not populated (same `data` ref, effect skipped)          | Added `chartType` to `useEffect` deps array in `StockChart.tsx`                                                  |
+| lightweight-charts crash (`ensureNotNull`) on 6M/1Y | MongoDB stores duplicate daily bars at different UTC offsets (T00, T04, T05); same YYYY-MM-DD maps to duplicate `time` keys | Backend dedup in `getHistory` (keeps highest UTC per date); frontend defensive dedup before `setData()`          |
+| Volume bars invisible on 1D range                   | 390 bars in ~600px = ~1.5px/bar, below `HistogramSeries` render threshold                                                   | `minBarSpacing: 2` in `timeScale` options                                                                        |
+| Market dashboard shows only NVDA                    | `getMovers()` scans `papi:price:*` Redis keys — only symbols streamed via Kafka or previously visited have entries          | `getMovers()` now mget-checks 15 default symbols and fetches missing quotes via Polygon snapshot before scanning |
 
 ## Feature Implementation Progress
 

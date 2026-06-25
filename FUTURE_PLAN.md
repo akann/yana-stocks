@@ -203,20 +203,20 @@ from scratch.
 
 Sequenced to deliver value early, deferring items that need new integrations:
 
-| #   | Feature                                                               | Effort  | New data source?                                     |
-| --- | --------------------------------------------------------------------- | ------- | ---------------------------------------------------- |
-| 0   | **Massive migration** — replace Alpaca + Yahoo Finance for US prices  | Medium  | Massive/Polygon.io ($29/mo)                          |
-| 1   | Candlestick chart (switch to lightweight-charts)                      | Medium  | No                                                   |
-| 2   | Volume histogram pane below price chart                               | Low     | No                                                   |
-| 3   | Moving average overlays (SMA/EMA)                                     | Low     | No                                                   |
-| 4   | RSI sub-chart                                                         | Medium  | No                                                   |
-| 5   | MACD sub-chart + buy/sell signal badges                               | Medium  | No                                                   |
-| 6   | Watchlist `+` button across all ticker appearances                    | Low     | No — backend already exists                          |
-| 7   | ETF support in asset browser                                          | Trivial | No — Massive ticker reference includes ETFs natively |
-| 8   | Analyst ratings (FMP) + news consolidation (FMP replaces Alpaca News) | Medium  | Financial Modeling Prep                              |
-| 9   | Location-specific defaults + UK data (Twelve Data)                    | Medium  | Twelve Data                                          |
-| 10  | Home screen with indices & sectors                                    | High    | FMP + Twelve Data                                    |
-| 11  | Stock screener                                                        | High    | FMP + Twelve Data                                    |
+| #   | Feature                                                               | Effort  | New data source?                                     | Status     |
+| --- | --------------------------------------------------------------------- | ------- | ---------------------------------------------------- | ---------- |
+| 0   | **Massive migration** — replace Alpaca + Yahoo Finance for US prices  | Medium  | Massive/Polygon.io ($29/mo)                          | ✓ complete |
+| 1   | Candlestick chart (switch to lightweight-charts)                      | Medium  | No                                                   | ✓ complete |
+| 2   | Volume histogram pane below price chart                               | Low     | No                                                   | ✓ complete |
+| 3   | Moving average overlays (SMA/EMA)                                     | Low     | No                                                   | ✓ complete |
+| 4   | RSI sub-chart                                                         | Medium  | No                                                   | **next**   |
+| 5   | MACD sub-chart + buy/sell signal badges                               | Medium  | No                                                   | pending    |
+| 6   | Watchlist `+` button across all ticker appearances                    | Low     | No — backend already exists                          | pending    |
+| 7   | ETF support in asset browser                                          | Trivial | No — Massive ticker reference includes ETFs natively | pending    |
+| 8   | Analyst ratings (FMP) + news consolidation (FMP replaces Alpaca News) | Medium  | Financial Modeling Prep                              | pending    |
+| 9   | Location-specific defaults + UK data (Twelve Data)                    | Medium  | Twelve Data                                          | pending    |
+| 10  | Home screen with indices & sectors                                    | High    | FMP + Twelve Data                                    | pending    |
+| 11  | Stock screener                                                        | High    | FMP + Twelve Data                                    | pending    |
 
 > Step 0 (Massive) is a prerequisite for Steps 1–7 to have accurate, real-time
 > data underneath them. Steps 1–6 are pure frontend and can be done
