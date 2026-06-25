@@ -886,3 +886,24 @@ runtime with missing `.so` errors.
 
 - **Free tier:** 100 requests/day, headlines only
 - **Use for:** sentiment-analyzer news feed
+
+## Feature Implementation Progress
+
+See `FUTURE_PLAN.md` for the full feature implementation plan (Steps 0–11),
+including data source details, exact files to change, and npm/pip packages per
+step.
+
+| Step | Feature                                                          | Status     |
+| ---- | ---------------------------------------------------------------- | ---------- |
+| 0    | Massive migration — replace Alpaca + Yahoo Finance for US prices | ✓ complete |
+| 1    | Candlestick chart (`StockChart.tsx`, lightweight-charts v5)      | ✓ complete |
+| 2    | Volume histogram pane                                            | ✓ complete |
+| 3    | Moving average overlays (SMA/EMA)                                | ✓ complete |
+| 4    | RSI sub-chart pane                                               | next       |
+| 5    | MACD sub-chart + buy/sell signal badges                          | pending    |
+| 6    | Universal watchlist `+` button                                   | pending    |
+| 7    | ETF support + MarketBrowser                                      | pending    |
+| 8    | Analyst ratings (FMP) + FMP news replacing Alpaca News           | pending    |
+| 9    | UK data pipeline (Twelve Data) + location defaults               | pending    |
+| 10   | Home screen with indices & sectors                               | pending    |
+| 11   | Stock screener                                                   | pending    |
