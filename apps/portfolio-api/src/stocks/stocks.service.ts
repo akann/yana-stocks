@@ -14,6 +14,26 @@ import type {
   PriceCacheEntry,
 } from './price-cache.types';
 
+// Popular large-cap symbols always shown in the movers dashboard.
+// Quotes are fetched on-demand for any symbol not already in the Redis price cache.
+const DEFAULT_SYMBOLS = [
+  'AAPL',
+  'MSFT',
+  'GOOGL',
+  'AMZN',
+  'META',
+  'TSLA',
+  'NVDA',
+  'NFLX',
+  'AMD',
+  'JPM',
+  'V',
+  'JNJ',
+  'UNH',
+  'XOM',
+  'BAC',
+];
+
 @Injectable()
 export class StocksService {
   private readonly logger = new Logger(StocksService.name);
@@ -84,6 +104,14 @@ export class StocksService {
     const cacheKey = 'papi:movers';
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached) as MarketMovers;
+
+    // Ensure every default symbol has a cached quote — fetch any that are missing.
+    const priceKeys = DEFAULT_SYMBOLS.map((s) => `papi:price:${s}`);
+    const existing = await this.redis.mget(priceKeys);
+    const missing = DEFAULT_SYMBOLS.filter((_, i) => !existing[i]);
+    if (missing.length) {
+      await Promise.allSettled(missing.map((s) => this.getStock(s)));
+    }
 
     const keys = await this.redis.scan('papi:price:*');
     if (!keys.length) return { gainers: [], losers: [] };
