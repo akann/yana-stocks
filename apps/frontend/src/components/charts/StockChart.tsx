@@ -7,6 +7,9 @@ import {
   ColorType,
   CrosshairMode,
   LineStyle,
+  CandlestickSeries,
+  AreaSeries,
+  LineSeries,
   type IChartApi,
   type ISeriesApi,
   type IPriceLine,
@@ -125,7 +128,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
 
         let series = maSeriesMapRef.current.get(cfg.key);
         if (!series) {
-          series = chart.addLineSeries({
+          series = chart.addSeries(LineSeries, {
             color: cfg.color,
             lineWidth: 1,
             priceLineVisible: false,
@@ -139,7 +142,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
     };
 
     if (chartType === 'candlestick') {
-      const candleSeries = chart.addCandlestickSeries({
+      const candleSeries = chart.addSeries(CandlestickSeries, {
         upColor: '#22c55e',
         downColor: '#ef4444',
         borderVisible: false,
@@ -151,13 +154,16 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
         const sorted = sortBars(bars);
 
         candleSeries.setData(
-          sorted.map((bar) => ({
-            time: toTime(bar.timestamp, isDaily),
-            open: bar.open,
-            high: bar.high,
-            low: bar.low,
-            close: bar.close,
-          })),
+          sorted
+            .filter((d) => d.open != null && d.high != null && d.low != null && d.close != null)
+            .map((d) => ({
+              time: toTime(d.timestamp, isDaily),
+              open: Number(d.open),
+              high: Number(d.high),
+              low: Number(d.low),
+              close: Number(d.close),
+            }))
+            .filter((d) => !isNaN(d.open) && !isNaN(d.high) && !isNaN(d.low) && !isNaN(d.close)),
         );
 
         chart.timeScale().fitContent();
@@ -178,7 +184,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
         }
       };
     } else {
-      const areaSeries = chart.addAreaSeries({
+      const areaSeries = chart.addSeries(AreaSeries, {
         lineColor: '#22c55e',
         topColor: 'rgba(34, 197, 94, 0.25)',
         bottomColor: 'rgba(34, 197, 94, 0)',
@@ -187,8 +193,16 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
 
       updateDataRef.current = (bars, currPrice) => {
         const sorted = sortBars(bars);
-        const first = sorted[0]?.close ?? 0;
-        const last = sorted[sorted.length - 1]?.close ?? 0;
+        const sanitized = sorted
+          .filter((d) => d.close != null)
+          .map((d) => ({
+            time: toTime(d.timestamp, isDaily),
+            value: Number(d.close),
+          }))
+          .filter((d) => !isNaN(d.value));
+
+        const first = sanitized[0]?.value ?? 0;
+        const last = sanitized[sanitized.length - 1]?.value ?? 0;
         const isUp = last >= first;
         const color = isUp ? '#22c55e' : '#ef4444';
 
@@ -198,12 +212,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
           bottomColor: 'rgba(0, 0, 0, 0)',
         });
 
-        areaSeries.setData(
-          sorted.map((bar) => ({
-            time: toTime(bar.timestamp, isDaily),
-            value: bar.close,
-          })),
-        );
+        areaSeries.setData(sanitized);
 
         chart.timeScale().fitContent();
 
