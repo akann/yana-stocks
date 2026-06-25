@@ -315,7 +315,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
       .reverse();
     updateDataRef.current(clean, currentPrice ?? null);
     updateMAsRef.current?.(clean, enabledMAs);
-  }, [data, currentPrice, enabledMAs, isDaily]);
+  }, [data, currentPrice, enabledMAs, isDaily, chartType]);
 
   function toggleMA(key: MAKey) {
     setEnabledMAs((prev) => {
