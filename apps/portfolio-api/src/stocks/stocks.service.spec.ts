@@ -210,13 +210,80 @@ describe('StocksService', () => {
 
       redis.get.mockResolvedValue(null);
       redis.scan.mockResolvedValue(keys);
-      redis.mget.mockResolvedValue(entries.map((e) => JSON.stringify(e)));
+      // First mget: DEFAULT_SYMBOLS presence check — all nulls (cold cache)
+      // Second mget: the actual scan-key data fetch
+      redis.mget
+        .mockResolvedValueOnce(new Array(15).fill(null))
+        .mockResolvedValueOnce(entries.map((e) => JSON.stringify(e)));
 
       const result = await service.getMovers(2);
 
       expect(result.gainers[0]?.symbol).toBe('AAPL');
       expect(result.losers[0]?.symbol).toBe('TSLA');
       expect(redis.set).toHaveBeenCalledWith('papi:movers', expect.any(String), 10);
+    });
+
+    describe('DEFAULT_SYMBOLS seeding', () => {
+      it('fetches all 15 DEFAULT_SYMBOLS when none are in the cache', async () => {
+        redis.get.mockResolvedValue(null);
+        redis.mget
+          .mockResolvedValueOnce(new Array(15).fill(null)) // none cached
+          .mockResolvedValueOnce([]); // scan returns nothing
+        redis.scan.mockResolvedValue([]);
+        httpService.get.mockReturnValue(
+          of({ data: mockPriceCacheEntry } as AxiosResponse<PriceCacheEntry>),
+        );
+
+        await service.getMovers();
+
+        // getStock hits price-processor once per missing symbol
+        expect(httpService.get).toHaveBeenCalledTimes(15);
+      });
+
+      it('skips fetching when all DEFAULT_SYMBOLS are already cached', async () => {
+        redis.get.mockResolvedValue(null);
+        redis.mget
+          .mockResolvedValueOnce(new Array(15).fill(JSON.stringify(mockPriceCacheEntry)))
+          .mockResolvedValueOnce([]);
+        redis.scan.mockResolvedValue([]);
+
+        await service.getMovers();
+
+        expect(httpService.get).not.toHaveBeenCalled();
+      });
+
+      it('only fetches symbols absent from the cache (partial hit)', async () => {
+        redis.get.mockResolvedValue(null);
+        // AAPL, MSFT, GOOGL are cached; the other 12 are missing
+        const partialHit = new Array(15).fill(null);
+        partialHit[0] = JSON.stringify(mockPriceCacheEntry); // AAPL
+        partialHit[1] = JSON.stringify(mockPriceCacheEntry); // MSFT
+        partialHit[2] = JSON.stringify(mockPriceCacheEntry); // GOOGL
+        redis.mget.mockResolvedValueOnce(partialHit).mockResolvedValueOnce([]);
+        redis.scan.mockResolvedValue([]);
+        httpService.get.mockReturnValue(
+          of({ data: mockPriceCacheEntry } as AxiosResponse<PriceCacheEntry>),
+        );
+
+        await service.getMovers();
+
+        expect(httpService.get).toHaveBeenCalledTimes(12);
+      });
+
+      it('still returns movers when DEFAULT_SYMBOLS fetches fail (Promise.allSettled)', async () => {
+        redis.get.mockResolvedValue(null);
+        redis.mget
+          .mockResolvedValueOnce(new Array(15).fill(null))
+          .mockResolvedValueOnce([JSON.stringify(mockPriceCacheEntry)]);
+        redis.scan.mockResolvedValue(['papi:price:AAPL']);
+        httpService.get.mockReturnValue(throwError(() => new Error('service down')));
+
+        const result = await service.getMovers();
+
+        expect(result.gainers).toBeDefined();
+        expect(result.losers).toBeDefined();
+        expect(result.gainers[0]?.symbol).toBe('AAPL');
+      });
     });
   });
 

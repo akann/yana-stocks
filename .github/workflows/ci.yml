@@ -191,7 +191,7 @@ jobs:
   integration-test:
     runs-on: runners-yana-stocks
     needs: [changes, ts-quality]
-    if: false
+    if: needs.changes.outputs.ts == 'true'
     services:
       postgres:
         image: harbor.yanatech.co.uk/library/postgres:16-alpine
@@ -272,6 +272,12 @@ jobs:
             'MONGODB_URI=mongodb://admin:password@localhost:27017/portfolio_service_test?authSource=admin' \
             'KAFKA_BROKERS=localhost:19092' \
             > apps/portfolio-service/.env.test
+
+          printf '%s\n' \
+            'REDIS_URL=redis://localhost:6379' \
+            'KAFKA_BROKERS=localhost:19092' \
+            'PRICE_PROCESSOR_URL=http://localhost:3002' \
+            > apps/portfolio-api/.env.test
 
       - name: Run integration tests
         run: pnpm turbo run test:int --concurrency=3
