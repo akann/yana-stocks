@@ -161,29 +161,43 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
       updateDataRef.current = (bars, currPrice) => {
         const sorted = sortBars(bars);
 
+        // Both series must share the exact same time points — any bar present in
+        // one but absent in the other leaves a "hole" in the shared time scale
+        // index space, causing ensureNotNull() to crash at render time.
+        const valid = sorted.filter((d) => {
+          const o = Number(d.open);
+          const h = Number(d.high);
+          const l = Number(d.low);
+          const c = Number(d.close);
+          return (
+            d.open != null &&
+            d.high != null &&
+            d.low != null &&
+            d.close != null &&
+            !isNaN(o) &&
+            !isNaN(h) &&
+            !isNaN(l) &&
+            !isNaN(c)
+          );
+        });
+
         candleSeries.setData(
-          sorted
-            .filter((d) => d.open != null && d.high != null && d.low != null && d.close != null)
-            .map((d) => ({
-              time: toTime(d.timestamp, isDaily),
-              open: Number(d.open),
-              high: Number(d.high),
-              low: Number(d.low),
-              close: Number(d.close),
-            }))
-            .filter((d) => !isNaN(d.open) && !isNaN(d.high) && !isNaN(d.low) && !isNaN(d.close)),
+          valid.map((d) => ({
+            time: toTime(d.timestamp, isDaily),
+            open: Number(d.open),
+            high: Number(d.high),
+            low: Number(d.low),
+            close: Number(d.close),
+          })),
         );
 
         volSeries.setData(
-          sorted
-            .filter((d) => d.volume != null)
-            .map((d) => ({
-              time: toTime(d.timestamp, isDaily),
-              value: Number(d.volume),
-              color:
-                Number(d.close) >= Number(d.open) ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)',
-            }))
-            .filter((d) => !isNaN(d.value)),
+          valid.map((d) => ({
+            time: toTime(d.timestamp, isDaily),
+            value: Number(d.volume) || 0,
+            color:
+              Number(d.close) >= Number(d.open) ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)',
+          })),
         );
 
         chart.timeScale().fitContent();
@@ -213,16 +227,13 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
 
       updateDataRef.current = (bars, currPrice) => {
         const sorted = sortBars(bars);
-        const sanitized = sorted
-          .filter((d) => d.close != null)
-          .map((d) => ({
-            time: toTime(d.timestamp, isDaily),
-            value: Number(d.close),
-          }))
-          .filter((d) => !isNaN(d.value));
+        const valid = sorted.filter((d) => {
+          const c = Number(d.close);
+          return d.close != null && !isNaN(c);
+        });
 
-        const first = sanitized[0]?.value ?? 0;
-        const last = sanitized[sanitized.length - 1]?.value ?? 0;
+        const first = Number(valid[0]?.close) ?? 0;
+        const last = Number(valid[valid.length - 1]?.close) ?? 0;
         const isUp = last >= first;
         const color = isUp ? '#22c55e' : '#ef4444';
 
@@ -232,17 +243,19 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
           bottomColor: 'rgba(0, 0, 0, 0)',
         });
 
-        areaSeries.setData(sanitized);
+        areaSeries.setData(
+          valid.map((d) => ({
+            time: toTime(d.timestamp, isDaily),
+            value: Number(d.close),
+          })),
+        );
 
         volSeries.setData(
-          sorted
-            .filter((d) => d.volume != null)
-            .map((d) => ({
-              time: toTime(d.timestamp, isDaily),
-              value: Number(d.volume),
-              color: color === '#22c55e' ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)',
-            }))
-            .filter((d) => !isNaN(d.value)),
+          valid.map((d) => ({
+            time: toTime(d.timestamp, isDaily),
+            value: Number(d.volume) || 0,
+            color: isUp ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)',
+          })),
         );
 
         chart.timeScale().fitContent();
