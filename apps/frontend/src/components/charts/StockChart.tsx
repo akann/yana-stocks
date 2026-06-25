@@ -106,6 +106,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
         borderColor: 'transparent',
         timeVisible: !isDaily,
         secondsVisible: false,
+        minBarSpacing: 2,
       },
     });
     chartRef.current = chart;
