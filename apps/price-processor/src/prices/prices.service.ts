@@ -149,7 +149,7 @@ export class PricesService {
       }))
       .filter((bar) => {
         if (interval !== '1d') return true;
-        const dateKey = new Date(bar.timestamp as string | Date).toISOString().slice(0, 10);
+        const dateKey = new Date(bar.timestamp).toISOString().slice(0, 10);
         if (seenDates.has(dateKey)) return false;
         seenDates.add(dateKey);
         return true;
