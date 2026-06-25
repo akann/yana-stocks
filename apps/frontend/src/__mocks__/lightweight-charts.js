@@ -10,12 +10,14 @@ const mockChart = {
   remove: jest.fn(),
   removeSeries: jest.fn(),
   timeScale: jest.fn(() => ({ fitContent: jest.fn() })),
+  priceScale: jest.fn(() => ({ applyOptions: jest.fn() })),
   applyOptions: jest.fn(),
 };
 
 const CandlestickSeries = function () {};
 const AreaSeries = function () {};
 const LineSeries = function () {};
+const HistogramSeries = function () {};
 
 module.exports = {
   createChart: jest.fn(() => mockChart),
@@ -25,4 +27,5 @@ module.exports = {
   CandlestickSeries,
   AreaSeries,
   LineSeries,
+  HistogramSeries,
 };

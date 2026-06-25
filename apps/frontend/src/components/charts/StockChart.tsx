@@ -10,6 +10,7 @@ import {
   CandlestickSeries,
   AreaSeries,
   LineSeries,
+  HistogramSeries,
   type IChartApi,
   type ISeriesApi,
   type IPriceLine,
@@ -50,6 +51,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
   const updateDataRef = useRef<((bars: OHLCVBar[], currPrice: number | null) => void) | null>(null);
   const updateMAsRef = useRef<((sorted: OHLCVBar[], enabled: Set<MAKey>) => void) | null>(null);
   const priceLineRef = useRef<IPriceLine | null>(null);
+  const volSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const maSeriesMapRef = useRef<Map<MAKey, ISeriesApi<'Line'>>>(new Map());
 
   const [range, setRange] = useState<RangeLabel>('1W');
@@ -83,6 +85,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
     updateDataRef.current = null;
     updateMAsRef.current = null;
     priceLineRef.current = null;
+    volSeriesRef.current = null;
     maSeriesMap.clear();
 
     const chart = createChart(el, {
@@ -107,10 +110,15 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
     });
     chartRef.current = chart;
 
-    // Volume overlay in main pane — bottom 20% via scaleMargins.
-    // addPane() nulls the per-pane right axis widget when visible:false is set,
-    // hitting an ensureNotNull assertion in v5.2.0 _adjustSizeImpl. Using a
-    // custom priceScaleId ('vol') in the main pane avoids that code path.
+    const volSeries = chart.addSeries(HistogramSeries, {
+      priceFormat: { type: 'volume' },
+      priceScaleId: 'vol',
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+    chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+    volSeriesRef.current = volSeries;
+
     // MA series management — called from the data/MA effects
     updateMAsRef.current = (sorted: OHLCVBar[], enabled: Set<MAKey>) => {
       // Remove series that are no longer enabled
@@ -166,6 +174,18 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
             .filter((d) => !isNaN(d.open) && !isNaN(d.high) && !isNaN(d.low) && !isNaN(d.close)),
         );
 
+        volSeries.setData(
+          sorted
+            .filter((d) => d.volume != null)
+            .map((d) => ({
+              time: toTime(d.timestamp, isDaily),
+              value: Number(d.volume),
+              color:
+                Number(d.close) >= Number(d.open) ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)',
+            }))
+            .filter((d) => !isNaN(d.value)),
+        );
+
         chart.timeScale().fitContent();
 
         if (priceLineRef.current) {
@@ -214,6 +234,17 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
 
         areaSeries.setData(sanitized);
 
+        volSeries.setData(
+          sorted
+            .filter((d) => d.volume != null)
+            .map((d) => ({
+              time: toTime(d.timestamp, isDaily),
+              value: Number(d.volume),
+              color: color === '#22c55e' ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)',
+            }))
+            .filter((d) => !isNaN(d.value)),
+        );
+
         chart.timeScale().fitContent();
 
         if (priceLineRef.current) {
@@ -246,6 +277,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
       updateDataRef.current = null;
       updateMAsRef.current = null;
       priceLineRef.current = null;
+      volSeriesRef.current = null;
       maSeriesMap.clear();
     };
   }, [chartType, isDaily]);
