@@ -273,6 +273,41 @@ describe('PricesService', () => {
       expect(mockGet).not.toHaveBeenCalled();
     });
 
+    it('deduplicates bars with the same YYYY-MM-DD for 1d interval, keeping highest UTC', async () => {
+      const { service, model, redisGet } = await buildModule();
+      // Simulate two MongoDB docs for the same trading day at different UTC hours
+      const dupBars: PriceBar[] = [
+        { ...mockBar, interval: '1d', timestamp: new Date('2024-01-02T04:00:00.000Z'), close: 155 },
+        { ...mockBar, interval: '1d', timestamp: new Date('2024-01-02T00:00:00.000Z'), close: 150 },
+      ];
+      model.find.mockReturnValue(makeFindChain(dupBars));
+      redisGet.mockImplementation((key: string) =>
+        Promise.resolve(key === 'hist:fetched:SHOP:1d' ? '1' : null),
+      );
+
+      const result = await service.getHistory('SHOP', { limit: 21, interval: '1d' });
+
+      expect(result).toHaveLength(1);
+      // Bars are sorted DESC so T04 comes first → T04 bar is kept
+      expect(result[0]?.close).toBe(155);
+    });
+
+    it('does not deduplicate bars for 1m interval', async () => {
+      const { service, model, redisGet } = await buildModule();
+      const bars: PriceBar[] = [
+        { ...mockBar, interval: '1m', timestamp: new Date('2024-01-02T10:31:00.000Z') },
+        { ...mockBar, interval: '1m', timestamp: new Date('2024-01-02T10:30:00.000Z') },
+      ];
+      model.find.mockReturnValue(makeFindChain(bars));
+      redisGet.mockImplementation((key: string) =>
+        Promise.resolve(key === 'hist:fetched:SHOP:1m' ? '1' : null),
+      );
+
+      const result = await service.getHistory('SHOP', { limit: 60, interval: '1m' });
+
+      expect(result).toHaveLength(2);
+    });
+
     it('1d and 1m freshness flags are independent', async () => {
       const { service, redisGet, mockGet } = await buildModule();
       mockGet.mockResolvedValue({ data: massiveAggEmpty });

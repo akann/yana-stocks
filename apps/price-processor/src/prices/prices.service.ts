@@ -132,16 +132,28 @@ export class PricesService {
       if (fetched.length > 0) bars = fetched;
     }
 
-    return bars.map((b) => ({
-      symbol: b.symbol,
-      timestamp: b.timestamp,
-      open: b.open,
-      high: b.high,
-      low: b.low,
-      close: b.close,
-      volume: b.volume,
-      interval: (b.interval ?? '1m') as OHLCVInterval,
-    }));
+    // MongoDB can store multiple bars per trading day at different UTC offsets
+    // (T00, T04, T05 …). Keep only the first bar seen per date for daily intervals;
+    // bars are sorted DESC so first = highest UTC = most recently stored.
+    const seenDates = new Set<string>();
+    return bars
+      .map((b) => ({
+        symbol: b.symbol,
+        timestamp: b.timestamp,
+        open: b.open,
+        high: b.high,
+        low: b.low,
+        close: b.close,
+        volume: b.volume,
+        interval: (b.interval ?? '1m') as OHLCVInterval,
+      }))
+      .filter((bar) => {
+        if (interval !== '1d') return true;
+        const dateKey = new Date(bar.timestamp as string | Date).toISOString().slice(0, 10);
+        if (seenDates.has(dateKey)) return false;
+        seenDates.add(dateKey);
+        return true;
+      });
   }
 
   async getQuote(symbol: string): Promise<QuoteEntry | null> {

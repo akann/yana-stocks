@@ -299,9 +299,22 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
   useEffect(() => {
     if (!data?.length || !updateDataRef.current) return;
     const sorted = sortBars(data);
-    updateDataRef.current(data, currentPrice ?? null);
-    updateMAsRef.current?.(sorted, enabledMAs);
-  }, [data, currentPrice, enabledMAs]);
+    // Defensive dedup: MongoDB may have multiple docs per trading day from different
+    // UTC offsets. Reverse → first-seen wins → reverse back keeps last (highest UTC) per key.
+    const seenTs = new Set<string | number>();
+    const clean = sorted
+      .slice()
+      .reverse()
+      .filter((d) => {
+        const t = toTime(d.timestamp, isDaily) as string | number;
+        if (seenTs.has(t)) return false;
+        seenTs.add(t);
+        return true;
+      })
+      .reverse();
+    updateDataRef.current(clean, currentPrice ?? null);
+    updateMAsRef.current?.(clean, enabledMAs);
+  }, [data, currentPrice, enabledMAs, isDaily]);
 
   function toggleMA(key: MAKey) {
     setEnabledMAs((prev) => {
