@@ -6,7 +6,9 @@ const mockSeries = {
 };
 
 const mockChart = {
-  addSeries: jest.fn(() => mockSeries),
+  addCandlestickSeries: jest.fn(() => mockSeries),
+  addAreaSeries: jest.fn(() => mockSeries),
+  addLineSeries: jest.fn(() => mockSeries),
   remove: jest.fn(),
   removeSeries: jest.fn(),
   timeScale: jest.fn(() => ({ fitContent: jest.fn() })),
@@ -18,7 +20,4 @@ module.exports = {
   ColorType: { Solid: 'solid' },
   CrosshairMode: { Normal: 0 },
   LineStyle: { Dashed: 1 },
-  CandlestickSeries: class {},
-  AreaSeries: class {},
-  LineSeries: class {},
 };

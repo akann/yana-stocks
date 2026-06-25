@@ -4,9 +4,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   createChart,
-  CandlestickSeries,
-  AreaSeries,
-  LineSeries,
   ColorType,
   CrosshairMode,
   LineStyle,
@@ -128,7 +125,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
 
         let series = maSeriesMapRef.current.get(cfg.key);
         if (!series) {
-          series = chart.addSeries(LineSeries, {
+          series = chart.addLineSeries({
             color: cfg.color,
             lineWidth: 1,
             priceLineVisible: false,
@@ -142,7 +139,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
     };
 
     if (chartType === 'candlestick') {
-      const candleSeries = chart.addSeries(CandlestickSeries, {
+      const candleSeries = chart.addCandlestickSeries({
         upColor: '#22c55e',
         downColor: '#ef4444',
         borderVisible: false,
@@ -181,7 +178,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
         }
       };
     } else {
-      const areaSeries = chart.addSeries(AreaSeries, {
+      const areaSeries = chart.addAreaSeries({
         lineColor: '#22c55e',
         topColor: 'rgba(34, 197, 94, 0.25)',
         bottomColor: 'rgba(34, 197, 94, 0)',
