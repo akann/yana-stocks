@@ -131,7 +131,7 @@ export default function WatchlistPage(): React.JSX.Element {
             </button>
             <button
               type="submit"
-              disabled={createMutation.isPending}
+              disabled={createMutation.isPending || !newListName.trim()}
               className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-3 py-2 rounded-lg text-sm transition-colors"
             >
               {createMutation.isPending ? 'Creating…' : 'Create'}
