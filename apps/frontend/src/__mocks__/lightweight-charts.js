@@ -10,7 +10,6 @@ const mockChart = {
   remove: jest.fn(),
   removeSeries: jest.fn(),
   timeScale: jest.fn(() => ({ fitContent: jest.fn() })),
-  priceScale: jest.fn(() => ({ applyOptions: jest.fn() })),
   applyOptions: jest.fn(),
 };
 
@@ -20,7 +19,6 @@ module.exports = {
   CrosshairMode: { Normal: 0 },
   LineStyle: { Dashed: 1 },
   CandlestickSeries: class {},
-  HistogramSeries: class {},
   AreaSeries: class {},
   LineSeries: class {},
 };

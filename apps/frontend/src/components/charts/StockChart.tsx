@@ -5,7 +5,6 @@ import { useQuery } from '@tanstack/react-query';
 import {
   createChart,
   CandlestickSeries,
-  HistogramSeries,
   AreaSeries,
   LineSeries,
   ColorType,
@@ -112,16 +111,6 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
     // addPane() nulls the per-pane right axis widget when visible:false is set,
     // hitting an ensureNotNull assertion in v5.2.0 _adjustSizeImpl. Using a
     // custom priceScaleId ('vol') in the main pane avoids that code path.
-    const volumeSeries = chart.addSeries(HistogramSeries, {
-      color: 'rgba(148, 163, 184, 0.5)',
-      priceFormat: { type: 'volume' },
-      priceScaleId: 'vol',
-    });
-    chart.priceScale('vol').applyOptions({
-      scaleMargins: { top: 0.8, bottom: 0 },
-      visible: false,
-    });
-
     // MA series management — called from the data/MA effects
     updateMAsRef.current = (sorted: OHLCVBar[], enabled: Set<MAKey>) => {
       // Remove series that are no longer enabled
@@ -174,14 +163,6 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
           })),
         );
 
-        volumeSeries.setData(
-          sorted.map((bar) => ({
-            time: toTime(bar.timestamp, isDaily),
-            value: bar.volume,
-            color: bar.close >= bar.open ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)',
-          })),
-        );
-
         chart.timeScale().fitContent();
 
         if (priceLineRef.current) {
@@ -224,14 +205,6 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
           sorted.map((bar) => ({
             time: toTime(bar.timestamp, isDaily),
             value: bar.close,
-          })),
-        );
-
-        volumeSeries.setData(
-          sorted.map((bar) => ({
-            time: toTime(bar.timestamp, isDaily),
-            value: bar.volume,
-            color: bar.close >= bar.open ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)',
           })),
         );
 
