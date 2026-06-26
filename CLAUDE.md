@@ -946,7 +946,7 @@ step.
 | 10   | Home screen with indices & sectors                               | ✓ complete |
 | 11   | Stock screener                                                   | ✓ complete |
 | 12   | News pin markers with headline popup                             | ✓ complete |
-| 13   | Home market preference UI (profile settings + home wiring)       | pending    |
+| 13   | Home market preference UI (profile settings + home wiring)       | ✓ complete |
 | 14   | Sector rotation time-series heatmap (S&P 500 + FTSE 100)         | pending    |
 | 15   | Factor performance tiles                                         | pending    |
 

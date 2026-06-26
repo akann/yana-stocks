@@ -15,8 +15,10 @@ const TABS: { id: AssetMarket; label: string }[] = [
   { id: 'uk', label: '🇬🇧 UK Equities' },
 ];
 
-export function MarketBrowser(): React.JSX.Element {
-  const [activeTab, setActiveTab] = useState<AssetMarket>('us');
+export function MarketBrowser({
+  defaultTab = 'us',
+}: { defaultTab?: AssetMarket } = {}): React.JSX.Element {
+  const [activeTab, setActiveTab] = useState<AssetMarket>(defaultTab);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
 

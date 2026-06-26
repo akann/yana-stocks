@@ -7,6 +7,8 @@ import { MarketNews } from '@/components/home/MarketNews';
 import { StockScreener } from '@/components/home/StockScreener';
 import { MoversCard } from '@/components/market/MoversCard';
 import { MarketBrowser } from '@/components/market/MarketBrowser';
+import { useAuth } from '@/context/AuthContext';
+import type { AssetMarket } from '@/types';
 
 const BOTTOM_TABS = [
   { id: 'browser', label: 'Market Browser' },
@@ -15,7 +17,13 @@ const BOTTOM_TABS = [
 
 type BottomTab = (typeof BOTTOM_TABS)[number]['id'];
 
+function defaultMarketTab(pref: 'US' | 'UK' | 'global' | undefined): AssetMarket {
+  if (pref === 'UK') return 'uk';
+  return 'us';
+}
+
 export function HomePageView(): React.JSX.Element {
+  const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState<BottomTab>('browser');
 
   return (
@@ -52,7 +60,11 @@ export function HomePageView(): React.JSX.Element {
             </button>
           ))}
         </div>
-        {activeTab === 'browser' ? <MarketBrowser /> : <StockScreener />}
+        {activeTab === 'browser' ? (
+          <MarketBrowser defaultTab={defaultMarketTab(profile?.preferences?.defaultMarket)} />
+        ) : (
+          <StockScreener />
+        )}
       </div>
     </div>
   );
