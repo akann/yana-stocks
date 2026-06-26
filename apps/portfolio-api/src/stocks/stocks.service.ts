@@ -2,20 +2,26 @@ import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { OHLCV, PredictionSignal, SentimentSignal } from '@yana-stocks/shared-types';
+import {
+  Configuration,
+  DefaultApi,
+  ListTickersMarketEnum,
+  ListTickersTypeEnum,
+} from '@polygon.io/client-js';
+import type { ListTickers200ResponseResultsInner } from '@polygon.io/client-js';
 import { firstValueFrom } from 'rxjs';
 import { RedisService } from '../redis/redis.service';
-import { MOCK_ASSETS } from './mock-assets';
+import { MOCK_ASSETS, MOCK_ETF_ASSETS } from './mock-assets';
 import type {
   AggregateStockResponse,
   AssetEntry,
+  AssetMarket,
   AssetsPage,
   MarketMovers,
   MoverEntry,
   PriceCacheEntry,
 } from './price-cache.types';
 
-// Popular large-cap symbols always shown in the movers dashboard.
-// Quotes are fetched on-demand for any symbol not already in the Redis price cache.
 const DEFAULT_SYMBOLS = [
   'AAPL',
   'MSFT',
@@ -105,7 +111,6 @@ export class StocksService {
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached) as MarketMovers;
 
-    // Ensure every default symbol has a cached quote — fetch any that are missing.
     const priceKeys = DEFAULT_SYMBOLS.map((s) => `papi:price:${s}`);
     const existing = await this.redis.mget(priceKeys);
     const missing = DEFAULT_SYMBOLS.filter((_, i) => !existing[i]);
@@ -143,16 +148,21 @@ export class StocksService {
     return movers;
   }
 
-  async getAssets(search: string, page: number, limit: number): Promise<AssetsPage> {
-    const CACHE_KEY = 'papi:assets:all';
-    const CACHE_TTL = 86400; // 24h — asset list barely changes
+  async getAssets(
+    search: string,
+    page: number,
+    limit: number,
+    market: AssetMarket = 'us',
+  ): Promise<AssetsPage> {
+    const CACHE_KEY = `papi:assets:${market}`;
+    const CACHE_TTL = 86400;
 
     let all: AssetEntry[];
     const cached = await this.redis.get(CACHE_KEY);
     if (cached) {
       all = JSON.parse(cached) as AssetEntry[];
     } else {
-      all = await this.fetchAssetsFromAlpaca();
+      all = await this.fetchAssetsFromMassive(market === 'etf' ? 'ETF' : 'CS');
       await this.redis.set(CACHE_KEY, JSON.stringify(all), CACHE_TTL);
     }
 
@@ -173,43 +183,48 @@ export class StocksService {
     };
   }
 
-  private async fetchAssetsFromAlpaca(): Promise<AssetEntry[]> {
-    const apiKey = this.config.get<string>('alpaca.apiKey') ?? '';
-    const apiSecret = this.config.get<string>('alpaca.apiSecret') ?? '';
+  private async fetchAssetsFromMassive(type: 'CS' | 'ETF'): Promise<AssetEntry[]> {
+    const assetClass: 'us_equity' | 'us_etf' = type === 'ETF' ? 'us_etf' : 'us_equity';
+    const apiKey = this.config.get<string>('massiveApiKey') ?? '';
 
-    if (!apiKey || !apiSecret) {
-      this.logger.warn('ALPACA_API_KEY / ALPACA_API_SECRET not set — using curated dev asset list');
-      return MOCK_ASSETS;
+    if (!apiKey) {
+      this.logger.warn('MASSIVE_API_KEY not set — using curated dev asset list');
+      return type === 'ETF' ? MOCK_ETF_ASSETS : MOCK_ASSETS;
     }
 
     try {
-      const response = await firstValueFrom(
-        this.httpService.get<AlpacaAsset[]>('https://paper-api.alpaca.markets/v2/assets', {
-          params: { status: 'active', asset_class: 'us_equity' },
-          headers: {
-            'APCA-API-KEY-ID': apiKey,
-            'APCA-API-SECRET-KEY': apiSecret,
-          },
-        }),
+      const api = new DefaultApi(new Configuration({ apiKey }));
+      const massiveType = type === 'ETF' ? ListTickersTypeEnum.Etf : ListTickersTypeEnum.Cs;
+      const resp = await api.listTickers(
+        undefined,
+        massiveType,
+        ListTickersMarketEnum.Stocks,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        1000,
       );
-      return response.data
-        .filter((a) => a.tradable && a.symbol && a.name)
-        .map((a) => ({
-          symbol: a.symbol,
-          name: a.name,
-          exchange: a.exchange,
-          tradable: a.tradable,
+
+      return (resp.results ?? [])
+        .filter((t): t is ListTickers200ResponseResultsInner => !!(t.ticker && t.name))
+        .map((t) => ({
+          symbol: t.ticker!,
+          name: t.name!,
+          exchange: t.primary_exchange ?? '',
+          tradable: true,
+          assetClass,
         }));
     } catch (err) {
-      this.logger.error(`Alpaca assets fetch failed, falling back to dev list: ${String(err)}`);
-      return MOCK_ASSETS;
+      this.logger.error(`Massive assets fetch failed, falling back to dev list: ${String(err)}`);
+      return type === 'ETF' ? MOCK_ETF_ASSETS : MOCK_ASSETS;
     }
   }
-}
-
-interface AlpacaAsset {
-  symbol: string;
-  name: string;
-  exchange: string;
-  tradable: boolean;
 }

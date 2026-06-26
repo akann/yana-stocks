@@ -3,6 +3,7 @@
 import React, { useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { MoversCard } from '@/components/market/MoversCard';
+import { MarketBrowser } from '@/components/market/MarketBrowser';
 
 export function HomePageView(): React.JSX.Element {
   const symbolRef = useRef<HTMLInputElement>(null);
@@ -38,6 +39,7 @@ export function HomePageView(): React.JSX.Element {
         </form>
       </div>
       <MoversCard />
+      <MarketBrowser />
     </div>
   );
 }

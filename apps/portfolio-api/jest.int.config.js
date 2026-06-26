@@ -9,4 +9,7 @@ module.exports = {
   testEnvironment: 'node',
   globalSetup: '<rootDir>/../test/int-global-setup.js',
   forceExit: true,
+  moduleNameMapper: {
+    '^@polygon.io/client-js$': '<rootDir>/__mocks__/polygon-client-js.ts',
+  },
 };

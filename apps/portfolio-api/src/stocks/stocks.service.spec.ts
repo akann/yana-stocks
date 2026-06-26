@@ -1,6 +1,7 @@
 import { HttpService } from '@nestjs/axios';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { DefaultApi } from '@polygon.io/client-js';
 import { of, throwError } from 'rxjs';
 import type { AxiosResponse } from 'axios';
 import type { OHLCV } from '@yana-stocks/shared-types';
@@ -16,6 +17,47 @@ const mockPriceCacheEntry: PriceCacheEntry = {
   volume: 1000000,
   timestamp: '2024-01-01T12:00:00Z',
 };
+
+const mockEquityAssets: AssetEntry[] = [
+  {
+    symbol: 'AAPL',
+    name: 'Apple Inc.',
+    exchange: 'NASDAQ',
+    tradable: true,
+    assetClass: 'us_equity',
+  },
+  {
+    symbol: 'MSFT',
+    name: 'Microsoft Corporation',
+    exchange: 'NASDAQ',
+    tradable: true,
+    assetClass: 'us_equity',
+  },
+  {
+    symbol: 'JPM',
+    name: 'JPMorgan Chase & Co.',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'us_equity',
+  },
+];
+
+const mockEtfAssets: AssetEntry[] = [
+  {
+    symbol: 'SPY',
+    name: 'SPDR S&P 500 ETF Trust',
+    exchange: 'NYSE ARCA',
+    tradable: true,
+    assetClass: 'us_etf',
+  },
+  {
+    symbol: 'QQQ',
+    name: 'Invesco QQQ Trust',
+    exchange: 'NASDAQ',
+    tradable: true,
+    assetClass: 'us_etf',
+  },
+];
 
 describe('StocksService', () => {
   let service: StocksService;
@@ -210,8 +252,6 @@ describe('StocksService', () => {
 
       redis.get.mockResolvedValue(null);
       redis.scan.mockResolvedValue(keys);
-      // First mget: DEFAULT_SYMBOLS presence check — all nulls (cold cache)
-      // Second mget: the actual scan-key data fetch
       redis.mget
         .mockResolvedValueOnce(new Array(15).fill(null))
         .mockResolvedValueOnce(entries.map((e) => JSON.stringify(e)));
@@ -226,9 +266,7 @@ describe('StocksService', () => {
     describe('DEFAULT_SYMBOLS seeding', () => {
       it('fetches all 15 DEFAULT_SYMBOLS when none are in the cache', async () => {
         redis.get.mockResolvedValue(null);
-        redis.mget
-          .mockResolvedValueOnce(new Array(15).fill(null)) // none cached
-          .mockResolvedValueOnce([]); // scan returns nothing
+        redis.mget.mockResolvedValueOnce(new Array(15).fill(null)).mockResolvedValueOnce([]);
         redis.scan.mockResolvedValue([]);
         httpService.get.mockReturnValue(
           of({ data: mockPriceCacheEntry } as AxiosResponse<PriceCacheEntry>),
@@ -236,7 +274,6 @@ describe('StocksService', () => {
 
         await service.getMovers();
 
-        // getStock hits price-processor once per missing symbol
         expect(httpService.get).toHaveBeenCalledTimes(15);
       });
 
@@ -254,11 +291,10 @@ describe('StocksService', () => {
 
       it('only fetches symbols absent from the cache (partial hit)', async () => {
         redis.get.mockResolvedValue(null);
-        // AAPL, MSFT, GOOGL are cached; the other 12 are missing
         const partialHit = new Array(15).fill(null);
-        partialHit[0] = JSON.stringify(mockPriceCacheEntry); // AAPL
-        partialHit[1] = JSON.stringify(mockPriceCacheEntry); // MSFT
-        partialHit[2] = JSON.stringify(mockPriceCacheEntry); // GOOGL
+        partialHit[0] = JSON.stringify(mockPriceCacheEntry);
+        partialHit[1] = JSON.stringify(mockPriceCacheEntry);
+        partialHit[2] = JSON.stringify(mockPriceCacheEntry);
         redis.mget.mockResolvedValueOnce(partialHit).mockResolvedValueOnce([]);
         redis.scan.mockResolvedValue([]);
         httpService.get.mockReturnValue(
@@ -288,95 +324,147 @@ describe('StocksService', () => {
   });
 
   describe('getAssets', () => {
-    const mockAlpacaAssets: AssetEntry[] = [
-      { symbol: 'AAPL', name: 'Apple Inc.', exchange: 'NASDAQ', tradable: true },
-      { symbol: 'MSFT', name: 'Microsoft Corporation', exchange: 'NASDAQ', tradable: true },
-      { symbol: 'JPM', name: 'JPMorgan Chase & Co.', exchange: 'NYSE', tradable: true },
-    ];
+    it('returns from Redis cache when present (us market)', async () => {
+      redis.get.mockResolvedValue(JSON.stringify(mockEquityAssets));
 
-    it('returns from Redis cache when present', async () => {
-      redis.get.mockResolvedValue(JSON.stringify(mockAlpacaAssets));
-
-      const result = await service.getAssets('', 1, 10);
+      const result = await service.getAssets('', 1, 10, 'us');
 
       expect(result.data).toHaveLength(3);
       expect(result.total).toBe(3);
+      expect(result.data[0]?.assetClass).toBe('us_equity');
       expect(httpService.get).not.toHaveBeenCalled();
     });
 
-    it('falls back to MOCK_ASSETS and caches when no Alpaca credentials are set', async () => {
+    it('returns from Redis cache when present (etf market)', async () => {
+      redis.get.mockResolvedValue(JSON.stringify(mockEtfAssets));
+
+      const result = await service.getAssets('', 1, 10, 'etf');
+
+      expect(result.data).toHaveLength(2);
+      expect(result.data[0]?.assetClass).toBe('us_etf');
+    });
+
+    it('uses separate cache keys for us and etf markets', async () => {
+      redis.get.mockResolvedValue(JSON.stringify(mockEquityAssets));
+
+      await service.getAssets('', 1, 10, 'us');
+      await service.getAssets('', 1, 10, 'etf');
+
+      expect(redis.get).toHaveBeenCalledWith('papi:assets:us');
+      expect(redis.get).toHaveBeenCalledWith('papi:assets:etf');
+    });
+
+    it('falls back to MOCK_ASSETS when no Massive API key is set and caches', async () => {
       redis.get.mockResolvedValue(null);
       (configService.get as jest.Mock).mockReturnValue('');
 
-      const result = await service.getAssets('', 1, 10);
+      const result = await service.getAssets('', 1, 10, 'us');
 
       expect(result.total).toBeGreaterThan(0);
-      expect(redis.set).toHaveBeenCalledWith('papi:assets:all', expect.any(String), 86400);
-      expect(httpService.get).not.toHaveBeenCalled();
+      expect(result.data[0]?.assetClass).toBe('us_equity');
+      expect(redis.set).toHaveBeenCalledWith('papi:assets:us', expect.any(String), 86400);
     });
 
-    it('fetches from Alpaca when credentials are set and caches the result', async () => {
+    it('falls back to MOCK_ETF_ASSETS when no Massive API key is set for etf market', async () => {
       redis.get.mockResolvedValue(null);
-      (configService.get as jest.Mock).mockImplementation((key: string) => {
-        if (key === 'alpaca.apiKey') return 'MY_KEY';
-        if (key === 'alpaca.apiSecret') return 'MY_SECRET';
-        return '';
-      });
-      httpService.get.mockReturnValue(
-        of({
-          data: mockAlpacaAssets.map((a) => ({ ...a })),
-        } as AxiosResponse<AssetEntry[]>),
-      );
+      (configService.get as jest.Mock).mockReturnValue('');
 
-      const result = await service.getAssets('', 1, 10);
-
-      expect(httpService.get).toHaveBeenCalledWith(
-        expect.stringContaining('alpaca.markets'),
-        expect.objectContaining({
-          headers: expect.objectContaining({ 'APCA-API-KEY-ID': 'MY_KEY' }) as unknown,
-        }),
-      );
-      expect(result.data).toHaveLength(3);
-      expect(redis.set).toHaveBeenCalledWith('papi:assets:all', expect.any(String), 86400);
-    });
-
-    it('falls back to MOCK_ASSETS when Alpaca request fails', async () => {
-      redis.get.mockResolvedValue(null);
-      (configService.get as jest.Mock).mockImplementation((key: string) => {
-        if (key === 'alpaca.apiKey') return 'MY_KEY';
-        if (key === 'alpaca.apiSecret') return 'MY_SECRET';
-        return '';
-      });
-      httpService.get.mockReturnValue(throwError(() => new Error('alpaca down')));
-
-      const result = await service.getAssets('', 1, 10);
+      const result = await service.getAssets('', 1, 10, 'etf');
 
       expect(result.total).toBeGreaterThan(0);
+      expect(result.data[0]?.assetClass).toBe('us_etf');
+      expect(redis.set).toHaveBeenCalledWith('papi:assets:etf', expect.any(String), 86400);
+    });
+
+    it('fetches from Massive when API key is set and caches the result', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('MY_MASSIVE_KEY');
+
+      const massiveResults = [
+        { ticker: 'AAPL', name: 'Apple Inc.', primary_exchange: 'NASDAQ', active: true },
+        { ticker: 'MSFT', name: 'Microsoft Corporation', primary_exchange: 'NASDAQ', active: true },
+      ];
+      const listTickersSpy = jest
+        .spyOn(DefaultApi.prototype, 'listTickers')
+        .mockResolvedValue({ results: massiveResults } as never);
+
+      const result = await service.getAssets('', 1, 10, 'us');
+
+      expect(listTickersSpy).toHaveBeenCalled();
+      expect(result.data).toHaveLength(2);
+      expect(result.data[0]?.symbol).toBe('AAPL');
+      expect(result.data[0]?.assetClass).toBe('us_equity');
+      expect(redis.set).toHaveBeenCalledWith('papi:assets:us', expect.any(String), 86400);
+
+      listTickersSpy.mockRestore();
+    });
+
+    it('calls Massive with type=ETF when market=etf', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('MY_MASSIVE_KEY');
+
+      const listTickersSpy = jest
+        .spyOn(DefaultApi.prototype, 'listTickers')
+        .mockResolvedValue({ results: [] } as never);
+
+      await service.getAssets('', 1, 10, 'etf');
+
+      expect(listTickersSpy).toHaveBeenCalledWith(
+        undefined,
+        'ETF',
+        'stocks',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        true,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        1000,
+      );
+
+      listTickersSpy.mockRestore();
+    });
+
+    it('falls back to MOCK_ASSETS when Massive request fails', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('MY_MASSIVE_KEY');
+
+      jest.spyOn(DefaultApi.prototype, 'listTickers').mockRejectedValue(new Error('massive down'));
+
+      const result = await service.getAssets('', 1, 10, 'us');
+
+      expect(result.total).toBeGreaterThan(0);
+      expect(result.data[0]?.assetClass).toBe('us_equity');
     });
 
     it('filters by symbol prefix (case-insensitive)', async () => {
-      redis.get.mockResolvedValue(JSON.stringify(mockAlpacaAssets));
+      redis.get.mockResolvedValue(JSON.stringify(mockEquityAssets));
 
-      const result = await service.getAssets('aa', 1, 10);
+      const result = await service.getAssets('aa', 1, 10, 'us');
 
       expect(result.data.every((a) => a.symbol.includes('AA'))).toBe(true);
       expect(result.total).toBe(1);
     });
 
     it('filters by name substring (case-insensitive)', async () => {
-      redis.get.mockResolvedValue(JSON.stringify(mockAlpacaAssets));
+      redis.get.mockResolvedValue(JSON.stringify(mockEquityAssets));
 
-      const result = await service.getAssets('microsoft', 1, 10);
+      const result = await service.getAssets('microsoft', 1, 10, 'us');
 
       expect(result.data[0]?.symbol).toBe('MSFT');
       expect(result.total).toBe(1);
     });
 
     it('paginates results correctly', async () => {
-      redis.get.mockResolvedValue(JSON.stringify(mockAlpacaAssets));
+      redis.get.mockResolvedValue(JSON.stringify(mockEquityAssets));
 
-      const page1 = await service.getAssets('', 1, 2);
-      const page2 = await service.getAssets('', 2, 2);
+      const page1 = await service.getAssets('', 1, 2, 'us');
+      const page2 = await service.getAssets('', 2, 2, 'us');
 
       expect(page1.data).toHaveLength(2);
       expect(page1.page).toBe(1);

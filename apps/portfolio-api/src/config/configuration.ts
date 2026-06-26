@@ -16,4 +16,5 @@ export default () => ({
     apiKey: process.env['ALPACA_API_KEY'] ?? '',
     apiSecret: process.env['ALPACA_API_SECRET'] ?? '',
   },
+  massiveApiKey: process.env['MASSIVE_API_KEY'] ?? '',
 });

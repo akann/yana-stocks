@@ -26,6 +26,7 @@
     "@opentelemetry/auto-instrumentations-node": "^0.77.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
     "@opentelemetry/sdk-node": "^0.219.0",
+    "@polygon.io/client-js": "^8.2.0",
     "@yana-stocks/kafka-client": "workspace:*",
     "@yana-stocks/shared-dto": "workspace:*",
     "@yana-stocks/shared-types": "workspace:*",
@@ -83,6 +84,9 @@
       "lcov",
       "html"
     ],
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@polygon.io/client-js$": "<rootDir>/__mocks__/polygon-client-js.ts"
+    }
   }
 }

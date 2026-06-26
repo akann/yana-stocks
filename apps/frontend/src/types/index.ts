@@ -78,6 +78,23 @@ export interface PredictionSignal {
   generatedAt: string;
 }
 
+export type AssetMarket = 'us' | 'etf';
+
+export interface AssetEntry {
+  symbol: string;
+  name: string;
+  exchange: string;
+  tradable: boolean;
+  assetClass: 'us_equity' | 'us_etf';
+}
+
+export interface AssetsPage {
+  data: AssetEntry[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 export interface MoverEntry {
   symbol: string;
   price: number;

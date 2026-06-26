@@ -366,18 +366,36 @@ describe('StocksController (integration)', () => {
   // ─── GET /market/assets ───────────────────────────────────────────────────
 
   describe('GET /market/assets', () => {
-    it('returns paginated MOCK_ASSETS when no Alpaca credentials are configured', async () => {
-      const { body } = await request(server).get('/market/assets?page=1&limit=5').expect(200);
+    it('returns paginated MOCK_ASSETS when no Massive API key is configured', async () => {
+      const { body } = await request(server)
+        .get('/market/assets?market=us&page=1&limit=5')
+        .expect(200);
 
       expect(body.data).toHaveLength(5);
       expect(body.total).toBeGreaterThan(5);
       expect(body.page).toBe(1);
       expect(body.limit).toBe(5);
+      expect(body.data[0]).toHaveProperty('assetClass', 'us_equity');
+    });
+
+    it('returns paginated MOCK_ETF_ASSETS for market=etf', async () => {
+      const { body } = await request(server)
+        .get('/market/assets?market=etf&page=1&limit=5')
+        .expect(200);
+
+      expect(body.data.length).toBeGreaterThan(0);
+      expect(body.data[0]).toHaveProperty('assetClass', 'us_etf');
+    });
+
+    it('defaults to us market when no market param is provided', async () => {
+      const { body } = await request(server).get('/market/assets?page=1&limit=5').expect(200);
+
+      expect(body.data[0]).toHaveProperty('assetClass', 'us_equity');
     });
 
     it('filters assets by symbol prefix (case-insensitive)', async () => {
       const { body } = await request(server)
-        .get('/market/assets?search=aapl&page=1&limit=10')
+        .get('/market/assets?market=us&search=aapl&page=1&limit=10')
         .expect(200);
 
       expect(body.data.every((a: { symbol: string }) => a.symbol.includes('AAPL'))).toBe(true);
@@ -385,7 +403,7 @@ describe('StocksController (integration)', () => {
 
     it('returns an empty data array when no assets match the search term', async () => {
       const { body } = await request(server)
-        .get('/market/assets?search=ZZZNOTEXIST&page=1&limit=10')
+        .get('/market/assets?market=us&search=ZZZNOTEXIST&page=1&limit=10')
         .expect(200);
 
       expect(body.data).toHaveLength(0);
@@ -393,7 +411,9 @@ describe('StocksController (integration)', () => {
     });
 
     it('caps limit at 100 regardless of query param', async () => {
-      const { body } = await request(server).get('/market/assets?page=1&limit=999').expect(200);
+      const { body } = await request(server)
+        .get('/market/assets?market=us&page=1&limit=999')
+        .expect(200);
 
       expect(body.data.length).toBeLessThanOrEqual(100);
     });
