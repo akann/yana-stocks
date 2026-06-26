@@ -84,6 +84,7 @@ import type {
   AssetEntry,
   AssetMarket,
   AssetsPage,
+  FactorTile,
   IndexQuote,
   MarketMovers,
   MarketNewsItem,
@@ -522,6 +523,57 @@ export class StocksService {
     const result: SectorRotationData = { dates, rows };
     await this.redis.set(CACHE_KEY, JSON.stringify(result), 3600);
     return result;
+  }
+
+  async getFactorPerformance(): Promise<FactorTile[]> {
+    const CACHE_KEY = 'papi:factors';
+    const cached = await this.redis.get(CACHE_KEY);
+    if (cached) return JSON.parse(cached) as FactorTile[];
+
+    const FACTOR_ETFS = [
+      { factor: 'Momentum', etf: 'MTUM' },
+      { factor: 'Value', etf: 'VTV' },
+      { factor: 'Growth', etf: 'VUG' },
+      { factor: 'Dividend', etf: 'VIG' },
+      { factor: 'Low Volatility', etf: 'USMV' },
+      { factor: 'Quality', etf: 'QUAL' },
+    ];
+
+    const histResults = await Promise.allSettled(
+      FACTOR_ETFS.map(({ etf }) =>
+        firstValueFrom(
+          this.httpService.get<OHLCV[]>(
+            `${this.priceProcessorUrl}/prices/${etf}/history?limit=22&interval=1d`,
+            { timeout: 5000 },
+          ),
+        ),
+      ),
+    );
+
+    const tiles: FactorTile[] = FACTOR_ETFS.map(({ factor, etf }, i) => {
+      const r = histResults[i];
+      if (!r || r.status !== 'fulfilled' || !r.value.data?.length) {
+        return { factor, etf, price: 0, change1d: 0, change1w: 0, change1m: 0 };
+      }
+      const bars = r.value.data;
+      const n = bars.length;
+      const price = Number(bars[n - 1]!.close);
+      const prev1d = n >= 2 ? Number(bars[n - 2]!.close) : price;
+      const prev1w = n >= 6 ? Number(bars[n - 6]!.close) : price;
+      const prev1m = n >= 22 ? Number(bars[n - 22]!.close) : Number(bars[0]!.close);
+      const pct = (from: number) => (from ? ((price - from) / from) * 100 : 0);
+      return {
+        factor,
+        etf,
+        price,
+        change1d: pct(prev1d),
+        change1w: pct(prev1w),
+        change1m: pct(prev1m),
+      };
+    });
+
+    await this.redis.set(CACHE_KEY, JSON.stringify(tiles), 900);
+    return tiles;
   }
 
   async getScreener(params: ScreenerParams): Promise<ScreenerResult[]> {

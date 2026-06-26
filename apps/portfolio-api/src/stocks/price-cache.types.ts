@@ -78,6 +78,15 @@ export interface MarketOverview {
   news: MarketNewsItem[];
 }
 
+export interface FactorTile {
+  factor: string;
+  etf: string;
+  price: number;
+  change1d: number;
+  change1w: number;
+  change1m: number;
+}
+
 export interface SectorRotationRow {
   sector: string;
   changes: number[];

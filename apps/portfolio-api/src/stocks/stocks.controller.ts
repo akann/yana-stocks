@@ -14,6 +14,7 @@ import { UserFromTokenGuard } from '../common/current-user.decorator';
 import type {
   AggregateStockResponse,
   AssetsPage,
+  FactorTile,
   MarketMovers,
   MarketOverview,
   ScreenerResult,
@@ -69,6 +70,15 @@ export class StocksController {
   ): Promise<SectorRotationData> {
     const safeIndex = index === 'ftse100' ? 'ftse100' : 'sp500';
     return this.stocksService.getSectorRotation(safeIndex);
+  }
+
+  @Get('market/factors')
+  @ApiOperation({
+    summary:
+      'Get factor ETF performance tiles (Momentum / Value / Growth / Dividend / Low Vol / Quality)',
+  })
+  getFactorPerformance(): Promise<FactorTile[]> {
+    return this.stocksService.getFactorPerformance();
   }
 
   @Get('market/screener')

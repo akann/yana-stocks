@@ -948,7 +948,7 @@ step.
 | 12   | News pin markers with headline popup                             | ✓ complete |
 | 13   | Home market preference UI (profile settings + home wiring)       | ✓ complete |
 | 14   | Sector rotation time-series heatmap (S&P 500 + FTSE 100)         | ✓ complete |
-| 15   | Factor performance tiles                                         | pending    |
+| 15   | Factor performance tiles                                         | ✓ complete |
 
 **UI polish (outside numbered steps):**
 

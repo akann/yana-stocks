@@ -7,6 +7,7 @@ import { MarketNews } from '@/components/home/MarketNews';
 import { StockScreener } from '@/components/home/StockScreener';
 import { MoversCard } from '@/components/market/MoversCard';
 import { MarketBrowser } from '@/components/market/MarketBrowser';
+import { FactorTiles } from '@/components/home/FactorTiles';
 import { useAuth } from '@/context/AuthContext';
 import type { AssetMarket } from '@/types';
 
@@ -36,6 +37,8 @@ export function HomePageView(): React.JSX.Element {
       </div>
 
       <IndicesBar />
+
+      <FactorTiles />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SectorRotationHeatmap />
