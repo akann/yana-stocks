@@ -22,7 +22,7 @@ export function MarketNews(): React.JSX.Element {
   });
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col">
+    <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col min-h-0">
       <h2 className="text-sm font-semibold text-gray-700 mb-3">Market News</h2>
       {isLoading ? (
         <div className="space-y-3">
@@ -37,7 +37,7 @@ export function MarketNews(): React.JSX.Element {
       ) : !data?.news.length ? (
         <p className="text-sm text-gray-400 py-4 text-center">No news available</p>
       ) : (
-        <ul className="space-y-3 flex-1 overflow-hidden">
+        <ul className="space-y-3 flex-1 overflow-y-auto min-h-0 pr-1">
           {data.news.map((item, i) => (
             <li key={i} className="border-b border-gray-50 last:border-0 pb-2.5 last:pb-0">
               <a href={item.url} target="_blank" rel="noopener noreferrer" className="group">
