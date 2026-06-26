@@ -4,6 +4,27 @@ import { ConfigService } from '@nestjs/config';
 import type { OHLCV, PredictionSignal, SentimentSignal } from '@yana-stocks/shared-types';
 import { firstValueFrom } from 'rxjs';
 
+interface FmpIndexQuote {
+  symbol?: string;
+  name?: string;
+  price?: number;
+  change?: number;
+  changesPercentage?: number;
+}
+
+interface FmpSectorPerformance {
+  sector?: string;
+  changesPercentage?: string | number;
+}
+
+interface FmpNewsItem {
+  title?: string;
+  url?: string;
+  publishedDate?: string;
+  site?: string;
+  text?: string;
+}
+
 interface PolygonTickerResult {
   ticker?: string;
   name?: string;
@@ -20,9 +41,13 @@ import type {
   AssetEntry,
   AssetMarket,
   AssetsPage,
+  IndexQuote,
   MarketMovers,
+  MarketNewsItem,
+  MarketOverview,
   MoverEntry,
   PriceCacheEntry,
+  SectorPerformance,
 } from './price-cache.types';
 
 const DEFAULT_SYMBOLS = [
@@ -192,6 +217,83 @@ export class StocksService {
       page,
       limit,
     };
+  }
+
+  async getOverview(): Promise<MarketOverview> {
+    const CACHE_KEY = 'papi:overview';
+    const cached = await this.redis.get(CACHE_KEY);
+    if (cached) return JSON.parse(cached) as MarketOverview;
+
+    const apiKey = this.config.get<string>('fmpApiKey') ?? '';
+    if (!apiKey) {
+      this.logger.warn('FMP_API_KEY not set — returning empty market overview');
+      return { indices: [], sectors: [], news: [] };
+    }
+
+    const FMP_BASE = 'https://financialmodelingprep.com/api/v3';
+    const INDEX_SYMBOLS = '%5EGSPC,%5EIXIC,%5EFTSE,%5EGDAXI';
+
+    const [indicesResult, sectorsResult, newsResult] = await Promise.allSettled([
+      firstValueFrom(
+        this.httpService.get<FmpIndexQuote[]>(`${FMP_BASE}/quote/${INDEX_SYMBOLS}`, {
+          params: { apikey: apiKey },
+          timeout: 5000,
+        }),
+      ),
+      firstValueFrom(
+        this.httpService.get<FmpSectorPerformance[]>(`${FMP_BASE}/sector-performance`, {
+          params: { apikey: apiKey },
+          timeout: 5000,
+        }),
+      ),
+      firstValueFrom(
+        this.httpService.get<FmpNewsItem[]>(`${FMP_BASE}/stock_news`, {
+          params: { tickers: 'SPY,QQQ,DIA', limit: 8, apikey: apiKey },
+          timeout: 5000,
+        }),
+      ),
+    ]);
+
+    const INDEX_NAME_MAP: Record<string, string> = {
+      '^GSPC': 'S&P 500',
+      '^IXIC': 'Nasdaq',
+      '^FTSE': 'FTSE 100',
+      '^GDAXI': 'DAX',
+    };
+
+    const indices: IndexQuote[] =
+      indicesResult.status === 'fulfilled'
+        ? (indicesResult.value.data ?? []).map((q) => ({
+            symbol: q.symbol ?? '',
+            name: INDEX_NAME_MAP[q.symbol ?? ''] ?? q.name ?? q.symbol ?? '',
+            price: q.price ?? 0,
+            change: q.change ?? 0,
+            changesPercentage: q.changesPercentage ?? 0,
+          }))
+        : [];
+
+    const sectors: SectorPerformance[] =
+      sectorsResult.status === 'fulfilled'
+        ? (sectorsResult.value.data ?? []).map((s) => ({
+            sector: s.sector ?? '',
+            changesPercentage: parseFloat(String(s.changesPercentage ?? '0').replace('%', '')),
+          }))
+        : [];
+
+    const news: MarketNewsItem[] =
+      newsResult.status === 'fulfilled'
+        ? (newsResult.value.data ?? []).map((n) => ({
+            title: n.title ?? '',
+            url: n.url ?? '',
+            publishedAt: n.publishedDate ?? '',
+            source: n.site ?? '',
+            summary: (n.text ?? '').slice(0, 200),
+          }))
+        : [];
+
+    const overview: MarketOverview = { indices, sectors, news };
+    await this.redis.set(CACHE_KEY, JSON.stringify(overview), 300);
+    return overview;
   }
 
   private async fetchAssetsFromMassive(type: 'CS' | 'ETF'): Promise<AssetEntry[]> {

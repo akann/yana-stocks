@@ -15,6 +15,7 @@ import type {
   AssetMarket,
   AssetsPage,
   MarketMovers,
+  MarketOverview,
 } from './price-cache.types';
 import { StocksService } from './stocks.service';
 
@@ -47,6 +48,14 @@ export class StocksController {
     @Query('top', new DefaultValuePipe(5), ParseIntPipe) top: number,
   ): Promise<MarketMovers> {
     return this.stocksService.getMovers(top);
+  }
+
+  @Get('market/overview')
+  @ApiOperation({
+    summary: 'Get market overview: index quotes, sector performance, and market news',
+  })
+  getOverview(): Promise<MarketOverview> {
+    return this.stocksService.getOverview();
   }
 
   @Get('market/assets')

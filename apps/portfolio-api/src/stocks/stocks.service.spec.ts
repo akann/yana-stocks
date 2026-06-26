@@ -464,4 +464,84 @@ describe('StocksService', () => {
       expect(page2.total).toBe(3);
     });
   });
+
+  describe('getOverview', () => {
+    const fmpIndices = [
+      { symbol: '^GSPC', name: 'S&P 500', price: 5200, change: 26, changesPercentage: 0.5 },
+      { symbol: '^IXIC', name: 'Nasdaq', price: 18000, change: -50, changesPercentage: -0.27 },
+    ];
+    const fmpSectors = [
+      { sector: 'Technology', changesPercentage: '+1.52%' },
+      { sector: 'Health Care', changesPercentage: '-0.23%' },
+    ];
+    const fmpNews = [
+      {
+        title: 'Markets rally on Fed optimism',
+        url: 'https://example.com/1',
+        publishedDate: '2026-01-01T10:00:00.000Z',
+        site: 'Reuters',
+        text: 'Lorem ipsum dolor sit amet.',
+      },
+    ];
+
+    it('returns overview from FMP and caches it', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('FMP_KEY');
+
+      httpService.get
+        .mockReturnValueOnce(of({ data: fmpIndices } as AxiosResponse))
+        .mockReturnValueOnce(of({ data: fmpSectors } as AxiosResponse))
+        .mockReturnValueOnce(of({ data: fmpNews } as AxiosResponse));
+
+      const result = await service.getOverview();
+
+      expect(result.indices).toHaveLength(2);
+      expect(result.indices[0]?.symbol).toBe('^GSPC');
+      expect(result.indices[0]?.name).toBe('S&P 500');
+      expect(result.sectors).toHaveLength(2);
+      expect(result.sectors[0]?.changesPercentage).toBeCloseTo(1.52);
+      expect(result.sectors[1]?.changesPercentage).toBeCloseTo(-0.23);
+      expect(result.news).toHaveLength(1);
+      expect(result.news[0]?.title).toBe('Markets rally on Fed optimism');
+      expect(redis.set).toHaveBeenCalledWith('papi:overview', expect.any(String), 300);
+    });
+
+    it('returns cached overview without hitting FMP', async () => {
+      const cached = { indices: fmpIndices, sectors: [], news: [] };
+      redis.get.mockResolvedValue(JSON.stringify(cached));
+
+      const result = await service.getOverview();
+
+      expect(httpService.get).not.toHaveBeenCalled();
+      expect(result.indices).toHaveLength(2);
+    });
+
+    it('returns empty overview when FMP_API_KEY is not set', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('');
+
+      const result = await service.getOverview();
+
+      expect(httpService.get).not.toHaveBeenCalled();
+      expect(result.indices).toHaveLength(0);
+      expect(result.sectors).toHaveLength(0);
+      expect(result.news).toHaveLength(0);
+    });
+
+    it('returns partial data when one FMP call fails', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('FMP_KEY');
+
+      httpService.get
+        .mockReturnValueOnce(of({ data: fmpIndices } as AxiosResponse))
+        .mockReturnValueOnce(throwError(() => new Error('sectors down')))
+        .mockReturnValueOnce(of({ data: fmpNews } as AxiosResponse));
+
+      const result = await service.getOverview();
+
+      expect(result.indices).toHaveLength(2);
+      expect(result.sectors).toHaveLength(0);
+      expect(result.news).toHaveLength(1);
+    });
+  });
 });

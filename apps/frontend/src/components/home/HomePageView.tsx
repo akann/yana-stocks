@@ -2,6 +2,9 @@
 
 import React, { useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { IndicesBar } from '@/components/home/IndicesBar';
+import { SectorHeatmap } from '@/components/home/SectorHeatmap';
+import { MarketNews } from '@/components/home/MarketNews';
 import { MoversCard } from '@/components/market/MoversCard';
 import { MarketBrowser } from '@/components/market/MarketBrowser';
 
@@ -18,8 +21,8 @@ export function HomePageView(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="text-center space-y-4 py-8">
+    <div className="space-y-6">
+      <div className="text-center space-y-4 py-6">
         <h1 className="text-3xl font-bold text-gray-900">Stock Market Dashboard</h1>
         <p className="text-gray-600">Real-time prices, sentiment analysis, and ML predictions</p>
         <form onSubmit={handleSearch} className="flex gap-2 max-w-sm mx-auto">
@@ -38,6 +41,14 @@ export function HomePageView(): React.JSX.Element {
           </button>
         </form>
       </div>
+
+      <IndicesBar />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SectorHeatmap />
+        <MarketNews />
+      </div>
+
       <MoversCard />
       <MarketBrowser />
     </div>

@@ -108,6 +108,33 @@ export interface MarketMovers {
   losers: MoverEntry[];
 }
 
+export interface IndexQuote {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  changesPercentage: number;
+}
+
+export interface SectorPerformance {
+  sector: string;
+  changesPercentage: number;
+}
+
+export interface MarketNewsItem {
+  title: string;
+  url: string;
+  publishedAt: string;
+  source: string;
+  summary: string;
+}
+
+export interface MarketOverview {
+  indices: IndexQuote[];
+  sectors: SectorPerformance[];
+  news: MarketNewsItem[];
+}
+
 export interface AnalystRating {
   strongBuy: number;
   buy: number;

@@ -364,6 +364,49 @@ describe('StocksController (integration)', () => {
     });
   });
 
+  // ─── GET /market/overview ─────────────────────────────────────────────────
+
+  describe('GET /market/overview', () => {
+    it('returns empty overview when FMP_API_KEY is not configured', async () => {
+      const { body } = await request(server).get('/market/overview').expect(200);
+
+      expect(body).toHaveProperty('indices');
+      expect(body).toHaveProperty('sectors');
+      expect(body).toHaveProperty('news');
+      expect(Array.isArray(body.indices)).toBe(true);
+      expect(Array.isArray(body.sectors)).toBe(true);
+      expect(Array.isArray(body.news)).toBe(true);
+    });
+
+    it('serves cached overview from Redis', async () => {
+      const cached = {
+        indices: [
+          { symbol: '^GSPC', name: 'S&P 500', price: 5200, change: 10, changesPercentage: 0.2 },
+        ],
+        sectors: [{ sector: 'Technology', changesPercentage: 1.5 }],
+        news: [
+          {
+            title: 'Test headline',
+            url: 'https://x.com',
+            publishedAt: '',
+            source: 'Reuters',
+            summary: '',
+          },
+        ],
+      };
+      await rawRedis.setex('papi:overview', 300, JSON.stringify(cached));
+
+      const { body } = await request(server).get('/market/overview').expect(200);
+
+      expect(body.indices).toHaveLength(1);
+      expect(body.indices[0].symbol).toBe('^GSPC');
+      expect(body.sectors[0].sector).toBe('Technology');
+      expect(body.news[0].title).toBe('Test headline');
+
+      await rawRedis.del('papi:overview');
+    });
+  });
+
   // ─── GET /market/assets ───────────────────────────────────────────────────
 
   describe('GET /market/assets', () => {
