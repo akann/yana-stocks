@@ -13,6 +13,7 @@ import { Model } from 'mongoose';
 import { RedisService } from '../redis/redis.service';
 import { KafkaProducerService } from './kafka-producer.service';
 import { PriceBar } from './schemas/price-bar.schema';
+import { TwelveDataService } from './twelve-data.service';
 
 export const POLYGON_HTTP = 'POLYGON_HTTP';
 
@@ -59,6 +60,7 @@ export class PricesService {
     private readonly redis: RedisService,
     private readonly kafkaProducer: KafkaProducerService,
     @Inject(POLYGON_HTTP) private readonly http: AxiosInstance,
+    private readonly twelveData: TwelveDataService,
     config: ConfigService,
   ) {
     this.apiKey = config.get<string>('massive.apiKey') ?? '';
@@ -157,6 +159,8 @@ export class PricesService {
   }
 
   async getQuote(symbol: string): Promise<QuoteEntry | null> {
+    if (symbol.endsWith('.L')) return this.twelveData.getQuote(symbol);
+
     const cacheKey = `price:quote:${symbol}`;
     const cached = await this.redis.get(cacheKey);
     if (cached) return JSON.parse(cached) as QuoteEntry;
@@ -199,6 +203,10 @@ export class PricesService {
     limit: number,
     filter: Record<string, unknown>,
   ): Promise<PriceBar[]> {
+    if (symbol.endsWith('.L')) {
+      return this.twelveData.fetchAndStoreHistory(symbol, interval, limit, filter);
+    }
+
     const noDataKey = `hist:no-data:${symbol}:${interval}`;
     if (await this.redis.get(noDataKey)) return [];
 

@@ -31,6 +31,8 @@ export class ProfileService {
         update['preferences.defaultCurrency'] = dto.preferences.defaultCurrency;
       if (dto.preferences.emailNotifications !== undefined)
         update['preferences.emailNotifications'] = dto.preferences.emailNotifications;
+      if (dto.preferences.defaultMarket !== undefined)
+        update['preferences.defaultMarket'] = dto.preferences.defaultMarket;
     }
 
     const profile = await this.profileModel.findOneAndUpdate(

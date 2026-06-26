@@ -12,4 +12,7 @@ export default () => ({
   massive: {
     apiKey: process.env['MASSIVE_API_KEY'] ?? '',
   },
+  twelveData: {
+    apiKey: process.env['TWELVE_DATA_API_KEY'] ?? '',
+  },
 });

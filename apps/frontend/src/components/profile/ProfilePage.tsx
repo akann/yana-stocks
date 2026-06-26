@@ -78,6 +78,7 @@ export function ProfilePage(): React.JSX.Element {
             initialTheme={profile?.preferences?.theme ?? 'light'}
             initialCurrency={profile?.preferences?.defaultCurrency ?? 'USD'}
             initialEmailNotifications={profile?.preferences?.emailNotifications ?? true}
+            initialDefaultMarket={profile?.preferences?.defaultMarket ?? 'US'}
             onSave={updateProfile}
           />
           <MFASection
@@ -279,6 +280,7 @@ interface EditProfileFormProps {
   initialTheme: 'light' | 'dark';
   initialCurrency: string;
   initialEmailNotifications: boolean;
+  initialDefaultMarket: 'US' | 'UK' | 'global';
   onSave: (dto: {
     displayName?: string;
     bio?: string;
@@ -287,6 +289,7 @@ interface EditProfileFormProps {
       theme?: 'light' | 'dark';
       defaultCurrency?: string;
       emailNotifications?: boolean;
+      defaultMarket?: 'US' | 'UK' | 'global';
     };
   }) => Promise<void>;
 }
@@ -298,6 +301,7 @@ function EditProfileForm({
   initialTheme,
   initialCurrency,
   initialEmailNotifications,
+  initialDefaultMarket,
   onSave,
 }: EditProfileFormProps): React.JSX.Element {
   const [displayName, setDisplayName] = useState(initialDisplayName);
@@ -306,6 +310,7 @@ function EditProfileForm({
   const [theme, setTheme] = useState<'light' | 'dark'>(initialTheme);
   const [currency, setCurrency] = useState(initialCurrency);
   const [emailNotifications, setEmailNotifications] = useState(initialEmailNotifications);
+  const [defaultMarket, setDefaultMarket] = useState<'US' | 'UK' | 'global'>(initialDefaultMarket);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -320,7 +325,7 @@ function EditProfileForm({
         displayName: displayName || undefined,
         bio: bio || undefined,
         avatar: avatar || undefined,
-        preferences: { theme, defaultCurrency: currency, emailNotifications },
+        preferences: { theme, defaultCurrency: currency, emailNotifications, defaultMarket },
       });
       setSuccess(true);
     } catch (err) {
@@ -394,6 +399,19 @@ function EditProfileForm({
                   {c}
                 </option>
               ))}
+            </select>
+          </div>
+
+          <div>
+            <label className={LABEL}>Default market</label>
+            <select
+              value={defaultMarket}
+              onChange={(e) => setDefaultMarket(e.target.value as 'US' | 'UK' | 'global')}
+              className={INPUT}
+            >
+              <option value="US">🇺🇸 US Equities</option>
+              <option value="UK">🇬🇧 UK Equities</option>
+              <option value="global">🌐 Global (All)</option>
             </select>
           </div>
 

@@ -13,6 +13,10 @@ export class PreferencesDto {
   @IsOptional()
   @IsBoolean()
   emailNotifications?: boolean;
+
+  @IsOptional()
+  @IsString()
+  defaultMarket?: 'US' | 'UK' | 'global';
 }
 
 export class UpdateProfileDto {

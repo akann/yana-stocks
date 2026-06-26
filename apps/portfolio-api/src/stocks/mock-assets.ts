@@ -1812,6 +1812,369 @@ export const MOCK_ASSETS: AssetEntry[] = [
   },
 ];
 
+export const MOCK_UK_ASSETS: AssetEntry[] = [
+  // Banking & Finance
+  {
+    symbol: 'HSBA.L',
+    name: 'HSBC Holdings plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'BARC.L',
+    name: 'Barclays plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'LLOY.L',
+    name: 'Lloyds Banking Group plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'NWG.L',
+    name: 'NatWest Group plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'STAN.L',
+    name: 'Standard Chartered plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'AVIVA.L',
+    name: 'Aviva plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'PRU.L',
+    name: 'Prudential plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'LGEN.L',
+    name: 'Legal & General Group plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  { symbol: 'MNG.L', name: 'M&G plc', exchange: 'LSE', tradable: true, assetClass: 'uk_equity' },
+
+  // Energy
+  { symbol: 'BP.L', name: 'BP plc', exchange: 'LSE', tradable: true, assetClass: 'uk_equity' },
+  { symbol: 'SHEL.L', name: 'Shell plc', exchange: 'LSE', tradable: true, assetClass: 'uk_equity' },
+
+  // Mining & Materials
+  {
+    symbol: 'RIO.L',
+    name: 'Rio Tinto plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'AAL.L',
+    name: 'Anglo American plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'BHP.L',
+    name: 'BHP Group plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'GLEN.L',
+    name: 'Glencore plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'ANTO.L',
+    name: 'Antofagasta plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+
+  // Pharmaceuticals & Healthcare
+  {
+    symbol: 'AZN.L',
+    name: 'AstraZeneca plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  { symbol: 'GSK.L', name: 'GSK plc', exchange: 'LSE', tradable: true, assetClass: 'uk_equity' },
+  { symbol: 'HLN.L', name: 'Haleon plc', exchange: 'LSE', tradable: true, assetClass: 'uk_equity' },
+  {
+    symbol: 'SHPG.L',
+    name: 'Smith+Nephew plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+
+  // Consumer Goods
+  {
+    symbol: 'ULVR.L',
+    name: 'Unilever plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'BATS.L',
+    name: 'British American Tobacco plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'IMB.L',
+    name: 'Imperial Brands plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  { symbol: 'DGE.L', name: 'Diageo plc', exchange: 'LSE', tradable: true, assetClass: 'uk_equity' },
+  {
+    symbol: 'ABF.L',
+    name: 'Associated British Foods plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  { symbol: 'TSCO.L', name: 'Tesco plc', exchange: 'LSE', tradable: true, assetClass: 'uk_equity' },
+  {
+    symbol: 'SBRY.L',
+    name: 'J Sainsbury plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'MKS.L',
+    name: 'Marks and Spencer Group plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'JD.L',
+    name: 'JD Sports Fashion plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'OCDO.L',
+    name: 'Ocado Group plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+
+  // Industrials & Aerospace
+  {
+    symbol: 'BA.L',
+    name: 'BAE Systems plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'RR.L',
+    name: 'Rolls-Royce Holdings plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'WEIR.L',
+    name: 'Weir Group plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  { symbol: 'IMI.L', name: 'IMI plc', exchange: 'LSE', tradable: true, assetClass: 'uk_equity' },
+  { symbol: 'HLMA.L', name: 'Halma plc', exchange: 'LSE', tradable: true, assetClass: 'uk_equity' },
+
+  // Telecoms & Technology
+  {
+    symbol: 'VOD.L',
+    name: 'Vodafone Group plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'BT.L',
+    name: 'BT Group plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'SAGE.L',
+    name: 'Sage Group plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+
+  // Media & Entertainment
+  { symbol: 'REL.L', name: 'RELX plc', exchange: 'LSE', tradable: true, assetClass: 'uk_equity' },
+  {
+    symbol: 'PSON.L',
+    name: 'Pearson plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  { symbol: 'WPP.L', name: 'WPP plc', exchange: 'LSE', tradable: true, assetClass: 'uk_equity' },
+
+  // Real Estate
+  { symbol: 'SGRO.L', name: 'SEGRO plc', exchange: 'LSE', tradable: true, assetClass: 'uk_equity' },
+  {
+    symbol: 'LAND.L',
+    name: 'Land Securities Group plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'BLND.L',
+    name: 'British Land Company plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'BKG.L',
+    name: 'Berkeley Group Holdings plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'BDEV.L',
+    name: 'Barratt Developments plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'PSN.L',
+    name: 'Persimmon plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'TW.L',
+    name: 'Taylor Wimpey plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+
+  // Utilities
+  {
+    symbol: 'NG.L',
+    name: 'National Grid plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  { symbol: 'SSE.L', name: 'SSE plc', exchange: 'LSE', tradable: true, assetClass: 'uk_equity' },
+  {
+    symbol: 'CNA.L',
+    name: 'Centrica plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'UU.L',
+    name: 'United Utilities Group plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'SVT.L',
+    name: 'Severn Trent plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+
+  // Aviation & Travel
+  {
+    symbol: 'IAG.L',
+    name: 'International Consolidated Airlines Group',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'EZJ.L',
+    name: 'easyJet plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'WIZZ.L',
+    name: 'Wizz Air Holdings plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'CPG.L',
+    name: 'Compass Group plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  {
+    symbol: 'WTB.L',
+    name: 'Whitbread plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+
+  // Professional Services
+  {
+    symbol: 'EXPN.L',
+    name: 'Experian plc',
+    exchange: 'LSE',
+    tradable: true,
+    assetClass: 'uk_equity',
+  },
+  { symbol: 'MNDI.L', name: 'Mondi plc', exchange: 'LSE', tradable: true, assetClass: 'uk_equity' },
+  { symbol: 'DCC.L', name: 'DCC plc', exchange: 'LSE', tradable: true, assetClass: 'uk_equity' },
+];
+
 export const MOCK_ETF_ASSETS: AssetEntry[] = [
   // Broad market
   {

@@ -12,6 +12,7 @@ const PAGE_SIZE = 20;
 const TABS: { id: AssetMarket; label: string }[] = [
   { id: 'us', label: '🇺🇸 US Equities' },
   { id: 'etf', label: '📊 ETFs' },
+  { id: 'uk', label: '🇬🇧 UK Equities' },
 ];
 
 export function MarketBrowser(): React.JSX.Element {
@@ -130,7 +131,8 @@ export function MarketBrowser(): React.JSX.Element {
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
                 <span className="text-xs text-gray-400">
-                  {data.total} {activeTab === 'etf' ? 'ETFs' : 'equities'}
+                  {data.total}{' '}
+                  {activeTab === 'etf' ? 'ETFs' : activeTab === 'uk' ? 'UK equities' : 'equities'}
                   {search ? ` matching "${search.toUpperCase()}"` : ''}
                 </span>
                 <div className="flex gap-1">

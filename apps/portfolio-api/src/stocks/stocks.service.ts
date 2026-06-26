@@ -14,7 +14,7 @@ interface PolygonTickersResponse {
   results?: PolygonTickerResult[];
 }
 import { RedisService } from '../redis/redis.service';
-import { MOCK_ASSETS, MOCK_ETF_ASSETS } from './mock-assets';
+import { MOCK_ASSETS, MOCK_ETF_ASSETS, MOCK_UK_ASSETS } from './mock-assets';
 import type {
   AggregateStockResponse,
   AssetEntry,
@@ -169,6 +169,9 @@ export class StocksService {
     const cached = await this.redis.get(CACHE_KEY);
     if (cached) {
       all = JSON.parse(cached) as AssetEntry[];
+    } else if (market === 'uk') {
+      all = MOCK_UK_ASSETS;
+      await this.redis.set(CACHE_KEY, JSON.stringify(all), CACHE_TTL);
     } else {
       all = await this.fetchAssetsFromMassive(market === 'etf' ? 'ETF' : 'CS');
       await this.redis.set(CACHE_KEY, JSON.stringify(all), CACHE_TTL);

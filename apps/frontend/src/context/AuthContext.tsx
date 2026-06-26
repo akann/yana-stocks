@@ -17,6 +17,7 @@ export interface UserPreferences {
   theme: 'light' | 'dark';
   defaultCurrency: string;
   emailNotifications: boolean;
+  defaultMarket: 'US' | 'UK' | 'global';
 }
 
 export interface UserProfile {

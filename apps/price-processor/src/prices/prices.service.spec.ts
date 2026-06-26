@@ -6,6 +6,7 @@ import { KAFKA_TOPICS } from '@yana-stocks/kafka-client';
 import { RedisService } from '../redis/redis.service';
 import { KafkaProducerService } from './kafka-producer.service';
 import { POLYGON_HTTP, PricesService } from './prices.service';
+import { TwelveDataService } from './twelve-data.service';
 import { PriceBar } from './schemas/price-bar.schema';
 
 // ── fixtures ──────────────────────────────────────────────────────────────
@@ -108,6 +109,13 @@ async function buildModule(): Promise<Fixture> {
         },
       },
       { provide: POLYGON_HTTP, useValue: { get: mockGet } },
+      {
+        provide: TwelveDataService,
+        useValue: {
+          getQuote: jest.fn().mockResolvedValue(null),
+          fetchAndStoreHistory: jest.fn().mockResolvedValue([]),
+        } satisfies Partial<TwelveDataService>,
+      },
     ],
   }).compile();
 

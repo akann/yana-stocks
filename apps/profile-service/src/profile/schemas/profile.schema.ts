@@ -11,6 +11,9 @@ export class Preferences {
 
   @Prop({ default: true })
   emailNotifications!: boolean;
+
+  @Prop({ default: 'US', enum: ['US', 'UK', 'global'] })
+  defaultMarket!: 'US' | 'UK' | 'global';
 }
 
 export const PreferencesSchema = SchemaFactory.createForClass(Preferences);

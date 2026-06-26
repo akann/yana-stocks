@@ -78,14 +78,14 @@ export interface PredictionSignal {
   generatedAt: string;
 }
 
-export type AssetMarket = 'us' | 'etf';
+export type AssetMarket = 'us' | 'etf' | 'uk';
 
 export interface AssetEntry {
   symbol: string;
   name: string;
   exchange: string;
   tradable: boolean;
-  assetClass: 'us_equity' | 'us_etf';
+  assetClass: 'us_equity' | 'us_etf' | 'uk_equity';
 }
 
 export interface AssetsPage {

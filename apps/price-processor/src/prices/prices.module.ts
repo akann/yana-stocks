@@ -7,6 +7,7 @@ import { KafkaProducerService } from './kafka-producer.service';
 import { PricesController } from './prices.controller';
 import { POLYGON_HTTP, PricesService } from './prices.service';
 import { PriceBar, PriceBarSchema } from './schemas/price-bar.schema';
+import { TwelveDataService } from './twelve-data.service';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { PriceBar, PriceBarSchema } from './schemas/price-bar.schema';
   controllers: [PricesController],
   providers: [
     PricesService,
+    TwelveDataService,
     KafkaProducerService,
     KafkaConsumerService,
     {
