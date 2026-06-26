@@ -586,30 +586,28 @@ describe('StocksService', () => {
   });
 
   describe('getScreener', () => {
-    const fmpScreenerItems = [
-      {
-        symbol: 'AAPL',
-        companyName: 'Apple Inc.',
-        price: 195,
-        marketCap: 3_000_000_000_000,
-        sector: 'Technology',
-        volume: 50_000_000,
-        lastAnnualDividendYield: 0.005,
-      },
-      {
-        symbol: 'MSFT',
-        companyName: 'Microsoft Corp',
-        price: 410,
-        marketCap: 3_100_000_000_000,
-        sector: 'Technology',
-        volume: 25_000_000,
-        lastAnnualDividendYield: 0.007,
-      },
-    ];
-    const fmpQuotes = [
-      { symbol: 'AAPL', change: 2.5, changesPercentage: 1.3 },
-      { symbol: 'MSFT', change: -1.2, changesPercentage: -0.3 },
-    ];
+    const aaplProfile = {
+      symbol: 'AAPL',
+      companyName: 'Apple Inc.',
+      price: 195,
+      change: 2.5,
+      changePercentage: 1.3,
+      marketCap: 3_000_000_000_000,
+      sector: 'Technology',
+      volume: 50_000_000,
+      lastDividend: 0.97,
+    };
+    const msftProfile = {
+      symbol: 'MSFT',
+      companyName: 'Microsoft Corp',
+      price: 410,
+      change: -1.2,
+      changePercentage: -0.3,
+      marketCap: 3_100_000_000_000,
+      sector: 'Technology',
+      volume: 25_000_000,
+      lastDividend: 3.0,
+    };
 
     it('returns empty array when FMP_API_KEY is not set', async () => {
       redis.get.mockResolvedValue(null);
@@ -632,7 +630,7 @@ describe('StocksService', () => {
           marketCap: 3_000_000_000_000,
           sector: 'Technology',
           volume: 50_000_000,
-          dividendYield: 0.005,
+          dividendYield: 0.5,
         },
       ];
       redis.get.mockResolvedValue(JSON.stringify(cached));
@@ -643,27 +641,25 @@ describe('StocksService', () => {
       expect(result[0]?.symbol).toBe('AAPL');
     });
 
-    it('fetches screener + individual quotes from FMP, merges, and caches', async () => {
+    it('fetches profiles from FMP stable API, applies filters, and caches', async () => {
       redis.get.mockResolvedValue(null);
       (configService.get as jest.Mock).mockReturnValue('FMP_KEY');
 
-      // screener returns 2 items, then 2 individual quote calls (one per symbol)
+      // First two calls return AAPL and MSFT profiles; remaining SCREENER_SYMBOLS return []
       httpService.get
-        .mockReturnValueOnce(of({ data: fmpScreenerItems } as AxiosResponse))
-        .mockReturnValueOnce(of({ data: [fmpQuotes[0]] } as AxiosResponse))
-        .mockReturnValueOnce(of({ data: [fmpQuotes[1]] } as AxiosResponse));
+        .mockReturnValueOnce(of({ data: [aaplProfile] } as AxiosResponse))
+        .mockReturnValueOnce(of({ data: [msftProfile] } as AxiosResponse))
+        .mockReturnValue(of({ data: [] } as AxiosResponse));
 
       const result = await service.getScreener({ limit: 25 });
 
-      expect(result).toHaveLength(2);
-      expect(result[0]?.symbol).toBe('AAPL');
-      expect(result[0]?.changesPercentage).toBeCloseTo(1.3);
-      expect(result[1]?.changesPercentage).toBeCloseTo(-0.3);
-      expect(redis.set).toHaveBeenCalledWith(
-        expect.stringContaining('papi:screener:'),
-        expect.any(String),
-        300,
-      );
+      expect(result.length).toBeGreaterThanOrEqual(2);
+      // sorted by marketCap descending — MSFT (3.1T) > AAPL (3T)
+      expect(result[0]?.symbol).toBe('MSFT');
+      expect(result[0]?.changesPercentage).toBeCloseTo(-0.3);
+      expect(result[1]?.symbol).toBe('AAPL');
+      expect(result[1]?.changesPercentage).toBeCloseTo(1.3);
+      expect(redis.set).toHaveBeenCalledWith('papi:screener:profiles', expect.any(String), 3600);
     });
 
     it('applies changeMin filter on cached results without extra API calls', async () => {
@@ -677,7 +673,7 @@ describe('StocksService', () => {
           marketCap: 3e12,
           sector: 'Technology',
           volume: 50e6,
-          dividendYield: 0.005,
+          dividendYield: 0.5,
         },
         {
           symbol: 'MSFT',
@@ -688,7 +684,7 @@ describe('StocksService', () => {
           marketCap: 3.1e12,
           sector: 'Technology',
           volume: 25e6,
-          dividendYield: 0.007,
+          dividendYield: 0.7,
         },
       ];
       redis.get.mockResolvedValue(JSON.stringify(cached));
