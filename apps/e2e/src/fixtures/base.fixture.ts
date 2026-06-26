@@ -56,6 +56,11 @@ export async function setupStockMocks(
     const limit = parseInt(url.searchParams.get('limit') ?? '60', 10);
     return fulfill(route, historyFactory(limit, interval));
   });
+
+  // Default empty watchlists so AddToWatchlistButton doesn't hit an unrouted endpoint.
+  // Tests that need specific watchlist data can register their own route after this call
+  // (Playwright LIFO route ordering means the later registration wins).
+  await page.route(/\/api\/portfolio\/watchlists$/, (route) => fulfill(route, []));
 }
 
 // Extended test fixture that:

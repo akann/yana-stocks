@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { NewsPanel } from '@/components/news/NewsPanel';
 import { StockChart } from '@/components/charts/StockChart';
 import { SignalsPanel } from '@/components/signals/SignalsPanel';
+import { AddToWatchlistButton } from '@/components/watchlist/AddToWatchlistButton';
 import type { OHLCVBar, StockAggregate } from '@/types';
 
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
@@ -115,6 +116,7 @@ export default function StockPage(): React.JSX.Element | null {
                 </span>
                 Live
               </span>
+              <AddToWatchlistButton symbol={upperSymbol} />
             </div>
 
             {priceLoading ? (

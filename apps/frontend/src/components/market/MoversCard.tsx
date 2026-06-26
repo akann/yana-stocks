@@ -5,29 +5,32 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api } from '@/lib/api';
+import { AddToWatchlistButton } from '@/components/watchlist/AddToWatchlistButton';
 import type { MarketMovers, MoverEntry } from '@/types';
 
 function MoverRow({ entry, rank }: { entry: MoverEntry; rank: number }): React.JSX.Element {
   const positive = entry.changePercent >= 0;
   return (
-    <Link
-      href={`/stocks/${entry.symbol}`}
-      className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-100 transition-colors group"
-    >
-      <div className="flex items-center gap-3">
-        <span className="text-xs text-gray-600 w-4">{rank}</span>
-        <span className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
+    <div className="flex items-center py-2 px-3 rounded-lg hover:bg-gray-100 transition-colors group">
+      <Link href={`/stocks/${entry.symbol}`} className="flex items-center gap-3 flex-1 min-w-0">
+        <span className="text-xs text-gray-600 w-4 shrink-0">{rank}</span>
+        <span className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors truncate">
           {entry.symbol}
         </span>
-      </div>
-      <div className="text-right">
-        <div className="text-sm font-medium text-gray-900">${entry.price.toFixed(2)}</div>
-        <div className={clsx('text-xs font-medium', positive ? 'text-green-600' : 'text-red-600')}>
-          {positive ? '+' : ''}
-          {entry.changePercent.toFixed(2)}%
+        <div className="text-right ml-auto shrink-0">
+          <div className="text-sm font-medium text-gray-900">${entry.price.toFixed(2)}</div>
+          <div
+            className={clsx('text-xs font-medium', positive ? 'text-green-600' : 'text-red-600')}
+          >
+            {positive ? '+' : ''}
+            {entry.changePercent.toFixed(2)}%
+          </div>
         </div>
+      </Link>
+      <div className="ml-1 shrink-0">
+        <AddToWatchlistButton symbol={entry.symbol} />
       </div>
-    </Link>
+    </div>
   );
 }
 

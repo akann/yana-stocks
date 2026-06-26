@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
+import { AddToWatchlistButton } from './AddToWatchlistButton';
 import type { StockAggregate, Watchlist } from '@/types';
 
 interface Props {
@@ -178,30 +179,33 @@ export function WatchlistCard({
                     </td>
 
                     <td className="px-5 py-3.5 text-right">
-                      <button
-                        onClick={() => onRemoveSymbol(sym)}
-                        disabled={isRemoving}
-                        className="text-gray-600 hover:text-red-600 transition-colors disabled:opacity-30"
-                        title={`Remove ${sym}`}
-                      >
-                        {isRemoving ? (
-                          <span className="text-xs">…</span>
-                        ) : (
-                          <svg
-                            className="w-3.5 h-3.5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                        )}
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <AddToWatchlistButton symbol={sym} excludeWatchlistId={watchlist.id} />
+                        <button
+                          onClick={() => onRemoveSymbol(sym)}
+                          disabled={isRemoving}
+                          className="text-gray-600 hover:text-red-600 transition-colors disabled:opacity-30"
+                          title={`Remove ${sym}`}
+                        >
+                          {isRemoving ? (
+                            <span className="text-xs">…</span>
+                          ) : (
+                            <svg
+                              className="w-3.5 h-3.5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

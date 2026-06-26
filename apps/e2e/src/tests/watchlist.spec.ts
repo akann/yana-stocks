@@ -130,7 +130,7 @@ test.describe('Watchlist page — authenticated, with existing watchlist', () =>
     await page.route(/\/api\/news\/AAPL$/, (route) => fulfill(route, []));
 
     await gotoWatchlistPage(page);
-    await page.getByRole('cell', { name: 'AAPL' }).click();
+    await page.getByRole('cell', { name: 'AAPL', exact: true }).click();
     await page.waitForURL(/\/stocks\/AAPL/, { timeout: 10_000 });
     await expect(page).toHaveURL(/\/stocks\/AAPL/);
   });

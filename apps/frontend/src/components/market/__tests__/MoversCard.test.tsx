@@ -3,6 +3,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MoversCard } from '../MoversCard';
 
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: jest.fn() }),
+}));
+
+jest.mock('@/context/AuthContext', () => ({
+  useAuth: () => ({ isAuthenticated: false, isLoading: false }),
+}));
+
 const mockMovers = {
   gainers: [
     { symbol: 'NVDA', price: 194.92, change: 10.5, changePercent: 5.7, volume: 1_200_000 },
