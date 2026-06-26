@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call */
 import type { Server } from 'node:http';
 import { HttpService } from '@nestjs/axios';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
@@ -70,7 +71,7 @@ describe('StocksController (integration)', () => {
     await app.init();
 
     server = app.getHttpServer() as Server;
-    httpService = moduleRef.get(HttpService) as jest.Mocked<HttpService>;
+    httpService = moduleRef.get<jest.Mocked<HttpService>>(HttpService);
     rawRedis = new Redis(process.env['REDIS_URL'] ?? 'redis://localhost:6379');
   });
 

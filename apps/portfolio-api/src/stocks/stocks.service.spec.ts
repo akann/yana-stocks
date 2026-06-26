@@ -396,6 +396,7 @@ describe('StocksService', () => {
 
       expect(httpService.get).toHaveBeenCalledWith(
         'https://api.polygon.io/v3/reference/tickers',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         expect.objectContaining({ params: expect.objectContaining({ type: 'CS' }) }),
       );
       expect(result.data).toHaveLength(2);
@@ -416,6 +417,7 @@ describe('StocksService', () => {
 
       expect(httpService.get).toHaveBeenCalledWith(
         'https://api.polygon.io/v3/reference/tickers',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         expect.objectContaining({ params: expect.objectContaining({ type: 'ETF' }) }),
       );
     });
