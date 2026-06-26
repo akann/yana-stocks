@@ -82,6 +82,30 @@ const mockEtfAssets: AssetEntry[] = [
   },
 ];
 
+const mockGlobalAssets: AssetEntry[] = [
+  {
+    symbol: 'ASML',
+    name: 'ASML Holding N.V.',
+    exchange: 'NASDAQ',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'NVO',
+    name: 'Novo Nordisk A/S',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'TSM',
+    name: 'Taiwan Semiconductor Manufacturing',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+];
+
 describe('StocksService', () => {
   let service: StocksService;
   let redis: jest.Mocked<RedisService>;
@@ -514,6 +538,36 @@ describe('StocksService', () => {
       expect(page1.page).toBe(1);
       expect(page2.data).toHaveLength(1);
       expect(page2.total).toBe(3);
+    });
+
+    it('returns from Redis cache when present (global market)', async () => {
+      redis.get.mockResolvedValue(JSON.stringify(mockGlobalAssets));
+
+      const result = await service.getAssets('', 1, 10, 'global');
+
+      expect(result.data).toHaveLength(3);
+      expect(result.data[0]?.assetClass).toBe('intl_equity');
+      expect(httpService.get).not.toHaveBeenCalled();
+    });
+
+    it('uses separate cache key for global market', async () => {
+      redis.get.mockResolvedValue(JSON.stringify(mockGlobalAssets));
+
+      await service.getAssets('', 1, 10, 'global');
+
+      expect(redis.get).toHaveBeenCalledWith('papi:assets:global');
+    });
+
+    it('returns MOCK_GLOBAL_ASSETS for global market without calling Massive', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('MY_MASSIVE_KEY');
+
+      const result = await service.getAssets('', 1, 10, 'global');
+
+      expect(httpService.get).not.toHaveBeenCalled();
+      expect(result.total).toBeGreaterThan(0);
+      expect(result.data.every((a) => a.assetClass === 'intl_equity')).toBe(true);
+      expect(redis.set).toHaveBeenCalledWith('papi:assets:global', expect.any(String), 86400);
     });
   });
 
