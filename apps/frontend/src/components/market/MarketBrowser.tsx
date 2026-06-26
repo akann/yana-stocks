@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { api } from '@/lib/api';
@@ -21,6 +21,13 @@ export function MarketBrowser({
   const [activeTab, setActiveTab] = useState<AssetMarket>(defaultTab);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const userSelectedRef = useRef(false);
+
+  useEffect(() => {
+    if (!userSelectedRef.current) {
+      setActiveTab(defaultTab);
+    }
+  }, [defaultTab]);
 
   const { data, isLoading, isError } = useQuery<AssetsPage>({
     queryKey: ['market-assets', activeTab, search, page],
@@ -37,6 +44,7 @@ export function MarketBrowser({
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0;
 
   function handleTabChange(tab: AssetMarket) {
+    userSelectedRef.current = true;
     setActiveTab(tab);
     setSearch('');
     setPage(1);
