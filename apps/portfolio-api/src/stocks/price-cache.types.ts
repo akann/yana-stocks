@@ -39,10 +39,10 @@ export interface AssetEntry {
   name: string;
   exchange: string;
   tradable: boolean;
-  assetClass: 'us_equity' | 'us_etf' | 'uk_equity';
+  assetClass: 'us_equity' | 'us_etf' | 'uk_equity' | 'intl_equity';
 }
 
-export type AssetMarket = 'us' | 'etf' | 'uk';
+export type AssetMarket = 'us' | 'etf' | 'uk' | 'global';
 
 export interface AssetsPage {
   data: AssetEntry[];

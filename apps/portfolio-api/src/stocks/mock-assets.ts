@@ -2378,3 +2378,291 @@ export const MOCK_ETF_ASSETS: AssetEntry[] = [
     assetClass: 'us_etf',
   },
 ];
+
+export const MOCK_GLOBAL_ASSETS: AssetEntry[] = [
+  // Europe — Netherlands
+  {
+    symbol: 'ASML',
+    name: 'ASML Holding N.V.',
+    exchange: 'NASDAQ',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'PHIA',
+    name: 'Koninklijke Philips N.V.',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'ING',
+    name: 'ING Groep N.V.',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  // Europe — Germany
+  { symbol: 'SAP', name: 'SAP SE', exchange: 'NYSE', tradable: true, assetClass: 'intl_equity' },
+  {
+    symbol: 'SIEGY',
+    name: 'Siemens AG',
+    exchange: 'OTC',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  { symbol: 'BAYRY', name: 'Bayer AG', exchange: 'OTC', tradable: true, assetClass: 'intl_equity' },
+  // Europe — Switzerland
+  {
+    symbol: 'NESN',
+    name: 'Nestlé S.A.',
+    exchange: 'OTC',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'NVS',
+    name: 'Novartis AG',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'ROG',
+    name: 'Roche Holding AG',
+    exchange: 'OTC',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  // Europe — Denmark
+  {
+    symbol: 'NVO',
+    name: 'Novo Nordisk A/S',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  // Europe — France
+  {
+    symbol: 'MC',
+    name: 'LVMH Moët Hennessy',
+    exchange: 'OTC',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'TTE',
+    name: 'TotalEnergies SE',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  { symbol: 'AIR', name: 'Airbus SE', exchange: 'OTC', tradable: true, assetClass: 'intl_equity' },
+  // Europe — Spain
+  {
+    symbol: 'BBVA',
+    name: 'Banco Bilbao Vizcaya Argentaria',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'SAN',
+    name: 'Banco Santander S.A.',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  // Europe — Sweden
+  {
+    symbol: 'ERIC',
+    name: 'Ericsson',
+    exchange: 'NASDAQ',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  // Asia-Pacific — Taiwan
+  {
+    symbol: 'TSM',
+    name: 'Taiwan Semiconductor Manufacturing',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  // Asia-Pacific — Japan
+  {
+    symbol: 'TM',
+    name: 'Toyota Motor Corporation',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'SONY',
+    name: 'Sony Group Corporation',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'HMC',
+    name: 'Honda Motor Co.',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'MUFG',
+    name: 'Mitsubishi UFJ Financial Group',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'SNE',
+    name: 'Nintendo Co.',
+    exchange: 'OTC',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  // Asia-Pacific — South Korea
+  {
+    symbol: 'SSNLF',
+    name: 'Samsung Electronics',
+    exchange: 'OTC',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  // Asia-Pacific — Australia
+  {
+    symbol: 'BHP',
+    name: 'BHP Group Limited',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'RIO',
+    name: 'Rio Tinto plc',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  // Asia-Pacific — China
+  {
+    symbol: 'BABA',
+    name: 'Alibaba Group Holding',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'TCEHY',
+    name: 'Tencent Holdings',
+    exchange: 'OTC',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'BIDU',
+    name: 'Baidu Inc.',
+    exchange: 'NASDAQ',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'JD',
+    name: 'JD.com Inc.',
+    exchange: 'NASDAQ',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  // Asia-Pacific — Singapore / SE Asia
+  {
+    symbol: 'SE',
+    name: 'Sea Limited',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'GRAB',
+    name: 'Grab Holdings',
+    exchange: 'NASDAQ',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  // Latin America
+  {
+    symbol: 'MELI',
+    name: 'MercadoLibre Inc.',
+    exchange: 'NASDAQ',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'NU',
+    name: 'Nu Holdings',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'ITUB',
+    name: 'Itaú Unibanco Holding',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  // Canada
+  {
+    symbol: 'SHOP',
+    name: 'Shopify Inc.',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'CNQ',
+    name: 'Canadian Natural Resources',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'RY',
+    name: 'Royal Bank of Canada',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'TD',
+    name: 'Toronto-Dominion Bank',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  // India
+  {
+    symbol: 'INFY',
+    name: 'Infosys Limited',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'WIT',
+    name: 'Wipro Limited',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+  {
+    symbol: 'HDB',
+    name: 'HDFC Bank Limited',
+    exchange: 'NYSE',
+    tradable: true,
+    assetClass: 'intl_equity',
+  },
+];

@@ -120,9 +120,11 @@ export class StocksController {
         ? 'etf'
         : market === 'uk'
           ? 'uk'
-          : market === 'all'
-            ? 'all'
-            : ('us' as const);
+          : market === 'global'
+            ? 'global'
+            : market === 'all'
+              ? 'all'
+              : ('us' as const);
     return this.stocksService.getAssets(search, page, Math.min(limit, 100), safeMarket);
   }
 }

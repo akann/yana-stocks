@@ -78,7 +78,7 @@ interface FmpHistoricalSectorEntry {
 }
 
 import { RedisService } from '../redis/redis.service';
-import { MOCK_ASSETS, MOCK_ETF_ASSETS, MOCK_UK_ASSETS } from './mock-assets';
+import { MOCK_ASSETS, MOCK_ETF_ASSETS, MOCK_GLOBAL_ASSETS, MOCK_UK_ASSETS } from './mock-assets';
 import type {
   AggregateStockResponse,
   AssetEntry,
@@ -330,6 +330,8 @@ export class StocksService {
     let all: AssetEntry[];
     if (market === 'uk') {
       all = MOCK_UK_ASSETS;
+    } else if (market === 'global') {
+      all = MOCK_GLOBAL_ASSETS;
     } else {
       all = await this.fetchAssetsFromMassive(market === 'etf' ? 'ETF' : 'CS');
     }

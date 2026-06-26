@@ -13,6 +13,7 @@ const TABS: { id: AssetMarket; label: string }[] = [
   { id: 'us', label: '🇺🇸 US Equities' },
   { id: 'etf', label: '📊 ETFs' },
   { id: 'uk', label: '🇬🇧 UK Equities' },
+  { id: 'global', label: '🌍 Global' },
 ];
 
 export function MarketBrowser({

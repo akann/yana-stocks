@@ -20,6 +20,7 @@ type BottomTab = (typeof BOTTOM_TABS)[number]['id'];
 
 function defaultMarketTab(pref: 'US' | 'UK' | 'global' | undefined): AssetMarket {
   if (pref === 'UK') return 'uk';
+  if (pref === 'global') return 'global';
   return 'us';
 }
 

@@ -51,7 +51,7 @@ export function FactorTiles(): React.JSX.Element {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-start justify-between mb-3">
         <h2 className="text-sm font-semibold text-gray-700">Factor Performance</h2>
         <div className="flex gap-1">
           {TIMEFRAMES.map((t) => (

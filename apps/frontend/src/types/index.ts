@@ -78,7 +78,7 @@ export interface PredictionSignal {
   generatedAt: string;
 }
 
-export type AssetMarket = 'us' | 'etf' | 'uk';
+export type AssetMarket = 'us' | 'etf' | 'uk' | 'global';
 
 export interface AssetEntry {
   symbol: string;
