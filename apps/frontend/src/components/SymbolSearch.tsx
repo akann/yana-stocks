@@ -93,10 +93,10 @@ export function SymbolSearch(): React.JSX.Element {
         placeholder="Search symbol…"
         autoComplete="off"
         spellCheck={false}
-        className="w-full bg-white/10 text-white placeholder-gray-400 text-sm rounded-lg pl-3 pr-8 py-1.5 focus:outline-none focus:bg-white/15 focus:ring-1 focus:ring-blue-400 transition-all uppercase"
+        className="w-full bg-gray-100 text-gray-900 placeholder-gray-500 text-sm rounded-lg pl-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all uppercase"
       />
       <svg
-        className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400"
+        className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
