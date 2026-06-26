@@ -636,67 +636,66 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
     <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
       {/* Controls */}
       <div className="flex flex-col gap-2 mb-3">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
-            Price Chart
-            {signalBadges.map(({ signal: s, count }) => (
-              <span
-                key={`${s.source}-${s.type}`}
-                title={count > 1 ? `${count} crossovers — ${s.description}` : s.description}
-                className={`text-xs px-1.5 py-0.5 rounded font-medium normal-case tracking-normal ${
-                  s.type === 'buy' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+        {/* Row 1: title + signal badges — always one line */}
+        <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
+          Price Chart
+          {signalBadges.map(({ signal: s, count }) => (
+            <span
+              key={`${s.source}-${s.type}`}
+              title={count > 1 ? `${count} crossovers — ${s.description}` : s.description}
+              className={`text-xs px-1.5 py-0.5 rounded font-medium normal-case tracking-normal ${
+                s.type === 'buy' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+              }`}
+            >
+              {s.source === 'rsi'
+                ? s.type === 'buy'
+                  ? 'Oversold'
+                  : 'Overbought'
+                : s.source === 'macd'
+                  ? s.type === 'buy'
+                    ? `↑ MACD${count > 1 ? ` ×${count}` : ''}`
+                    : `↓ MACD${count > 1 ? ` ×${count}` : ''}`
+                  : s.type === 'buy'
+                    ? `↑ MA Cross${count > 1 ? ` ×${count}` : ''}`
+                    : `↓ MA Cross${count > 1 ? ` ×${count}` : ''}`}
+            </span>
+          ))}
+        </h3>
+
+        {/* Row 2: chart type toggle + range buttons — always one line */}
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1">
+            {(['line', 'candlestick'] as ChartType[]).map((type) => (
+              <button
+                key={type}
+                onClick={() => setChartType(type)}
+                className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
+                  chartType === type
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
                 }`}
               >
-                {s.source === 'rsi'
-                  ? s.type === 'buy'
-                    ? 'Oversold'
-                    : 'Overbought'
-                  : s.source === 'macd'
-                    ? s.type === 'buy'
-                      ? `↑ MACD${count > 1 ? ` ×${count}` : ''}`
-                      : `↓ MACD${count > 1 ? ` ×${count}` : ''}`
-                    : s.type === 'buy'
-                      ? `↑ MA Cross${count > 1 ? ` ×${count}` : ''}`
-                      : `↓ MA Cross${count > 1 ? ` ×${count}` : ''}`}
-              </span>
+                {type === 'line' ? 'Line' : 'Candle'}
+              </button>
             ))}
-          </h3>
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Chart type toggle */}
-            <div className="flex gap-1">
-              {(['line', 'candlestick'] as ChartType[]).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setChartType(type)}
-                  className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
-                    chartType === type
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
-                  }`}
-                >
-                  {type === 'line' ? 'Line' : 'Candle'}
-                </button>
-              ))}
-            </div>
+          </div>
 
-            <div className="w-px h-4 bg-gray-200" />
+          <div className="w-px h-4 bg-gray-200" />
 
-            {/* Range buttons */}
-            <div className="flex gap-1">
-              {RANGES.map((r) => (
-                <button
-                  key={r.label}
-                  onClick={() => setRange(r.label)}
-                  className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
-                    range === r.label
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
+          <div className="flex gap-1">
+            {RANGES.map((r) => (
+              <button
+                key={r.label}
+                onClick={() => setRange(r.label)}
+                className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
+                  range === r.label
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
           </div>
         </div>
 
