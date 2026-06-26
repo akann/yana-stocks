@@ -41,7 +41,7 @@ packages/
 | Monorepo        | Turborepo + pnpm workspaces                                                         |
 | auth-service    | Go (Chi router, pgx, golang-migrate, HS256 JWT)                                     |
 | NestJS services | NestJS, Mongoose, ioredis, KafkaJS, Passport/JWT                                    |
-| Frontend        | Next.js 16 App Router, TailwindCSS, TanStack Query, lightweight-charts v5           |
+| Frontend        | Next.js 16 App Router, TailwindCSS, TanStack Query, lightweight-charts v5, Recharts |
 | Python services | Python 3.12, FastAPI, HuggingFace Transformers, Facebook Prophet, confluent-kafka   |
 | Databases       | PostgreSQL 16 (auth), MongoDB 8 (OHLCV/portfolios/profiles), Redis 8 (cache/tokens) |
 | Messaging       | Kafka (Redpanda locally, Strimzi in production)                                     |

@@ -187,10 +187,17 @@ yana-stocks/
 - **Purpose:** REST aggregator — combines prices, signals, predictions
 - **Redis:** Cache aggregated responses (TTL 10s)
 - **Endpoints:**
-  - `GET /stocks/:symbol` — price + sentiment + prediction
-  - `GET /stocks/:symbol/history` — OHLCV history
-  - `GET /signals/:symbol` — latest signals
-  - `GET /market/movers` — top gainers/losers
+  - `GET /stocks/:symbol` — price + sentiment + prediction (JWT required)
+  - `GET /stocks/:symbol/history` — OHLCV history (JWT required)
+  - `GET /signals/:symbol` — latest signals (JWT required)
+  - `GET /market/movers?top=N` — top gainers/losers (public)
+  - `GET /market/overview` — index quotes, sector performance, market news
+    (public)
+  - `GET /market/screener` — filter US stocks by market cap, volume, dividend
+    yield, sector (public)
+  - `GET /market/assets?search=&page=&limit=&market=us|etf|uk|all` — browse
+    tradable assets with search and pagination; `market=all` merges US
+    equities + ETF + UK and deduplicates by symbol (public)
 
 ### 8. frontend (Next.js 16)
 
@@ -209,6 +216,14 @@ yana-stocks/
 - **URL:** `https://stocks.yanatech.co.uk`
 - **Dev proxy:** `next.config.mjs` rewrites `/api/*` to local services (see
   frontend env vars)
+- **Navbar:** `src/components/Navbar.tsx` — `sticky top-0 z-50` (stays fixed on
+  scroll). Contains `SymbolSearch` component: debounced (250ms) autocomplete
+  input that queries `GET /market/assets?market=all`, shows 8 results in a
+  dropdown with keyboard navigation (↑↓ Enter Escape), navigates to
+  `/stocks/:symbol` on selection. Hidden on mobile (`hidden md:block`).
+- **Homepage layout** (`HomePageView.tsx`): `IndicesBar` → `SectorHeatmap` +
+  `MarketNews` (side-by-side, both fixed at 350px height with internal scroll) →
+  `MoversCard` → tabbed `MarketBrowser` / `StockScreener`.
 - **SEO:** Uses Next.js 16 native `Metadata` API (not next-seo — redundant in
   App Router). Root `layout.tsx` sets site-wide metadata: title template
   (`%s | YanaStocks`), description, keywords, `authors`/`creator` (Akan
@@ -924,8 +939,15 @@ step.
 | 4    | RSI sub-chart pane                                               | next       |
 | 5    | MACD sub-chart + buy/sell signal badges                          | pending    |
 | 6    | Universal watchlist `+` button                                   | pending    |
-| 7    | ETF support + MarketBrowser                                      | pending    |
+| 7    | ETF support + MarketBrowser                                      | ✓ complete |
 | 8    | Analyst ratings (FMP) + FMP news replacing Alpaca News           | pending    |
 | 9    | UK data pipeline (Twelve Data) + location defaults               | pending    |
-| 10   | Home screen with indices & sectors                               | pending    |
-| 11   | Stock screener                                                   | pending    |
+| 10   | Home screen with indices & sectors                               | ✓ complete |
+| 11   | Stock screener                                                   | ✓ complete |
+
+**UI polish (outside numbered steps):**
+
+- Navbar symbol autocomplete (`SymbolSearch`) — debounced, keyboard nav,
+  `market=all`
+- Sticky navbar (`sticky top-0 z-50`)
+- MarketNews fixed 350px height with internal scroll
