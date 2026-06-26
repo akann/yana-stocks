@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api } from '@/lib/api';
 
-interface NewsArticle {
+export interface NewsArticle {
   headline: string;
   source: string;
   url: string;

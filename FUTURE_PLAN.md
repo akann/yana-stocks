@@ -209,14 +209,14 @@ Sequenced to deliver value early, deferring items that need new integrations:
 | 1   | Candlestick chart (switch to lightweight-charts)                      | Medium  | No                                                   | ✓ complete |
 | 2   | Volume histogram pane below price chart                               | Low     | No                                                   | ✓ complete |
 | 3   | Moving average overlays (SMA/EMA)                                     | Low     | No                                                   | ✓ complete |
-| 4   | RSI sub-chart                                                         | Medium  | No                                                   | **next**   |
-| 5   | MACD sub-chart + buy/sell signal badges                               | Medium  | No                                                   | pending    |
-| 6   | Watchlist `+` button across all ticker appearances                    | Low     | No — backend already exists                          | pending    |
-| 7   | ETF support in asset browser                                          | Trivial | No — Massive ticker reference includes ETFs natively | pending    |
-| 8   | Analyst ratings (FMP) + news consolidation (FMP replaces Alpaca News) | Medium  | Financial Modeling Prep                              | pending    |
-| 9   | Location-specific defaults + UK data (Twelve Data)                    | Medium  | Twelve Data                                          | pending    |
-| 10  | Home screen with indices & sectors                                    | High    | FMP + Twelve Data                                    | pending    |
-| 11  | Stock screener                                                        | High    | FMP + Twelve Data                                    | pending    |
+| 4   | RSI sub-chart                                                         | Medium  | No                                                   | ✓ complete |
+| 5   | MACD sub-chart + buy/sell signal badges                               | Medium  | No                                                   | ✓ complete |
+| 6   | Watchlist `+` button across all ticker appearances                    | Low     | No — backend already exists                          | ✓ complete |
+| 7   | ETF support in asset browser                                          | Trivial | No — Massive ticker reference includes ETFs natively | ✓ complete |
+| 8   | Analyst ratings (FMP) + news consolidation (FMP replaces Alpaca News) | Medium  | Financial Modeling Prep                              | ✓ complete |
+| 9   | Location-specific defaults + UK data (Twelve Data)                    | Medium  | Twelve Data                                          | ✓ complete |
+| 10  | Home screen with indices & sectors                                    | High    | FMP + Twelve Data                                    | ✓ complete |
+| 11  | Stock screener                                                        | High    | FMP + Twelve Data                                    | ✓ complete |
 
 > Step 0 (Massive) is a prerequisite for Steps 1–7 to have accurate, real-time
 > data underneath them. Steps 1–6 are pure frontend and can be done

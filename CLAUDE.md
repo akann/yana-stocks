@@ -936,12 +936,12 @@ step.
 | 1    | Candlestick chart (`StockChart.tsx`, lightweight-charts v5)      | ✓ complete |
 | 2    | Volume histogram pane                                            | ✓ complete |
 | 3    | Moving average overlays (SMA/EMA)                                | ✓ complete |
-| 4    | RSI sub-chart pane                                               | next       |
-| 5    | MACD sub-chart + buy/sell signal badges                          | pending    |
-| 6    | Universal watchlist `+` button                                   | pending    |
+| 4    | RSI sub-chart pane                                               | ✓ complete |
+| 5    | MACD sub-chart + buy/sell signal badges                          | ✓ complete |
+| 6    | Universal watchlist `+` button                                   | ✓ complete |
 | 7    | ETF support + MarketBrowser                                      | ✓ complete |
-| 8    | Analyst ratings (FMP) + FMP news replacing Alpaca News           | pending    |
-| 9    | UK data pipeline (Twelve Data) + location defaults               | pending    |
+| 8    | Analyst ratings (FMP) + FMP news replacing Alpaca News           | ✓ complete |
+| 9    | UK data pipeline (Twelve Data) + location defaults               | ✓ complete |
 | 10   | Home screen with indices & sectors                               | ✓ complete |
 | 11   | Stock screener                                                   | ✓ complete |
 

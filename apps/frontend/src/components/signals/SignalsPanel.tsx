@@ -5,7 +5,15 @@ import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api } from '@/lib/api';
 import { sortBars, toTime } from '@/lib/chart-utils';
-import { detectSignals } from '@/lib/signals';
+import { detectSignals, type MAConfig } from '@/lib/signals';
+
+// Fixed MA set for the sidebar — 63 daily bars is enough for these periods
+const SIGNALS_MA_CONFIGS: MAConfig[] = [
+  { key: 'EMA12', type: 'ema', period: 12 },
+  { key: 'EMA26', type: 'ema', period: 26 },
+  { key: 'SMA20', type: 'sma', period: 20 },
+  { key: 'SMA50', type: 'sma', period: 50 },
+];
 import type { OHLCVBar, PredictionHorizon, PredictionSignal, SentimentSignal } from '@/types';
 
 interface SignalsResponse {
@@ -66,7 +74,7 @@ export function SignalsPanel({ symbol }: { symbol: string }): React.JSX.Element 
         return true;
       })
       .reverse();
-    return detectSignals(clean, true, true, true);
+    return detectSignals(clean, true, true, true, SIGNALS_MA_CONFIGS);
   }, [historyBars]);
 
   const sentiment = signals?.sentiment;

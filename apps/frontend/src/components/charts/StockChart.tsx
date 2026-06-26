@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   createChart,
+  createSeriesMarkers,
   ColorType,
   CrosshairMode,
   LineStyle,
@@ -13,11 +14,15 @@ import {
   HistogramSeries,
   type IChartApi,
   type ISeriesApi,
+  type ISeriesMarkersPluginApi,
+  type SeriesMarker,
+  type Time,
   type IPriceLine,
 } from 'lightweight-charts';
 import { api } from '@/lib/api';
 import { computeMA, computeMACD, computeRSI, sortBars, toTime } from '@/lib/chart-utils';
-import { detectSignals, type ChartSignal } from '@/lib/signals';
+import { detectSignals, type ChartSignal, type MAConfig } from '@/lib/signals';
+import { type NewsArticle } from '@/components/news/NewsPanel';
 import type { OHLCVBar } from '@/types';
 
 const RANGES = [
@@ -46,6 +51,53 @@ interface Props {
   currentPrice?: number | null;
 }
 
+function buildMarkers(
+  signals: ChartSignal[],
+  newsArticles: NewsArticle[],
+  clean: OHLCVBar[],
+  isDaily: boolean,
+): SeriesMarker<Time>[] {
+  const markers: SeriesMarker<Time>[] = [];
+
+  for (const s of signals) {
+    if (s.source !== 'ma-cross') continue;
+    markers.push({
+      time: s.time,
+      position: s.type === 'buy' ? 'belowBar' : 'aboveBar',
+      color: s.type === 'buy' ? '#22c55e' : '#ef4444',
+      shape: s.type === 'buy' ? 'arrowUp' : 'arrowDown',
+      size: 1,
+    });
+  }
+
+  // News markers on daily charts only — intraday minute-snapping is unreliable
+  if (isDaily && newsArticles.length > 0) {
+    const barDates = new Set(clean.map((b) => b.timestamp.slice(0, 10)));
+    for (const a of newsArticles) {
+      const date = a.publishedAt.slice(0, 10);
+      if (!barDates.has(date)) continue;
+      markers.push({
+        time: date as Time,
+        position: 'aboveBar',
+        color:
+          a.sentimentLabel === 'positive'
+            ? '#22c55e'
+            : a.sentimentLabel === 'negative'
+              ? '#ef4444'
+              : '#9ca3af',
+        shape: 'circle',
+        size: 1,
+      });
+    }
+  }
+
+  // lightweight-charts requires markers sorted by time
+  return markers.sort((a, b) => {
+    const n = (t: Time) => (typeof t === 'string' ? new Date(t).getTime() : Number(t));
+    return n(a.time) - n(b.time);
+  });
+}
+
 export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -56,6 +108,9 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
   >(null);
   const updateMACDRef = useRef<
     ((sorted: OHLCVBar[], show: boolean, rsiVisible: boolean) => void) | null
+  >(null);
+  const updateMarkersRef = useRef<
+    ((signals: ChartSignal[], news: NewsArticle[], clean: OHLCVBar[]) => void) | null
   >(null);
   const priceLineRef = useRef<IPriceLine | null>(null);
   const volSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
@@ -73,6 +128,22 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
 
   const activeRange = RANGES.find((r) => r.label === range)!;
   const isDaily = activeRange.interval === '1d';
+
+  const activeMaConfigs = useMemo<MAConfig[]>(
+    () =>
+      MA_CONFIGS.filter((c) => enabledMAs.has(c.key as MAKey)).map(({ key, type, period }) => ({
+        key,
+        type,
+        period,
+      })),
+    [enabledMAs],
+  );
+
+  const { data: news = [] } = useQuery<NewsArticle[]>({
+    queryKey: ['news', symbol],
+    queryFn: () => api.get<NewsArticle[]>(`/news/${symbol}`).then((r) => r.data),
+    staleTime: 300_000,
+  });
 
   const { data, isLoading } = useQuery<OHLCVBar[]>({
     queryKey: ['history', symbol, activeRange.limit, activeRange.interval],
@@ -99,6 +170,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
     updateMAsRef.current = null;
     updateRSIRef.current = null;
     updateMACDRef.current = null;
+    updateMarkersRef.current = null;
     priceLineRef.current = null;
     volSeriesRef.current = null;
     rsiSeriesRef.current = null;
@@ -309,6 +381,8 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
       applyAllMargins(rsiVisible, true);
     };
 
+    let markerPlugin: ISeriesMarkersPluginApi<Time> | null = null;
+
     if (chartType === 'candlestick') {
       const candleSeries = chart.addSeries(CandlestickSeries, {
         upColor: '#22c55e',
@@ -377,6 +451,15 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
           });
         }
       };
+
+      updateMarkersRef.current = (signals, newsArticles, clean) => {
+        const markers = buildMarkers(signals, newsArticles, clean, isDaily);
+        if (markerPlugin) {
+          markerPlugin.setMarkers(markers);
+        } else if (markers.length > 0) {
+          markerPlugin = createSeriesMarkers(candleSeries, markers);
+        }
+      };
     } else {
       const areaSeries = chart.addSeries(AreaSeries, {
         lineColor: '#22c55e',
@@ -435,6 +518,15 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
           });
         }
       };
+
+      updateMarkersRef.current = (signals, newsArticles, clean) => {
+        const markers = buildMarkers(signals, newsArticles, clean, isDaily);
+        if (markerPlugin) {
+          markerPlugin.setMarkers(markers);
+        } else if (markers.length > 0) {
+          markerPlugin = createSeriesMarkers(areaSeries, markers);
+        }
+      };
     }
 
     const ro = new ResizeObserver((entries) => {
@@ -445,12 +537,14 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
 
     return () => {
       ro.disconnect();
+      markerPlugin?.detach();
       chart.remove();
       chartRef.current = null;
       updateDataRef.current = null;
       updateMAsRef.current = null;
       updateRSIRef.current = null;
       updateMACDRef.current = null;
+      updateMarkersRef.current = null;
       priceLineRef.current = null;
       volSeriesRef.current = null;
       rsiSeriesRef.current = null;
@@ -482,7 +576,19 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
     updateMAsRef.current?.(clean, enabledMAs);
     updateRSIRef.current?.(clean, showRSI, showMACD);
     updateMACDRef.current?.(clean, showMACD, showRSI);
-  }, [data, currentPrice, enabledMAs, showRSI, showMACD, isDaily, chartType]);
+    const signalsForMarkers = detectSignals(clean, isDaily, showRSI, showMACD, activeMaConfigs);
+    updateMarkersRef.current?.(signalsForMarkers, news, clean);
+  }, [
+    data,
+    currentPrice,
+    enabledMAs,
+    showRSI,
+    showMACD,
+    isDaily,
+    chartType,
+    news,
+    activeMaConfigs,
+  ]);
 
   function toggleMA(key: MAKey) {
     setEnabledMAs((prev) => {
@@ -511,8 +617,8 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
         return true;
       })
       .reverse();
-    return detectSignals(clean, isDaily, showRSI, showMACD);
-  }, [data, isDaily, showRSI, showMACD]);
+    return detectSignals(clean, isDaily, showRSI, showMACD, activeMaConfigs);
+  }, [data, isDaily, showRSI, showMACD, activeMaConfigs]);
 
   return (
     <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
@@ -533,9 +639,13 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
                   ? s.type === 'buy'
                     ? 'Oversold'
                     : 'Overbought'
-                  : s.type === 'buy'
-                    ? '↑ MACD'
-                    : '↓ MACD'}
+                  : s.source === 'macd'
+                    ? s.type === 'buy'
+                      ? '↑ MACD'
+                      : '↓ MACD'
+                    : s.type === 'buy'
+                      ? '↑ MA Cross'
+                      : '↓ MA Cross'}
               </span>
             ))}
           </h3>
