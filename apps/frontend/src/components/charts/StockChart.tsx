@@ -620,6 +620,18 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
     return detectSignals(clean, isDaily, showRSI, showMACD, activeMaConfigs);
   }, [data, isDaily, showRSI, showMACD, activeMaConfigs]);
 
+  // Collapse badges: one badge per source+type, with ×N count when N > 1.
+  const signalBadges = useMemo(() => {
+    const groups = new Map<string, { signal: ChartSignal; count: number }>();
+    for (const s of chartSignals) {
+      const key = `${s.source}-${s.type}`;
+      const g = groups.get(key);
+      if (g) g.count++;
+      else groups.set(key, { signal: s, count: 1 });
+    }
+    return Array.from(groups.values());
+  }, [chartSignals]);
+
   return (
     <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
       {/* Controls */}
@@ -627,10 +639,10 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
             Price Chart
-            {chartSignals.map((s, i) => (
+            {signalBadges.map(({ signal: s, count }) => (
               <span
-                key={`${s.source}-${i}`}
-                title={s.description}
+                key={`${s.source}-${s.type}`}
+                title={count > 1 ? `${count} crossovers — ${s.description}` : s.description}
                 className={`text-xs px-1.5 py-0.5 rounded font-medium normal-case tracking-normal ${
                   s.type === 'buy' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                 }`}
@@ -641,11 +653,11 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
                     : 'Overbought'
                   : s.source === 'macd'
                     ? s.type === 'buy'
-                      ? '↑ MACD'
-                      : '↓ MACD'
+                      ? `↑ MACD${count > 1 ? ` ×${count}` : ''}`
+                      : `↓ MACD${count > 1 ? ` ×${count}` : ''}`
                     : s.type === 'buy'
-                      ? '↑ MA Cross'
-                      : '↓ MA Cross'}
+                      ? `↑ MA Cross${count > 1 ? ` ×${count}` : ''}`
+                      : `↓ MA Cross${count > 1 ? ` ×${count}` : ''}`}
               </span>
             ))}
           </h3>
