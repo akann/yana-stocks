@@ -16,7 +16,7 @@ import {
   type IPriceLine,
 } from 'lightweight-charts';
 import { api } from '@/lib/api';
-import { computeMA, sortBars, toTime } from '@/lib/chart-utils';
+import { computeMA, computeRSI, sortBars, toTime } from '@/lib/chart-utils';
 import type { OHLCVBar } from '@/types';
 
 const RANGES = [
@@ -50,13 +50,16 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
   const chartRef = useRef<IChartApi | null>(null);
   const updateDataRef = useRef<((bars: OHLCVBar[], currPrice: number | null) => void) | null>(null);
   const updateMAsRef = useRef<((sorted: OHLCVBar[], enabled: Set<MAKey>) => void) | null>(null);
+  const updateRSIRef = useRef<((sorted: OHLCVBar[], show: boolean) => void) | null>(null);
   const priceLineRef = useRef<IPriceLine | null>(null);
   const volSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
+  const rsiSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const maSeriesMapRef = useRef<Map<MAKey, ISeriesApi<'Line'>>>(new Map());
 
   const [range, setRange] = useState<RangeLabel>('1W');
   const [chartType, setChartType] = useState<ChartType>('candlestick');
   const [enabledMAs, setEnabledMAs] = useState<Set<MAKey>>(new Set());
+  const [showRSI, setShowRSI] = useState(false);
 
   const activeRange = RANGES.find((r) => r.label === range)!;
   const isDaily = activeRange.interval === '1d';
@@ -84,8 +87,10 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
     chartRef.current = null;
     updateDataRef.current = null;
     updateMAsRef.current = null;
+    updateRSIRef.current = null;
     priceLineRef.current = null;
     volSeriesRef.current = null;
+    rsiSeriesRef.current = null;
     maSeriesMap.clear();
 
     const chart = createChart(el, {
@@ -148,6 +153,60 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
         }
         series.setData(maData);
       }
+    };
+
+    updateRSIRef.current = (sorted: OHLCVBar[], show: boolean) => {
+      if (!show) {
+        if (rsiSeriesRef.current) {
+          chart.removeSeries(rsiSeriesRef.current);
+          rsiSeriesRef.current = null;
+        }
+        // Restore original margins
+        chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+        chart.priceScale('right').applyOptions({ scaleMargins: { top: 0, bottom: 0 } });
+        return;
+      }
+
+      const rsiData = computeRSI(sorted, 14, isDaily);
+      if (rsiData.length === 0) return;
+
+      if (!rsiSeriesRef.current) {
+        rsiSeriesRef.current = chart.addSeries(LineSeries, {
+          priceScaleId: 'rsi',
+          color: '#8b5cf6',
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: true,
+          crosshairMarkerVisible: true,
+          // Force the RSI scale to always show the full 0-100 range
+          autoscaleInfoProvider: () => ({
+            priceRange: { minValue: 0, maxValue: 100 },
+            margins: { above: 0.08, below: 0.08 },
+          }),
+        });
+        chart.priceScale('rsi').applyOptions({
+          scaleMargins: { top: 0.87, bottom: 0 },
+        });
+        rsiSeriesRef.current.createPriceLine({
+          price: 70,
+          color: 'rgba(239, 68, 68, 0.6)',
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: false,
+        });
+        rsiSeriesRef.current.createPriceLine({
+          price: 30,
+          color: 'rgba(34, 197, 94, 0.6)',
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: false,
+        });
+      }
+
+      rsiSeriesRef.current.setData(rsiData);
+      // Compress vol into a band above the RSI pane; push price candles up
+      chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.74, bottom: 0.14 } });
+      chart.priceScale('right').applyOptions({ scaleMargins: { top: 0.04, bottom: 0.27 } });
     };
 
     if (chartType === 'candlestick') {
@@ -290,8 +349,10 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
       chartRef.current = null;
       updateDataRef.current = null;
       updateMAsRef.current = null;
+      updateRSIRef.current = null;
       priceLineRef.current = null;
       volSeriesRef.current = null;
+      rsiSeriesRef.current = null;
       maSeriesMap.clear();
     };
   }, [chartType, isDaily]);
@@ -315,7 +376,8 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
       .reverse();
     updateDataRef.current(clean, currentPrice ?? null);
     updateMAsRef.current?.(clean, enabledMAs);
-  }, [data, currentPrice, enabledMAs, isDaily, chartType]);
+    updateRSIRef.current?.(clean, showRSI);
+  }, [data, currentPrice, enabledMAs, showRSI, isDaily, chartType]);
 
   function toggleMA(key: MAKey) {
     setEnabledMAs((prev) => {
@@ -376,7 +438,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
           </div>
         </div>
 
-        {/* MA toggles */}
+        {/* Indicator toggles — MAs + RSI */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-xs text-gray-400 font-medium mr-0.5">MA</span>
           {MA_CONFIGS.map((cfg) => {
@@ -396,6 +458,20 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
               </button>
             );
           })}
+
+          <div className="w-px h-3 bg-gray-200 mx-0.5" />
+
+          <button
+            onClick={() => setShowRSI((v) => !v)}
+            className={`px-2 py-0.5 text-xs rounded font-medium transition-colors border ${
+              showRSI
+                ? 'text-white border-[#8b5cf6]'
+                : 'text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700'
+            }`}
+            style={showRSI ? { backgroundColor: '#8b5cf6', borderColor: '#8b5cf6' } : undefined}
+          >
+            RSI 14
+          </button>
         </div>
       </div>
 

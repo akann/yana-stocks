@@ -1,16 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { MoversCard } from '@/components/market/MoversCard';
 
 export function HomePageView(): React.JSX.Element {
-  const [symbol, setSymbol] = useState('');
+  const symbolRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    const trimmed = symbol.trim().toUpperCase();
+    const trimmed = (symbolRef.current?.value ?? '').trim().toUpperCase();
     if (trimmed) {
       router.push(`/stocks/${trimmed}`);
     }
@@ -23,9 +23,9 @@ export function HomePageView(): React.JSX.Element {
         <p className="text-gray-600">Real-time prices, sentiment analysis, and ML predictions</p>
         <form onSubmit={handleSearch} className="flex gap-2 max-w-sm mx-auto">
           <input
+            ref={symbolRef}
             type="text"
-            value={symbol}
-            onChange={(e) => setSymbol(e.target.value)}
+            defaultValue=""
             placeholder="Search symbol (e.g. AAPL)"
             className="flex-1 bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 uppercase"
           />

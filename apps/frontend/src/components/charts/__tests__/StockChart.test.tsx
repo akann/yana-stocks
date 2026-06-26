@@ -67,4 +67,50 @@ describe('StockChart', () => {
     const { container } = render(<StockChart symbol="AAPL" />, { wrapper });
     expect(container.querySelector('.animate-pulse')).toBeInTheDocument();
   });
+
+  it('renders the RSI 14 toggle button', () => {
+    render(<StockChart symbol="AAPL" />, { wrapper });
+    expect(screen.getByRole('button', { name: 'RSI 14' })).toBeInTheDocument();
+  });
+
+  it('RSI 14 button is initially inactive (no purple background)', () => {
+    render(<StockChart symbol="AAPL" />, { wrapper });
+    expect(screen.getByRole('button', { name: 'RSI 14' })).not.toHaveStyle({
+      backgroundColor: '#8b5cf6',
+    });
+  });
+
+  it('activates RSI 14 button when clicked', async () => {
+    const user = userEvent.setup();
+    render(<StockChart symbol="AAPL" />, { wrapper });
+    const rsiBtn = screen.getByRole('button', { name: 'RSI 14' });
+    await user.click(rsiBtn);
+    expect(rsiBtn).toHaveStyle({ backgroundColor: '#8b5cf6' });
+  });
+
+  it('deactivates RSI 14 button when clicked a second time', async () => {
+    const user = userEvent.setup();
+    render(<StockChart symbol="AAPL" />, { wrapper });
+    const rsiBtn = screen.getByRole('button', { name: 'RSI 14' });
+    await user.click(rsiBtn);
+    await user.click(rsiBtn);
+    expect(rsiBtn).not.toHaveStyle({ backgroundColor: '#8b5cf6' });
+  });
+
+  it('MA toggles and RSI toggle are independent', async () => {
+    const user = userEvent.setup();
+    render(<StockChart symbol="AAPL" />, { wrapper });
+    const sma20 = screen.getByRole('button', { name: 'SMA 20' });
+    const rsiBtn = screen.getByRole('button', { name: 'RSI 14' });
+
+    await user.click(sma20);
+    await user.click(rsiBtn);
+
+    expect(sma20).toHaveStyle({ backgroundColor: '#3b82f6' });
+    expect(rsiBtn).toHaveStyle({ backgroundColor: '#8b5cf6' });
+
+    await user.click(sma20); // deactivate MA — RSI should be unaffected
+    expect(sma20).not.toHaveStyle({ backgroundColor: '#3b82f6' });
+    expect(rsiBtn).toHaveStyle({ backgroundColor: '#8b5cf6' });
+  });
 });

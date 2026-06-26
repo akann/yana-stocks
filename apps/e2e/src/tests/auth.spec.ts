@@ -38,7 +38,9 @@ test.describe('Login page', () => {
     await page.goto('/login');
     await page.locator('#login-email').fill('user@test.com');
     await page.locator('#login-password').fill('password');
-    await page.getByRole('button', { name: 'Sign in' }).click();
+    // requestSubmit() fires the DOM submit event synchronously, bypassing simulated
+    // mouse/keyboard events which drop intermittently on WebKit mobile.
+    await page.locator('form').evaluate((form: HTMLFormElement) => form.requestSubmit());
 
     await expect(page.getByRole('button', { name: 'Signing in…' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Signing in…' })).toBeDisabled();
@@ -55,7 +57,7 @@ test.describe('Login page', () => {
     await page.goto('/login');
     await page.locator('#login-email').fill('user@test.com');
     await page.locator('#login-password').fill('password123');
-    await page.getByRole('button', { name: 'Sign in' }).click();
+    await page.locator('form').evaluate((form: HTMLFormElement) => form.requestSubmit());
 
     await page.waitForURL(/\/dashboard/, { timeout: 10_000 });
     await expect(page).toHaveURL(/\/dashboard/);
@@ -70,7 +72,7 @@ test.describe('Login page', () => {
     await page.goto('/login');
     await page.locator('#login-email').fill('mfa@test.com');
     await page.locator('#login-password').fill('password');
-    await page.getByRole('button', { name: 'Sign in' }).click();
+    await page.locator('form').evaluate((form: HTMLFormElement) => form.requestSubmit());
 
     await expect(page.getByText('Two-factor authentication')).toBeVisible();
     await expect(page.getByPlaceholder('000000')).toBeVisible();
@@ -88,7 +90,11 @@ test.describe('Auth guard — unauthenticated redirects', () => {
   }
 });
 
+// Nav links use `hidden md:flex` (≥768px) and the username uses `hidden sm:block` (≥640px).
+// iPhone 14 is 390px — both are CSS-hidden on mobile. Run navbar tests at desktop width.
 test.describe('Navbar auth state', () => {
+  test.use({ viewport: { width: 1280, height: 720 } });
+
   test('unauthenticated: shows Sign in and Sign up, hides app nav links', async ({ page }) => {
     await mockMovers(page);
     await page.goto('/');

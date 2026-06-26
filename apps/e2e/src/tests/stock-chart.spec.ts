@@ -78,6 +78,109 @@ test.describe('StockChart — /stocks/NVDA', () => {
     await expect(stockPage.canvas).toBeVisible();
   });
 
+  test.describe('RSI indicator', () => {
+    test('RSI 14 toggle button is visible on the stock page', async ({ page }) => {
+      await setupStockMocks(page);
+      const stockPage = new StockPage(page);
+      await stockPage.goto(SYMBOL);
+      await stockPage.waitForLoad();
+
+      await expect(page.getByRole('button', { name: 'RSI 14' })).toBeVisible();
+    });
+
+    test('clicking RSI 14 activates the button with purple background', async ({ page }) => {
+      await setupStockMocks(page);
+      const stockPage = new StockPage(page);
+      await stockPage.goto(SYMBOL);
+      await stockPage.waitForLoad();
+
+      const rsiBtn = page.getByRole('button', { name: 'RSI 14' });
+      await rsiBtn.click();
+
+      // #8b5cf6 = rgb(139, 92, 246)
+      await expect(rsiBtn).toHaveCSS('background-color', 'rgb(139, 92, 246)');
+    });
+
+    test('toggling RSI on then off causes no JS errors', async ({ page, jsErrors }) => {
+      await setupStockMocks(page);
+      const stockPage = new StockPage(page);
+      await stockPage.goto(SYMBOL);
+      await stockPage.waitForLoad();
+
+      const rsiBtn = page.getByRole('button', { name: 'RSI 14' });
+      await rsiBtn.click(); // enable
+      await page.waitForTimeout(300);
+      await rsiBtn.click(); // disable
+      await page.waitForTimeout(300);
+
+      expect(jsErrors, `JS errors toggling RSI: ${jsErrors.join('; ')}`).toHaveLength(0);
+      await expect(stockPage.canvas).toBeVisible();
+    });
+
+    test('RSI stays active and chart survives a candlestick ↔ line switch', async ({
+      page,
+      jsErrors,
+    }) => {
+      await setupStockMocks(page);
+      const stockPage = new StockPage(page);
+      await stockPage.goto(SYMBOL);
+      await stockPage.waitForLoad();
+
+      await page.getByRole('button', { name: 'RSI 14' }).click();
+      await page.waitForTimeout(200);
+
+      await page.getByRole('button', { name: 'Line', exact: true }).click();
+      await page.waitForTimeout(300);
+      expect(jsErrors, `JS errors after RSI+Line switch: ${jsErrors.join('; ')}`).toHaveLength(0);
+
+      await page.getByRole('button', { name: 'Candle', exact: true }).click();
+      await page.waitForTimeout(300);
+      expect(jsErrors, `JS errors after RSI+Candle switch: ${jsErrors.join('; ')}`).toHaveLength(0);
+
+      // RSI button must still be active after chart type switch (state survives recreation)
+      await expect(page.getByRole('button', { name: 'RSI 14' })).toHaveCSS(
+        'background-color',
+        'rgb(139, 92, 246)',
+      );
+      await expect(stockPage.canvas).toBeVisible();
+    });
+
+    test('RSI active on 1M range (21 bars) produces output without errors', async ({
+      page,
+      jsErrors,
+    }) => {
+      await setupStockMocks(page);
+      const stockPage = new StockPage(page);
+      await stockPage.goto(SYMBOL);
+      await stockPage.waitForLoad();
+
+      // 1M = 21 daily bars → RSI(14) produces 7 data points
+      await stockPage.clickRange('1M');
+      await page.waitForTimeout(300);
+      await page.getByRole('button', { name: 'RSI 14' }).click();
+      await page.waitForTimeout(300);
+
+      expect(jsErrors, `JS errors with RSI on 1M: ${jsErrors.join('; ')}`).toHaveLength(0);
+      await expect(stockPage.canvas).toBeVisible();
+    });
+
+    test('switching to 1Y with RSI active produces no JS errors', async ({ page, jsErrors }) => {
+      await setupStockMocks(page);
+      const stockPage = new StockPage(page);
+      await stockPage.goto(SYMBOL);
+      await stockPage.waitForLoad();
+
+      await page.getByRole('button', { name: 'RSI 14' }).click();
+      await page.waitForTimeout(200);
+
+      await stockPage.clickRange('1Y'); // 252 bars → 238 RSI values
+      await page.waitForTimeout(400);
+
+      expect(jsErrors, `JS errors with RSI on 1Y: ${jsErrors.join('; ')}`).toHaveLength(0);
+      await expect(stockPage.canvas).toBeVisible();
+    });
+  });
+
   test('chart stays populated after toggling chart type (regression: data effect must re-run on chartType change)', async ({
     page,
     jsErrors,

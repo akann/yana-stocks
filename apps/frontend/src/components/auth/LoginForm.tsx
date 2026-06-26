@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -8,8 +8,8 @@ import { useAuth } from '@/context/AuthContext';
 export function LoginForm(): React.JSX.Element {
   const { login, verifyMFALogin, mfaRequired } = useAuth();
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const [totpCode, setTotpCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,7 +19,7 @@ export function LoginForm(): React.JSX.Element {
     setError('');
     setLoading(true);
     try {
-      const result = await login(email, password);
+      const result = await login(emailRef.current?.value ?? '', passwordRef.current?.value ?? '');
       if (!result.mfaRequired) {
         router.replace('/dashboard');
       }
@@ -94,11 +94,11 @@ export function LoginForm(): React.JSX.Element {
               Email
             </label>
             <input
+              ref={emailRef}
               id="login-email"
               type="email"
               autoComplete="username"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              defaultValue=""
               placeholder="you@example.com"
               className="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500"
               required
@@ -114,11 +114,11 @@ export function LoginForm(): React.JSX.Element {
               </Link>
             </div>
             <input
+              ref={passwordRef}
               id="login-password"
               type="password"
               autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              defaultValue=""
               placeholder="••••••••"
               className="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500"
               required

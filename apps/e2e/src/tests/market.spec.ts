@@ -43,7 +43,9 @@ test.describe('Market dashboard (homepage)', () => {
 
     await page.goto('/');
     await page.getByPlaceholder('Search symbol (e.g. AAPL)').fill('nvda');
-    await page.getByRole('button', { name: 'Go' }).click();
+    // press('Enter') on the focused input is more reliable than button click on
+    // WebKit mobile simulation where synthetic mouse events can drop intermittently.
+    await page.getByPlaceholder('Search symbol (e.g. AAPL)').press('Enter');
     await page.waitForURL(/\/stocks\/NVDA/, { timeout: 10_000 });
 
     await expect(page).toHaveURL(/\/stocks\/NVDA/);

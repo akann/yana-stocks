@@ -1,4 +1,4 @@
-import { toTime, sortBars, computeMA } from '../chart-utils';
+import { toTime, sortBars, computeMA, computeRSI } from '../chart-utils';
 import type { OHLCVBar } from '@/types';
 
 function makeBar(timestamp: string, close: number, extra: Partial<OHLCVBar> = {}): OHLCVBar {
@@ -123,5 +123,89 @@ describe('computeMA', () => {
       const expected = Math.floor(new Date('2024-01-01T09:31:00.000Z').getTime() / 1000);
       expect(result[0]?.time).toBe(expected);
     });
+  });
+});
+
+describe('computeRSI', () => {
+  // period consecutive rising closes guarantee RS = ∞ → RSI = 100
+  function risingBars(count: number): OHLCVBar[] {
+    return Array.from({ length: count }, (_, i) =>
+      makeBar(new Date(Date.UTC(2024, 0, i + 1)).toISOString().slice(0, 10), 100 + i),
+    );
+  }
+
+  // period consecutive falling closes guarantee RS = 0 → RSI = 0
+  function fallingBars(count: number): OHLCVBar[] {
+    return Array.from({ length: count }, (_, i) =>
+      makeBar(new Date(Date.UTC(2024, 0, i + 1)).toISOString().slice(0, 10), 100 - i),
+    );
+  }
+
+  it('returns empty array when bars.length <= period', () => {
+    expect(computeRSI(risingBars(14), 14, true)).toEqual([]);
+    expect(computeRSI([], 14, true)).toEqual([]);
+  });
+
+  it('returns 1 value when bars.length === period + 1', () => {
+    expect(computeRSI(risingBars(15), 14, true)).toHaveLength(1);
+  });
+
+  it('returns bars.length - period values', () => {
+    expect(computeRSI(risingBars(20), 14, true)).toHaveLength(6);
+  });
+
+  it('aligns first value to bar at index period (not period - 1 like MA)', () => {
+    const bars = risingBars(20);
+    const result = computeRSI(bars, 14, true);
+    // bar index 14 = 2024-01-15
+    expect(result[0]?.time).toBe('2024-01-15');
+  });
+
+  it('aligns last value to the final bar', () => {
+    const bars = risingBars(20);
+    const result = computeRSI(bars, 14, true);
+    expect(result[result.length - 1]?.time).toBe('2024-01-20');
+  });
+
+  it('returns 100 for all-rising prices (no losing periods)', () => {
+    // Use period=2 for a simple, hand-verifiable case
+    const result = computeRSI(risingBars(5), 2, true);
+    expect(result.length).toBeGreaterThan(0);
+    for (const { value } of result) {
+      expect(value).toBe(100);
+    }
+  });
+
+  it('returns 0 for all-falling prices (no gaining periods)', () => {
+    const result = computeRSI(fallingBars(5), 2, true);
+    expect(result.length).toBeGreaterThan(0);
+    for (const { value } of result) {
+      expect(value).toBe(0);
+    }
+  });
+
+  it('all output values are in the [0, 100] range for mixed market data', () => {
+    const mixedBars = Array.from({ length: 30 }, (_, i) =>
+      makeBar(
+        new Date(Date.UTC(2024, 0, i + 1)).toISOString().slice(0, 10),
+        100 + Math.sin(i) * 20,
+      ),
+    );
+    const result = computeRSI(mixedBars, 14, true);
+    expect(result.length).toBeGreaterThan(0);
+    for (const { value } of result) {
+      expect(value).toBeGreaterThanOrEqual(0);
+      expect(value).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it('returns Unix second timestamps for intraday bars', () => {
+    const intradayBars = Array.from({ length: 5 }, (_, i) =>
+      makeBar(new Date(Date.UTC(2024, 0, 1, 9, 30 + i)).toISOString(), 100 + i),
+    );
+    // period=2: first output aligns to bars[2] = 09:32 UTC
+    const result = computeRSI(intradayBars, 2, false);
+    const expected = Math.floor(new Date('2024-01-01T09:32:00.000Z').getTime() / 1000);
+    expect(result[0]?.time).toBe(expected);
   });
 });

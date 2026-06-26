@@ -58,9 +58,26 @@ export async function setupStockMocks(
   });
 }
 
-// Extended test fixture that automatically collects JS page errors.
-// Access via `jsErrors` param; assert `expect(jsErrors).toHaveLength(0)` to catch crashes.
-export const test = base.extend<{ jsErrors: string[] }>({
+// Extended test fixture that:
+// 1. Pre-dismisses the cookie consent banner so it never renders during tests.
+//    CookieBanner is `position:fixed` and mounts after React hydration; on WebKit
+//    its DOM insertion triggers a layout recalculation that can make synthetic
+//    clicks land on stale coordinates. Pre-setting the consent key in localStorage
+//    via addInitScript makes useCookieConsent read `status:'accepted'` immediately.
+// 2. Automatically collects JS page errors (access via `jsErrors` fixture param).
+export const test = base.extend<{ jsErrors: string[]; _cookieConsent: void }>({
+  _cookieConsent: [
+    async ({ page }, use) => {
+      await page.addInitScript(() => {
+        localStorage.setItem(
+          'cookie_consent',
+          JSON.stringify({ status: 'accepted', timestamp: 0 }),
+        );
+      });
+      await use();
+    },
+    { auto: true },
+  ],
   jsErrors: [
     async ({ page }, use) => {
       const errors: string[] = [];

@@ -1,4 +1,4 @@
-import { SMA, EMA } from 'technicalindicators';
+import { SMA, EMA, RSI } from 'technicalindicators';
 import type { Time } from 'lightweight-charts';
 import type { OHLCVBar } from '@/types';
 
@@ -28,4 +28,17 @@ export function computeMA(
   const offset = period - 1;
   // bars[offset + i] is always defined: values.length === bars.length - period + 1
   return values.map((v, i) => ({ time: toTime(bars[offset + i]!.timestamp, isDaily), value: v }));
+}
+
+// RSI needs period+1 values to produce the first output point; offset = period.
+// values.length === bars.length - period, so bars[period + i] is always defined.
+export function computeRSI(
+  bars: OHLCVBar[],
+  period: number,
+  isDaily: boolean,
+): { time: Time; value: number }[] {
+  if (bars.length <= period) return [];
+  const closes = bars.map((b) => b.close);
+  const values = RSI.calculate({ period, values: closes });
+  return values.map((v, i) => ({ time: toTime(bars[period + i]!.timestamp, isDaily), value: v }));
 }
