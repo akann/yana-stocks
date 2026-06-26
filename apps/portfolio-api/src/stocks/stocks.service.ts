@@ -21,14 +21,16 @@ interface FmpNewsItem {
   text?: string;
 }
 
-interface FmpScreenerResult {
+interface FmpProfile {
   symbol?: string;
   companyName?: string;
   price?: number;
+  change?: number;
+  changePercentage?: number;
   marketCap?: number;
   sector?: string;
   volume?: number;
-  lastAnnualDividendYield?: number;
+  lastDividend?: number;
 }
 
 interface FmpQuote {
@@ -92,6 +94,100 @@ const DEFAULT_SYMBOLS = [
   'UNH',
   'XOM',
   'BAC',
+];
+
+// Curated S&P 500 universe for the stock screener (covers all major sectors)
+const SCREENER_SYMBOLS = [
+  // Technology
+  'AAPL',
+  'MSFT',
+  'NVDA',
+  'GOOGL',
+  'META',
+  'AMZN',
+  'TSLA',
+  'AMD',
+  'INTC',
+  'CRM',
+  'ORCL',
+  'ADBE',
+  // Financials
+  'JPM',
+  'BAC',
+  'WFC',
+  'GS',
+  'MS',
+  'BLK',
+  'V',
+  'MA',
+  'AXP',
+  'C',
+  'SCHW',
+  // Healthcare
+  'JNJ',
+  'UNH',
+  'PFE',
+  'ABBV',
+  'MRK',
+  'LLY',
+  'TMO',
+  'ABT',
+  'CVS',
+  'MDT',
+  // Energy
+  'XOM',
+  'CVX',
+  'COP',
+  'SLB',
+  'EOG',
+  'MPC',
+  'PSX',
+  'OXY',
+  // Consumer Discretionary
+  'HD',
+  'MCD',
+  'NKE',
+  'SBUX',
+  'LOW',
+  'TGT',
+  'COST',
+  'NFLX',
+  'BKNG',
+  // Consumer Staples
+  'PG',
+  'KO',
+  'PEP',
+  'WMT',
+  'PM',
+  'MO',
+  // Industrials
+  'BA',
+  'HON',
+  'CAT',
+  'LMT',
+  'RTX',
+  'UPS',
+  'FDX',
+  'DE',
+  'MMM',
+  'GE',
+  // Communication Services
+  'T',
+  'VZ',
+  'DIS',
+  'CMCSA',
+  // Utilities
+  'NEE',
+  'DUK',
+  'SO',
+  // Real Estate
+  'AMT',
+  'PLD',
+  'EQIX',
+  // Materials
+  'LIN',
+  'APD',
+  'FCX',
 ];
 
 @Injectable()
@@ -374,14 +470,27 @@ export class StocksService {
       limit = 25,
     } = params;
 
-    const CACHE_KEY = `papi:screener:${marketCapMin ?? ''}:${marketCapMax ?? ''}:${volumeMin ?? ''}:${dividendYieldMin ?? ''}:${sector ?? ''}:${limit}`;
+    const all = await this.getScreenerProfiles();
+
+    let results = all;
+    if (marketCapMin !== undefined) results = results.filter((r) => r.marketCap >= marketCapMin);
+    if (marketCapMax !== undefined) results = results.filter((r) => r.marketCap <= marketCapMax);
+    if (volumeMin !== undefined) results = results.filter((r) => r.volume >= volumeMin);
+    if (dividendYieldMin !== undefined)
+      results = results.filter((r) => r.dividendYield >= dividendYieldMin);
+    if (sector) results = results.filter((r) => r.sector.toLowerCase() === sector.toLowerCase());
+    if (changeMin !== undefined) results = results.filter((r) => r.changesPercentage >= changeMin);
+
+    results.sort((a, b) => b.marketCap - a.marketCap);
+    return results.slice(0, limit);
+  }
+
+  private async getScreenerProfiles(): Promise<ScreenerResult[]> {
+    const CACHE_KEY = 'papi:screener:profiles';
+    const CACHE_TTL = 3600; // 1h — sector/fundamentals change slowly
+
     const cached = await this.redis.get(CACHE_KEY);
-    if (cached) {
-      const results = JSON.parse(cached) as ScreenerResult[];
-      return changeMin !== undefined
-        ? results.filter((r) => r.changesPercentage >= changeMin)
-        : results;
-    }
+    if (cached) return JSON.parse(cached) as ScreenerResult[];
 
     const apiKey = this.config.get<string>('fmpApiKey') ?? '';
     if (!apiKey) {
@@ -389,87 +498,46 @@ export class StocksService {
       return [];
     }
 
-    const FMP_V3 = 'https://financialmodelingprep.com/api/v3';
     const FMP_STABLE = 'https://financialmodelingprep.com/stable';
 
-    const screenerParams: Record<string, string | number | boolean> = {
-      isEtf: false,
-      isActivelyTrading: true,
-      exchange: 'NYSE,NASDAQ',
-      limit: Math.min(limit, 50),
-      apikey: apiKey,
-    };
-    if (marketCapMin) screenerParams['marketCapMoreThan'] = marketCapMin;
-    if (marketCapMax) screenerParams['marketCapLowerThan'] = marketCapMax;
-    if (volumeMin) screenerParams['volumeMoreThan'] = volumeMin;
-    if (dividendYieldMin) screenerParams['dividendMoreThan'] = dividendYieldMin;
-    if (sector) screenerParams['sector'] = sector;
-
-    let screenedItems: FmpScreenerResult[] = [];
-    try {
-      const resp = await firstValueFrom(
-        this.httpService.get<FmpScreenerResult[]>(`${FMP_V3}/stock-screener`, {
-          params: screenerParams,
-          timeout: 8000,
-        }),
-      );
-      screenedItems = resp.data ?? [];
-    } catch (err) {
-      this.logger.error(`FMP screener failed: ${String(err)}`);
-      return [];
-    }
-
-    if (!screenedItems.length) return [];
-
-    const symbols = screenedItems.map((s) => s.symbol ?? '').filter(Boolean);
-    const quoteMap = new Map<string, { change: number; changesPercentage: number }>();
-    try {
-      const quoteResults = await Promise.allSettled(
-        symbols.map((sym) =>
-          firstValueFrom(
-            this.httpService.get<FmpQuote[]>(`${FMP_STABLE}/quote`, {
-              params: { symbol: sym, apikey: apiKey },
+    const fetched = await Promise.allSettled(
+      SCREENER_SYMBOLS.map((sym) =>
+        firstValueFrom(
+          this.httpService.get<FmpProfile[]>(
+            `${FMP_STABLE}/profile?symbol=${sym}&apikey=${apiKey}`,
+            {
               timeout: 5000,
-            }),
+            },
           ),
         ),
-      );
-      for (const r of quoteResults) {
-        if (r.status !== 'fulfilled') continue;
-        for (const q of r.value.data ?? []) {
-          if (q.symbol) {
-            quoteMap.set(q.symbol, {
-              change: q.change ?? 0,
-              changesPercentage: q.changePercentage ?? q.changesPercentage ?? 0,
-            });
-          }
-        }
-      }
-    } catch {
-      // quotes optional — price change will default to 0
-    }
+      ),
+    );
 
-    const results: ScreenerResult[] = screenedItems.map((s) => {
-      const sym = s.symbol ?? '';
-      const quote = quoteMap.get(sym);
-      return {
-        symbol: sym,
-        name: s.companyName ?? '',
-        price: s.price ?? 0,
-        change: quote?.change ?? 0,
-        changesPercentage: quote?.changesPercentage ?? 0,
-        marketCap: s.marketCap ?? 0,
-        sector: s.sector ?? '',
-        volume: s.volume ?? 0,
-        dividendYield: s.lastAnnualDividendYield ?? 0,
-      };
+    const profiles: ScreenerResult[] = fetched.flatMap((r) => {
+      if (r.status !== 'fulfilled') return [];
+      const p = r.value.data?.[0];
+      if (!p?.symbol) return [];
+      const price = p.price ?? 0;
+      const dividendYield = price > 0 ? ((p.lastDividend ?? 0) / price) * 100 : 0;
+      return [
+        {
+          symbol: p.symbol,
+          name: p.companyName ?? '',
+          price,
+          change: p.change ?? 0,
+          changesPercentage: p.changePercentage ?? 0,
+          marketCap: p.marketCap ?? 0,
+          sector: p.sector ?? '',
+          volume: p.volume ?? 0,
+          dividendYield,
+        },
+      ];
     });
 
-    await this.redis.set(CACHE_KEY, JSON.stringify(results), 300);
-
-    return changeMin !== undefined
-      ? results.filter((r) => r.changesPercentage >= changeMin)
-      : results;
+    if (profiles.length > 0) {
+      await this.redis.set(CACHE_KEY, JSON.stringify(profiles), CACHE_TTL);
+    }
+    return profiles;
   }
 
   private async getMoversFromFmp(top: number): Promise<MarketMovers> {

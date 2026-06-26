@@ -6,7 +6,6 @@ import { RedisService } from '../redis/redis.service';
 import type { AnalystRating } from './analyst.types';
 
 const FMP_STABLE = 'https://financialmodelingprep.com/stable';
-const FMP_V4 = 'https://financialmodelingprep.com/api/v4';
 const CACHE_TTL = 86_400; // 24 h
 
 interface FmpRecommendation {
@@ -71,12 +70,12 @@ export class AnalystService {
     const [recResult, targetResult] = await Promise.allSettled([
       firstValueFrom(
         this.httpService.get<FmpRecommendation[]>(
-          `${FMP_STABLE}/analyst-consensus?symbol=${symbol}&limit=1&apikey=${apiKey}`,
+          `${FMP_STABLE}/grades-consensus?symbol=${symbol}&apikey=${apiKey}`,
         ),
       ),
       firstValueFrom(
         this.httpService.get<FmpPriceTarget | FmpPriceTarget[]>(
-          `${FMP_V4}/price-target-consensus?symbol=${symbol}&apikey=${apiKey}`,
+          `${FMP_STABLE}/price-target-consensus?symbol=${symbol}&apikey=${apiKey}`,
         ),
       ),
     ]);
