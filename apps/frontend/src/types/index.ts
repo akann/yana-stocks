@@ -135,6 +135,16 @@ export interface MarketOverview {
   news: MarketNewsItem[];
 }
 
+export interface SectorRotationRow {
+  sector: string;
+  changes: number[];
+}
+
+export interface SectorRotationData {
+  dates: string[];
+  rows: SectorRotationRow[];
+}
+
 export interface ScreenerResult {
   symbol: string;
   name: string;

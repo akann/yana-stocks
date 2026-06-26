@@ -61,6 +61,22 @@ interface PolygonTickerResult {
 interface PolygonTickersResponse {
   results?: PolygonTickerResult[];
 }
+
+interface FmpHistoricalSectorEntry {
+  date: string;
+  utilities?: number;
+  basicMaterials?: number;
+  communicationServices?: number;
+  consumerCyclical?: number;
+  consumerDefensive?: number;
+  energy?: number;
+  financialServices?: number;
+  healthcare?: number;
+  industrials?: number;
+  realEstate?: number;
+  technology?: number;
+}
+
 import { RedisService } from '../redis/redis.service';
 import { MOCK_ASSETS, MOCK_ETF_ASSETS, MOCK_UK_ASSETS } from './mock-assets';
 import type {
@@ -76,6 +92,8 @@ import type {
   PriceCacheEntry,
   ScreenerResult,
   SectorPerformance,
+  SectorRotationData,
+  SectorRotationRow,
 } from './price-cache.types';
 
 const DEFAULT_SYMBOLS = [
@@ -457,6 +475,53 @@ export class StocksService {
     const overview: MarketOverview = { indices, sectors, news };
     await this.redis.set(CACHE_KEY, JSON.stringify(overview), 300);
     return overview;
+  }
+
+  async getSectorRotation(index: 'sp500' | 'ftse100'): Promise<SectorRotationData> {
+    const CACHE_KEY = `papi:sector:rotation:${index}`;
+    const cached = await this.redis.get(CACHE_KEY);
+    if (cached) return JSON.parse(cached) as SectorRotationData;
+
+    // FTSE 100 sector time-series not yet available via FMP — return empty
+    if (index === 'ftse100') return { dates: [], rows: [] };
+
+    const apiKey = this.config.get<string>('fmpApiKey') ?? '';
+    if (!apiKey) return { dates: [], rows: [] };
+
+    const FMP_STABLE = 'https://financialmodelingprep.com/stable';
+    const resp = await firstValueFrom(
+      this.httpService.get<FmpHistoricalSectorEntry[]>(
+        `${FMP_STABLE}/historical-sectors-performance`,
+        { params: { limit: 12, apikey: apiKey }, timeout: 8000 },
+      ),
+    ).catch(() => ({ data: [] as FmpHistoricalSectorEntry[] }));
+
+    // FMP returns newest-first; reverse to chronological order for the heatmap
+    const entries = [...(resp.data ?? [])].reverse();
+    const dates = entries.map((e) => e.date);
+
+    const SECTOR_FIELDS: [keyof Omit<FmpHistoricalSectorEntry, 'date'>, string][] = [
+      ['technology', 'Technology'],
+      ['financialServices', 'Financials'],
+      ['healthcare', 'Health Care'],
+      ['consumerCyclical', 'Consumer Disc.'],
+      ['industrials', 'Industrials'],
+      ['communicationServices', 'Comm. Services'],
+      ['consumerDefensive', 'Consumer Staples'],
+      ['energy', 'Energy'],
+      ['realEstate', 'Real Estate'],
+      ['basicMaterials', 'Materials'],
+      ['utilities', 'Utilities'],
+    ];
+
+    const rows: SectorRotationRow[] = SECTOR_FIELDS.map(([field, sector]) => ({
+      sector,
+      changes: entries.map((e) => Number(e[field] ?? 0)),
+    }));
+
+    const result: SectorRotationData = { dates, rows };
+    await this.redis.set(CACHE_KEY, JSON.stringify(result), 3600);
+    return result;
   }
 
   async getScreener(params: ScreenerParams): Promise<ScreenerResult[]> {

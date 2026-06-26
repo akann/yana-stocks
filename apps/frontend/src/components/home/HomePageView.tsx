@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { IndicesBar } from '@/components/home/IndicesBar';
-import { SectorHeatmap } from '@/components/home/SectorHeatmap';
+import { SectorRotationHeatmap } from '@/components/home/SectorRotationHeatmap';
 import { MarketNews } from '@/components/home/MarketNews';
 import { StockScreener } from '@/components/home/StockScreener';
 import { MoversCard } from '@/components/market/MoversCard';
@@ -38,7 +38,7 @@ export function HomePageView(): React.JSX.Element {
       <IndicesBar />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SectorHeatmap />
+        <SectorRotationHeatmap />
         <MarketNews />
       </div>
 

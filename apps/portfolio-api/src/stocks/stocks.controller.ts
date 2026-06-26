@@ -17,6 +17,7 @@ import type {
   MarketMovers,
   MarketOverview,
   ScreenerResult,
+  SectorRotationData,
 } from './price-cache.types';
 import { StocksService } from './stocks.service';
 
@@ -57,6 +58,17 @@ export class StocksController {
   })
   getOverview(): Promise<MarketOverview> {
     return this.stocksService.getOverview();
+  }
+
+  @Get('market/sectors/rotation')
+  @ApiOperation({
+    summary: 'Get weekly sector rotation time-series for heatmap (S&P 500)',
+  })
+  getSectorRotation(
+    @Query('index', new DefaultValuePipe('sp500')) index: string,
+  ): Promise<SectorRotationData> {
+    const safeIndex = index === 'ftse100' ? 'ftse100' : 'sp500';
+    return this.stocksService.getSectorRotation(safeIndex);
   }
 
   @Get('market/screener')
