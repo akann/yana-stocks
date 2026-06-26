@@ -10,11 +10,7 @@ interface FmpIndexQuote {
   price?: number;
   change?: number;
   changesPercentage?: number;
-}
-
-interface FmpSectorPerformance {
-  sector?: string;
-  changesPercentage?: string | number;
+  changePercentage?: number;
 }
 
 interface FmpNewsItem {
@@ -40,6 +36,7 @@ interface FmpQuote {
   price?: number;
   change?: number;
   changesPercentage?: number;
+  changePercentage?: number;
   volume?: number;
 }
 
@@ -259,30 +256,8 @@ export class StocksService {
       return { indices: [], sectors: [], news: [] };
     }
 
-    const FMP_BASE = 'https://financialmodelingprep.com/api/v3';
-    const INDEX_SYMBOLS = '%5EGSPC,%5EIXIC,%5EFTSE,%5EGDAXI';
-
-    const [indicesResult, sectorsResult, newsResult] = await Promise.allSettled([
-      firstValueFrom(
-        this.httpService.get<FmpIndexQuote[]>(`${FMP_BASE}/quote/${INDEX_SYMBOLS}`, {
-          params: { apikey: apiKey },
-          timeout: 5000,
-        }),
-      ),
-      firstValueFrom(
-        this.httpService.get<FmpSectorPerformance[]>(`${FMP_BASE}/sector-performance`, {
-          params: { apikey: apiKey },
-          timeout: 5000,
-        }),
-      ),
-      firstValueFrom(
-        this.httpService.get<FmpNewsItem[]>(`${FMP_BASE}/stock_news`, {
-          params: { tickers: 'SPY,QQQ,DIA', limit: 8, apikey: apiKey },
-          timeout: 5000,
-        }),
-      ),
-    ]);
-
+    const FMP_STABLE = 'https://financialmodelingprep.com/stable';
+    const INDEX_SYMBOLS = ['^GSPC', '^IXIC', '^FTSE', '^GDAXI'];
     const INDEX_NAME_MAP: Record<string, string> = {
       '^GSPC': 'S&P 500',
       '^IXIC': 'Nasdaq',
@@ -290,35 +265,45 @@ export class StocksService {
       '^GDAXI': 'DAX',
     };
 
-    const indices: IndexQuote[] =
-      indicesResult.status === 'fulfilled'
-        ? (indicesResult.value.data ?? []).map((q) => ({
-            symbol: q.symbol ?? '',
-            name: INDEX_NAME_MAP[q.symbol ?? ''] ?? q.name ?? q.symbol ?? '',
-            price: q.price ?? 0,
-            change: q.change ?? 0,
-            changesPercentage: q.changesPercentage ?? 0,
-          }))
-        : [];
+    const [indexResults, newsResult] = await Promise.all([
+      Promise.allSettled(
+        INDEX_SYMBOLS.map((sym) =>
+          firstValueFrom(
+            this.httpService.get<FmpIndexQuote[]>(`${FMP_STABLE}/quote`, {
+              params: { symbol: sym, apikey: apiKey },
+              timeout: 5000,
+            }),
+          ),
+        ),
+      ),
+      firstValueFrom(
+        this.httpService.get<FmpNewsItem[]>(`${FMP_STABLE}/news/stock`, {
+          params: { limit: 8, apikey: apiKey },
+          timeout: 5000,
+        }),
+      ).catch(() => ({ data: [] as FmpNewsItem[] })),
+    ]);
 
-    const sectors: SectorPerformance[] =
-      sectorsResult.status === 'fulfilled'
-        ? (sectorsResult.value.data ?? []).map((s) => ({
-            sector: s.sector ?? '',
-            changesPercentage: parseFloat(String(s.changesPercentage ?? '0').replace('%', '')),
-          }))
-        : [];
+    const indices: IndexQuote[] = indexResults.flatMap((r) => {
+      if (r.status !== 'fulfilled') return [];
+      return (r.value.data ?? []).map((q) => ({
+        symbol: q.symbol ?? '',
+        name: INDEX_NAME_MAP[q.symbol ?? ''] ?? q.name ?? q.symbol ?? '',
+        price: q.price ?? 0,
+        change: q.change ?? 0,
+        changesPercentage: q.changePercentage ?? q.changesPercentage ?? 0,
+      }));
+    });
 
-    const news: MarketNewsItem[] =
-      newsResult.status === 'fulfilled'
-        ? (newsResult.value.data ?? []).map((n) => ({
-            title: n.title ?? '',
-            url: n.url ?? '',
-            publishedAt: n.publishedDate ?? '',
-            source: n.site ?? '',
-            summary: (n.text ?? '').slice(0, 200),
-          }))
-        : [];
+    const sectors: SectorPerformance[] = [];
+
+    const news: MarketNewsItem[] = (newsResult.data ?? []).map((n) => ({
+      title: n.title ?? '',
+      url: n.url ?? '',
+      publishedAt: n.publishedDate ?? '',
+      source: n.site ?? '',
+      summary: (n.text ?? '').slice(0, 200),
+    }));
 
     const overview: MarketOverview = { indices, sectors, news };
     await this.redis.set(CACHE_KEY, JSON.stringify(overview), 300);
@@ -351,7 +336,7 @@ export class StocksService {
       return [];
     }
 
-    const FMP_BASE = 'https://financialmodelingprep.com/api/v3';
+    const FMP_STABLE = 'https://financialmodelingprep.com/stable';
 
     const screenerParams: Record<string, string | number | boolean> = {
       isEtf: false,
@@ -369,7 +354,7 @@ export class StocksService {
     let screenedItems: FmpScreenerResult[] = [];
     try {
       const resp = await firstValueFrom(
-        this.httpService.get<FmpScreenerResult[]>(`${FMP_BASE}/stock-screener`, {
+        this.httpService.get<FmpScreenerResult[]>(`${FMP_STABLE}/stock-screener`, {
           params: screenerParams,
           timeout: 8000,
         }),
@@ -385,18 +370,25 @@ export class StocksService {
     const symbols = screenedItems.map((s) => s.symbol ?? '').filter(Boolean);
     const quoteMap = new Map<string, { change: number; changesPercentage: number }>();
     try {
-      const quoteResp = await firstValueFrom(
-        this.httpService.get<FmpQuote[]>(`${FMP_BASE}/quote/${symbols.join(',')}`, {
-          params: { apikey: apiKey },
-          timeout: 8000,
-        }),
+      const quoteResults = await Promise.allSettled(
+        symbols.map((sym) =>
+          firstValueFrom(
+            this.httpService.get<FmpQuote[]>(`${FMP_STABLE}/quote`, {
+              params: { symbol: sym, apikey: apiKey },
+              timeout: 5000,
+            }),
+          ),
+        ),
       );
-      for (const q of quoteResp.data ?? []) {
-        if (q.symbol) {
-          quoteMap.set(q.symbol, {
-            change: q.change ?? 0,
-            changesPercentage: q.changesPercentage ?? 0,
-          });
+      for (const r of quoteResults) {
+        if (r.status !== 'fulfilled') continue;
+        for (const q of r.value.data ?? []) {
+          if (q.symbol) {
+            quoteMap.set(q.symbol, {
+              change: q.change ?? 0,
+              changesPercentage: q.changePercentage ?? q.changesPercentage ?? 0,
+            });
+          }
         }
       }
     } catch {
@@ -433,13 +425,18 @@ export class StocksService {
       return { gainers: [], losers: [] };
     }
     try {
-      const resp = await firstValueFrom(
-        this.httpService.get<FmpQuote[]>(
-          `https://financialmodelingprep.com/api/v3/quote/${DEFAULT_SYMBOLS.join(',')}`,
-          { params: { apikey: apiKey }, timeout: 5000 },
+      const results = await Promise.allSettled(
+        DEFAULT_SYMBOLS.map((sym) =>
+          firstValueFrom(
+            this.httpService.get<FmpQuote[]>('https://financialmodelingprep.com/stable/quote', {
+              params: { symbol: sym, apikey: apiKey },
+              timeout: 5000,
+            }),
+          ),
         ),
       );
-      const entries: MoverEntry[] = (resp.data ?? [])
+      const entries: MoverEntry[] = results
+        .flatMap((r) => (r.status === 'fulfilled' ? (r.value.data ?? []) : []))
         .filter(
           (q): q is FmpQuote & { symbol: string; price: number } =>
             typeof q.symbol === 'string' && typeof q.price === 'number',
@@ -448,7 +445,7 @@ export class StocksService {
           symbol: q.symbol,
           price: q.price,
           change: q.change ?? 0,
-          changePercent: q.changesPercentage ?? 0,
+          changePercent: q.changePercentage ?? q.changesPercentage ?? 0,
           volume: q.volume ?? 0,
         }));
 
