@@ -325,6 +325,34 @@ describe('StocksService', () => {
     });
   });
 
+  describe('getMovers FMP fallback', () => {
+    it('falls back to FMP batch quotes when Redis has no price keys', async () => {
+      redis.get.mockResolvedValue(null);
+      redis.scan.mockResolvedValue([]);
+      redis.mget.mockResolvedValue(new Array(15).fill(null));
+      (configService.get as jest.Mock).mockReturnValue('FMP_KEY');
+
+      const fmpQuotes = [
+        { symbol: 'AAPL', price: 190, change: 3, changesPercentage: 1.6, volume: 60_000_000 },
+        { symbol: 'MSFT', price: 410, change: -2, changesPercentage: -0.5, volume: 25_000_000 },
+        { symbol: 'NVDA', price: 1080, change: 15, changesPercentage: 1.4, volume: 40_000_000 },
+      ];
+
+      httpService.get.mockImplementation((url: string) => {
+        if (url.includes('financialmodelingprep')) {
+          return of({ data: fmpQuotes } as AxiosResponse);
+        }
+        return throwError(() => new Error('price-processor down'));
+      });
+
+      const result = await service.getMovers(2);
+
+      expect(result.gainers[0]?.symbol).toBe('AAPL');
+      expect(result.losers[0]?.symbol).toBe('MSFT');
+      expect(redis.set).toHaveBeenCalledWith('papi:movers', expect.any(String), 60);
+    });
+  });
+
   describe('getAssets', () => {
     it('returns from Redis cache when present (us market)', async () => {
       redis.get.mockResolvedValue(JSON.stringify(mockEquityAssets));

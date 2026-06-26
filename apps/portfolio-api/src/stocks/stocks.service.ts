@@ -37,8 +37,10 @@ interface FmpScreenerResult {
 
 interface FmpQuote {
   symbol?: string;
+  price?: number;
   change?: number;
   changesPercentage?: number;
+  volume?: number;
 }
 
 interface ScreenerParams {
@@ -179,7 +181,7 @@ export class StocksService {
     }
 
     const keys = await this.redis.scan('papi:price:*');
-    if (!keys.length) return { gainers: [], losers: [] };
+    if (!keys.length) return this.getMoversFromFmp(top);
 
     const values = await this.redis.mget(keys);
     const entries: MoverEntry[] = keys.flatMap((key, i) => {
@@ -422,6 +424,45 @@ export class StocksService {
     return changeMin !== undefined
       ? results.filter((r) => r.changesPercentage >= changeMin)
       : results;
+  }
+
+  private async getMoversFromFmp(top: number): Promise<MarketMovers> {
+    const apiKey = this.config.get<string>('fmpApiKey') ?? '';
+    if (!apiKey) {
+      this.logger.warn('FMP_API_KEY not set — cannot build FMP movers fallback');
+      return { gainers: [], losers: [] };
+    }
+    try {
+      const resp = await firstValueFrom(
+        this.httpService.get<FmpQuote[]>(
+          `https://financialmodelingprep.com/api/v3/quote/${DEFAULT_SYMBOLS.join(',')}`,
+          { params: { apikey: apiKey }, timeout: 5000 },
+        ),
+      );
+      const entries: MoverEntry[] = (resp.data ?? [])
+        .filter(
+          (q): q is FmpQuote & { symbol: string; price: number } =>
+            typeof q.symbol === 'string' && typeof q.price === 'number',
+        )
+        .map((q) => ({
+          symbol: q.symbol,
+          price: q.price,
+          change: q.change ?? 0,
+          changePercent: q.changesPercentage ?? 0,
+          volume: q.volume ?? 0,
+        }));
+
+      entries.sort((a, b) => b.changePercent - a.changePercent);
+      const movers: MarketMovers = {
+        gainers: entries.slice(0, top),
+        losers: entries.slice(-top).reverse(),
+      };
+      await this.redis.set('papi:movers', JSON.stringify(movers), 60);
+      return movers;
+    } catch (err) {
+      this.logger.error(`FMP movers fallback failed: ${String(err)}`);
+      return { gainers: [], losers: [] };
+    }
   }
 
   private async fetchAssetsFromMassive(type: 'CS' | 'ETF'): Promise<AssetEntry[]> {
