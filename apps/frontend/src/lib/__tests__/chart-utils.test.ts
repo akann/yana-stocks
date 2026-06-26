@@ -1,4 +1,4 @@
-import { toTime, sortBars, computeMA, computeRSI } from '../chart-utils';
+import { toTime, sortBars, computeMA, computeRSI, computeMACD } from '../chart-utils';
 import type { OHLCVBar } from '@/types';
 
 function makeBar(timestamp: string, close: number, extra: Partial<OHLCVBar> = {}): OHLCVBar {
@@ -207,5 +207,100 @@ describe('computeRSI', () => {
     const result = computeRSI(intradayBars, 2, false);
     const expected = Math.floor(new Date('2024-01-01T09:32:00.000Z').getTime() / 1000);
     expect(result[0]?.time).toBe(expected);
+  });
+});
+
+describe('computeMACD', () => {
+  // Build a simple monotone rising dataset with enough bars for 12/26/9
+  function risingBars(count: number): OHLCVBar[] {
+    return Array.from({ length: count }, (_, i) =>
+      makeBar(new Date(Date.UTC(2024, 0, i + 1)).toISOString().slice(0, 10), 100 + i),
+    );
+  }
+
+  function fallingBars(count: number): OHLCVBar[] {
+    return Array.from({ length: count }, (_, i) =>
+      makeBar(new Date(Date.UTC(2024, 0, i + 1)).toISOString().slice(0, 10), 200 - i),
+    );
+  }
+
+  it('returns empty arrays when bars < slowPeriod + signalPeriod', () => {
+    const result = computeMACD(risingBars(34), 12, 26, 9, true);
+    expect(result.macdLine).toHaveLength(0);
+    expect(result.signalLine).toHaveLength(0);
+    expect(result.histogram).toHaveLength(0);
+  });
+
+  it('returns non-empty arrays for sufficient bars (12/26/9 needs ≥35)', () => {
+    const result = computeMACD(risingBars(50), 12, 26, 9, true);
+    expect(result.macdLine.length).toBeGreaterThan(0);
+    expect(result.signalLine.length).toBeGreaterThan(0);
+    expect(result.histogram.length).toBeGreaterThan(0);
+  });
+
+  it('all three output arrays have the same length', () => {
+    const result = computeMACD(risingBars(60), 12, 26, 9, true);
+    expect(result.macdLine.length).toBe(result.signalLine.length);
+    expect(result.macdLine.length).toBe(result.histogram.length);
+  });
+
+  it('all three arrays share the same time values', () => {
+    const result = computeMACD(risingBars(60), 12, 26, 9, true);
+    for (let i = 0; i < result.macdLine.length; i++) {
+      expect(result.macdLine[i]!.time).toBe(result.signalLine[i]!.time);
+      expect(result.macdLine[i]!.time).toBe(result.histogram[i]!.time);
+    }
+  });
+
+  it('histogram value equals macdLine - signalLine at each point', () => {
+    const result = computeMACD(risingBars(60), 12, 26, 9, true);
+    for (let i = 0; i < result.histogram.length; i++) {
+      const diff = result.macdLine[i]!.value - result.signalLine[i]!.value;
+      expect(result.histogram[i]!.value).toBeCloseTo(diff, 8);
+    }
+  });
+
+  it('positive histogram bars are green, negative are red', () => {
+    const rising = computeMACD(risingBars(60), 12, 26, 9, true);
+    const falling = computeMACD(fallingBars(60), 12, 26, 9, true);
+
+    for (const bar of rising.histogram) {
+      if (bar.value >= 0) expect(bar.color).toMatch(/rgba\(34,197,94/);
+      else expect(bar.color).toMatch(/rgba\(239,68,68/);
+    }
+    for (const bar of falling.histogram) {
+      if (bar.value >= 0) expect(bar.color).toMatch(/rgba\(34,197,94/);
+      else expect(bar.color).toMatch(/rgba\(239,68,68/);
+    }
+  });
+
+  it('output length = bars.length - (slowPeriod - 1) - (signalPeriod - 1)', () => {
+    const bars = risingBars(100);
+    const result = computeMACD(bars, 12, 26, 9, true);
+    // 100 - 25 - 8 = 67
+    expect(result.macdLine).toHaveLength(100 - (26 - 1) - (9 - 1));
+  });
+
+  it('first time value aligns to bar at index slowPeriod - 1 + signalPeriod - 1', () => {
+    const bars = risingBars(100);
+    const result = computeMACD(bars, 12, 26, 9, true);
+    // first fully-defined entry = bars[25 + 8] = bars[33]
+    const expectedDate = new Date(Date.UTC(2024, 0, 34)).toISOString().slice(0, 10);
+    expect(result.macdLine[0]!.time).toBe(expectedDate);
+  });
+
+  it('last time value aligns to the final bar', () => {
+    const bars = risingBars(100);
+    const result = computeMACD(bars, 12, 26, 9, true);
+    const lastBar = bars[bars.length - 1]!;
+    expect(result.macdLine[result.macdLine.length - 1]!.time).toBe(lastBar.timestamp);
+  });
+
+  it('returns Unix second timestamps for intraday bars', () => {
+    const bars = Array.from({ length: 50 }, (_, i) =>
+      makeBar(new Date(Date.UTC(2024, 0, 1, 9, 30 + i)).toISOString(), 100 + i),
+    );
+    const result = computeMACD(bars, 3, 5, 3, false);
+    expect(typeof result.macdLine[0]?.time).toBe('number');
   });
 });

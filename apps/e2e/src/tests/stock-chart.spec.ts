@@ -181,6 +181,87 @@ test.describe('StockChart — /stocks/NVDA', () => {
     });
   });
 
+  test.describe('MACD indicator', () => {
+    test('MACD toggle button is visible on the stock page', async ({ page }) => {
+      await setupStockMocks(page);
+      const stockPage = new StockPage(page);
+      await stockPage.goto(SYMBOL);
+      await stockPage.waitForLoad();
+
+      await expect(page.getByRole('button', { name: 'MACD' })).toBeVisible();
+    });
+
+    test('clicking MACD activates the button with amber background', async ({ page }) => {
+      await setupStockMocks(page);
+      const stockPage = new StockPage(page);
+      await stockPage.goto(SYMBOL);
+      await stockPage.waitForLoad();
+
+      const macdBtn = page.getByRole('button', { name: 'MACD' });
+      await macdBtn.click();
+
+      // #f59e0b = rgb(245, 158, 11)
+      await expect(macdBtn).toHaveCSS('background-color', 'rgb(245, 158, 11)');
+    });
+
+    test('toggling MACD on then off causes no JS errors', async ({ page, jsErrors }) => {
+      await setupStockMocks(page);
+      const stockPage = new StockPage(page);
+      await stockPage.goto(SYMBOL);
+      await stockPage.waitForLoad();
+
+      const macdBtn = page.getByRole('button', { name: 'MACD' });
+      await macdBtn.click();
+      await page.waitForTimeout(300);
+      await macdBtn.click();
+      await page.waitForTimeout(300);
+
+      expect(jsErrors, `JS errors toggling MACD: ${jsErrors.join('; ')}`).toHaveLength(0);
+      await expect(stockPage.canvas).toBeVisible();
+    });
+
+    test('RSI and MACD both active causes no JS errors', async ({ page, jsErrors }) => {
+      await setupStockMocks(page);
+      const stockPage = new StockPage(page);
+      await stockPage.goto(SYMBOL);
+      await stockPage.waitForLoad();
+
+      await page.getByRole('button', { name: 'RSI 14' }).click();
+      await page.waitForTimeout(200);
+      await page.getByRole('button', { name: 'MACD' }).click();
+      await page.waitForTimeout(300);
+
+      expect(jsErrors, `JS errors with RSI+MACD: ${jsErrors.join('; ')}`).toHaveLength(0);
+      await expect(stockPage.canvas).toBeVisible();
+    });
+
+    test('MACD survives a candlestick ↔ line switch', async ({ page, jsErrors }) => {
+      await setupStockMocks(page);
+      const stockPage = new StockPage(page);
+      await stockPage.goto(SYMBOL);
+      await stockPage.waitForLoad();
+
+      await page.getByRole('button', { name: 'MACD' }).click();
+      await page.waitForTimeout(200);
+
+      await page.getByRole('button', { name: 'Line', exact: true }).click();
+      await page.waitForTimeout(300);
+      expect(jsErrors, `JS errors after MACD+Line switch: ${jsErrors.join('; ')}`).toHaveLength(0);
+
+      await page.getByRole('button', { name: 'Candle', exact: true }).click();
+      await page.waitForTimeout(300);
+      expect(jsErrors, `JS errors after MACD+Candle switch: ${jsErrors.join('; ')}`).toHaveLength(
+        0,
+      );
+
+      await expect(page.getByRole('button', { name: 'MACD' })).toHaveCSS(
+        'background-color',
+        'rgb(245, 158, 11)',
+      );
+      await expect(stockPage.canvas).toBeVisible();
+    });
+  });
+
   test('chart stays populated after toggling chart type (regression: data effect must re-run on chartType change)', async ({
     page,
     jsErrors,

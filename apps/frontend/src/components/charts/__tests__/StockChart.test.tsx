@@ -97,6 +97,52 @@ describe('StockChart', () => {
     expect(rsiBtn).not.toHaveStyle({ backgroundColor: '#8b5cf6' });
   });
 
+  it('renders the MACD toggle button', () => {
+    render(<StockChart symbol="AAPL" />, { wrapper });
+    expect(screen.getByRole('button', { name: 'MACD' })).toBeInTheDocument();
+  });
+
+  it('MACD button is initially inactive (no amber background)', () => {
+    render(<StockChart symbol="AAPL" />, { wrapper });
+    expect(screen.getByRole('button', { name: 'MACD' })).not.toHaveStyle({
+      backgroundColor: '#f59e0b',
+    });
+  });
+
+  it('activates MACD button when clicked', async () => {
+    const user = userEvent.setup();
+    render(<StockChart symbol="AAPL" />, { wrapper });
+    const macdBtn = screen.getByRole('button', { name: 'MACD' });
+    await user.click(macdBtn);
+    expect(macdBtn).toHaveStyle({ backgroundColor: '#f59e0b' });
+  });
+
+  it('deactivates MACD button when clicked a second time', async () => {
+    const user = userEvent.setup();
+    render(<StockChart symbol="AAPL" />, { wrapper });
+    const macdBtn = screen.getByRole('button', { name: 'MACD' });
+    await user.click(macdBtn);
+    await user.click(macdBtn);
+    expect(macdBtn).not.toHaveStyle({ backgroundColor: '#f59e0b' });
+  });
+
+  it('RSI and MACD toggles are independent', async () => {
+    const user = userEvent.setup();
+    render(<StockChart symbol="AAPL" />, { wrapper });
+    const rsiBtn = screen.getByRole('button', { name: 'RSI 14' });
+    const macdBtn = screen.getByRole('button', { name: 'MACD' });
+
+    await user.click(rsiBtn);
+    await user.click(macdBtn);
+
+    expect(rsiBtn).toHaveStyle({ backgroundColor: '#8b5cf6' });
+    expect(macdBtn).toHaveStyle({ backgroundColor: '#f59e0b' });
+
+    await user.click(rsiBtn);
+    expect(rsiBtn).not.toHaveStyle({ backgroundColor: '#8b5cf6' });
+    expect(macdBtn).toHaveStyle({ backgroundColor: '#f59e0b' });
+  });
+
   it('MA toggles and RSI toggle are independent', async () => {
     const user = userEvent.setup();
     render(<StockChart symbol="AAPL" />, { wrapper });

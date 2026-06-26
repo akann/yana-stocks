@@ -1,6 +1,6 @@
 'use client';
 // v5.2.0 + shared-valid-set fix
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   createChart,
@@ -16,7 +16,8 @@ import {
   type IPriceLine,
 } from 'lightweight-charts';
 import { api } from '@/lib/api';
-import { computeMA, computeRSI, sortBars, toTime } from '@/lib/chart-utils';
+import { computeMA, computeMACD, computeRSI, sortBars, toTime } from '@/lib/chart-utils';
+import { detectSignals, type ChartSignal } from '@/lib/signals';
 import type { OHLCVBar } from '@/types';
 
 const RANGES = [
@@ -50,16 +51,25 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
   const chartRef = useRef<IChartApi | null>(null);
   const updateDataRef = useRef<((bars: OHLCVBar[], currPrice: number | null) => void) | null>(null);
   const updateMAsRef = useRef<((sorted: OHLCVBar[], enabled: Set<MAKey>) => void) | null>(null);
-  const updateRSIRef = useRef<((sorted: OHLCVBar[], show: boolean) => void) | null>(null);
+  const updateRSIRef = useRef<
+    ((sorted: OHLCVBar[], show: boolean, macdVisible: boolean) => void) | null
+  >(null);
+  const updateMACDRef = useRef<
+    ((sorted: OHLCVBar[], show: boolean, rsiVisible: boolean) => void) | null
+  >(null);
   const priceLineRef = useRef<IPriceLine | null>(null);
   const volSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const rsiSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const macdLineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const macdSignalSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const macdHistSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const maSeriesMapRef = useRef<Map<MAKey, ISeriesApi<'Line'>>>(new Map());
 
   const [range, setRange] = useState<RangeLabel>('1W');
   const [chartType, setChartType] = useState<ChartType>('candlestick');
   const [enabledMAs, setEnabledMAs] = useState<Set<MAKey>>(new Set());
   const [showRSI, setShowRSI] = useState(false);
+  const [showMACD, setShowMACD] = useState(false);
 
   const activeRange = RANGES.find((r) => r.label === range)!;
   const isDaily = activeRange.interval === '1d';
@@ -88,9 +98,13 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
     updateDataRef.current = null;
     updateMAsRef.current = null;
     updateRSIRef.current = null;
+    updateMACDRef.current = null;
     priceLineRef.current = null;
     volSeriesRef.current = null;
     rsiSeriesRef.current = null;
+    macdLineSeriesRef.current = null;
+    macdSignalSeriesRef.current = null;
+    macdHistSeriesRef.current = null;
     maSeriesMap.clear();
 
     const chart = createChart(el, {
@@ -155,15 +169,48 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
       }
     };
 
-    updateRSIRef.current = (sorted: OHLCVBar[], show: boolean) => {
+    // Centrally manages all price-scale margins based on which sub-panes are active.
+    // Called after any indicator is added/removed so all scales stay consistent.
+    //
+    // Layout (% of chart height):
+    //   none:      price ~100%, vol overlay
+    //   one pane:  price ~69%, vol 12%, indicator 13%
+    //   two panes: price ~56%, vol 12%, RSI 13%, MACD 12%
+    const applyAllMargins = (rsiOn: boolean, macdOn: boolean) => {
+      if (!rsiOn && !macdOn) {
+        chart.priceScale('right').applyOptions({ scaleMargins: { top: 0, bottom: 0 } });
+        chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+      } else if (rsiOn && !macdOn) {
+        chart.priceScale('right').applyOptions({ scaleMargins: { top: 0.04, bottom: 0.27 } });
+        chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.74, bottom: 0.14 } });
+        if (rsiSeriesRef.current) {
+          chart.priceScale('rsi').applyOptions({ scaleMargins: { top: 0.87, bottom: 0 } });
+        }
+      } else if (!rsiOn && macdOn) {
+        chart.priceScale('right').applyOptions({ scaleMargins: { top: 0.04, bottom: 0.27 } });
+        chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.74, bottom: 0.14 } });
+        if (macdHistSeriesRef.current) {
+          chart.priceScale('macd').applyOptions({ scaleMargins: { top: 0.87, bottom: 0 } });
+        }
+      } else {
+        chart.priceScale('right').applyOptions({ scaleMargins: { top: 0.04, bottom: 0.4 } });
+        chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.61, bottom: 0.27 } });
+        if (rsiSeriesRef.current) {
+          chart.priceScale('rsi').applyOptions({ scaleMargins: { top: 0.74, bottom: 0.13 } });
+        }
+        if (macdHistSeriesRef.current) {
+          chart.priceScale('macd').applyOptions({ scaleMargins: { top: 0.87, bottom: 0 } });
+        }
+      }
+    };
+
+    updateRSIRef.current = (sorted: OHLCVBar[], show: boolean, macdVisible: boolean) => {
       if (!show) {
         if (rsiSeriesRef.current) {
           chart.removeSeries(rsiSeriesRef.current);
           rsiSeriesRef.current = null;
         }
-        // Restore original margins
-        chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
-        chart.priceScale('right').applyOptions({ scaleMargins: { top: 0, bottom: 0 } });
+        applyAllMargins(false, macdVisible);
         return;
       }
 
@@ -178,14 +225,10 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
           priceLineVisible: false,
           lastValueVisible: true,
           crosshairMarkerVisible: true,
-          // Force the RSI scale to always show the full 0-100 range
           autoscaleInfoProvider: () => ({
             priceRange: { minValue: 0, maxValue: 100 },
             margins: { above: 0.08, below: 0.08 },
           }),
-        });
-        chart.priceScale('rsi').applyOptions({
-          scaleMargins: { top: 0.87, bottom: 0 },
         });
         rsiSeriesRef.current.createPriceLine({
           price: 70,
@@ -204,9 +247,66 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
       }
 
       rsiSeriesRef.current.setData(rsiData);
-      // Compress vol into a band above the RSI pane; push price candles up
-      chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.74, bottom: 0.14 } });
-      chart.priceScale('right').applyOptions({ scaleMargins: { top: 0.04, bottom: 0.27 } });
+      applyAllMargins(true, macdVisible);
+    };
+
+    updateMACDRef.current = (sorted: OHLCVBar[], show: boolean, rsiVisible: boolean) => {
+      if (!show) {
+        if (macdHistSeriesRef.current) {
+          chart.removeSeries(macdHistSeriesRef.current);
+          macdHistSeriesRef.current = null;
+        }
+        if (macdLineSeriesRef.current) {
+          chart.removeSeries(macdLineSeriesRef.current);
+          macdLineSeriesRef.current = null;
+        }
+        if (macdSignalSeriesRef.current) {
+          chart.removeSeries(macdSignalSeriesRef.current);
+          macdSignalSeriesRef.current = null;
+        }
+        applyAllMargins(rsiVisible, false);
+        return;
+      }
+
+      const { macdLine, signalLine, histogram } = computeMACD(sorted, 12, 26, 9, isDaily);
+      if (macdLine.length === 0) return;
+
+      if (!macdHistSeriesRef.current) {
+        // Histogram first so it renders behind the lines
+        macdHistSeriesRef.current = chart.addSeries(HistogramSeries, {
+          priceScaleId: 'macd',
+          lastValueVisible: false,
+          priceLineVisible: false,
+        });
+        macdHistSeriesRef.current.createPriceLine({
+          price: 0,
+          color: 'rgba(107,114,128,0.4)',
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: false,
+        });
+        macdLineSeriesRef.current = chart.addSeries(LineSeries, {
+          priceScaleId: 'macd',
+          color: '#3b82f6',
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerVisible: false,
+        });
+        macdSignalSeriesRef.current = chart.addSeries(LineSeries, {
+          priceScaleId: 'macd',
+          color: '#f97316',
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerVisible: false,
+        });
+      }
+
+      macdHistSeriesRef.current.setData(histogram);
+      macdLineSeriesRef.current?.setData(macdLine);
+      macdSignalSeriesRef.current?.setData(signalLine);
+      applyAllMargins(rsiVisible, true);
     };
 
     if (chartType === 'candlestick') {
@@ -350,9 +450,13 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
       updateDataRef.current = null;
       updateMAsRef.current = null;
       updateRSIRef.current = null;
+      updateMACDRef.current = null;
       priceLineRef.current = null;
       volSeriesRef.current = null;
       rsiSeriesRef.current = null;
+      macdLineSeriesRef.current = null;
+      macdSignalSeriesRef.current = null;
+      macdHistSeriesRef.current = null;
       maSeriesMap.clear();
     };
   }, [chartType, isDaily]);
@@ -376,8 +480,9 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
       .reverse();
     updateDataRef.current(clean, currentPrice ?? null);
     updateMAsRef.current?.(clean, enabledMAs);
-    updateRSIRef.current?.(clean, showRSI);
-  }, [data, currentPrice, enabledMAs, showRSI, isDaily, chartType]);
+    updateRSIRef.current?.(clean, showRSI, showMACD);
+    updateMACDRef.current?.(clean, showMACD, showRSI);
+  }, [data, currentPrice, enabledMAs, showRSI, showMACD, isDaily, chartType]);
 
   function toggleMA(key: MAKey) {
     setEnabledMAs((prev) => {
@@ -391,13 +496,48 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
     });
   }
 
+  // Signal badges derived from current data + active indicator state — no new API calls.
+  const chartSignals = useMemo<ChartSignal[]>(() => {
+    if (!data?.length) return [];
+    const sorted = sortBars(data);
+    const seen = new Set<string | number>();
+    const clean = sorted
+      .slice()
+      .reverse()
+      .filter((d) => {
+        const t = toTime(d.timestamp, isDaily) as string | number;
+        if (seen.has(t)) return false;
+        seen.add(t);
+        return true;
+      })
+      .reverse();
+    return detectSignals(clean, isDaily, showRSI, showMACD);
+  }, [data, isDaily, showRSI, showMACD]);
+
   return (
     <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
       {/* Controls */}
       <div className="flex flex-col gap-2 mb-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider">
+          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider flex items-center gap-1.5 flex-wrap">
             Price Chart
+            {chartSignals.map((s, i) => (
+              <span
+                key={`${s.source}-${i}`}
+                title={s.description}
+                className={`text-xs px-1.5 py-0.5 rounded font-medium normal-case tracking-normal ${
+                  s.type === 'buy' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                }`}
+              >
+                {s.source === 'rsi'
+                  ? s.type === 'buy'
+                    ? 'Oversold'
+                    : 'Overbought'
+                  : s.type === 'buy'
+                    ? '↑ MACD'
+                    : '↓ MACD'}
+              </span>
+            ))}
           </h3>
           <div className="flex items-center gap-3 flex-wrap">
             {/* Chart type toggle */}
@@ -471,6 +611,18 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
             style={showRSI ? { backgroundColor: '#8b5cf6', borderColor: '#8b5cf6' } : undefined}
           >
             RSI 14
+          </button>
+
+          <button
+            onClick={() => setShowMACD((v) => !v)}
+            className={`px-2 py-0.5 text-xs rounded font-medium transition-colors border ${
+              showMACD
+                ? 'text-white border-[#f59e0b]'
+                : 'text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700'
+            }`}
+            style={showMACD ? { backgroundColor: '#f59e0b', borderColor: '#f59e0b' } : undefined}
+          >
+            MACD
           </button>
         </div>
       </div>

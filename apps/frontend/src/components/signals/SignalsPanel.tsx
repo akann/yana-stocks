@@ -1,10 +1,12 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { api } from '@/lib/api';
-import type { PredictionHorizon, PredictionSignal, SentimentSignal } from '@/types';
+import { sortBars, toTime } from '@/lib/chart-utils';
+import { detectSignals } from '@/lib/signals';
+import type { OHLCVBar, PredictionHorizon, PredictionSignal, SentimentSignal } from '@/types';
 
 interface SignalsResponse {
   symbol: string;
@@ -39,11 +41,63 @@ export function SignalsPanel({ symbol }: { symbol: string }): React.JSX.Element 
     retry: false,
   });
 
+  // 63 daily bars covers the slowPeriod+signalPeriod needed for MACD (26+9=35).
+  // The query key matches StockChart's 3M view, so the cache is shared when that
+  // range is active — no extra network request in the common case.
+  const { data: historyBars } = useQuery<OHLCVBar[]>({
+    queryKey: ['history', symbol, 63, '1d'],
+    queryFn: () =>
+      api.get<OHLCVBar[]>(`/stocks/${symbol}/history?limit=63&interval=1d`).then((r) => r.data),
+    staleTime: 300_000,
+    retry: false,
+  });
+
+  const techSignals = useMemo(() => {
+    if (!historyBars?.length) return [];
+    const sorted = sortBars(historyBars);
+    const seen = new Set<string | number>();
+    const clean = sorted
+      .slice()
+      .reverse()
+      .filter((d) => {
+        const t = toTime(d.timestamp, true) as string | number;
+        if (seen.has(t)) return false;
+        seen.add(t);
+        return true;
+      })
+      .reverse();
+    return detectSignals(clean, true, true, true);
+  }, [historyBars]);
+
   const sentiment = signals?.sentiment;
   const predList = predictions?.predictions ?? [];
 
   return (
     <div className="space-y-4">
+      {/* Technical signals */}
+      {techSignals.length > 0 && (
+        <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">
+            Technical
+          </h3>
+          <div className="space-y-2">
+            {techSignals.map((s, i) => (
+              <div key={`${s.source}-${i}`} className="flex items-center gap-2">
+                <span
+                  className={clsx(
+                    'text-xs font-semibold px-2 py-0.5 rounded',
+                    s.type === 'buy' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700',
+                  )}
+                >
+                  {s.type === 'buy' ? 'BUY' : 'SELL'}
+                </span>
+                <span className="text-xs text-gray-600">{s.description}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Sentiment */}
       <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
         <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">

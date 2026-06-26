@@ -23,7 +23,7 @@ module.exports = {
   createChart: jest.fn(() => mockChart),
   ColorType: { Solid: 'solid' },
   CrosshairMode: { Normal: 0 },
-  LineStyle: { Dashed: 1 },
+  LineStyle: { Dashed: 1, Solid: 0 },
   CandlestickSeries,
   AreaSeries,
   LineSeries,
