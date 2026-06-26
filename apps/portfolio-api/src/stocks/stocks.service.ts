@@ -2,14 +2,17 @@ import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { OHLCV, PredictionSignal, SentimentSignal } from '@yana-stocks/shared-types';
-import {
-  Configuration,
-  DefaultApi,
-  ListTickersMarketEnum,
-  ListTickersTypeEnum,
-} from '@polygon.io/client-js';
-import type { ListTickers200ResponseResultsInner } from '@polygon.io/client-js';
 import { firstValueFrom } from 'rxjs';
+
+interface PolygonTickerResult {
+  ticker?: string;
+  name?: string;
+  primary_exchange?: string;
+}
+
+interface PolygonTickersResponse {
+  results?: PolygonTickerResult[];
+}
 import { RedisService } from '../redis/redis.service';
 import { MOCK_ASSETS, MOCK_ETF_ASSETS } from './mock-assets';
 import type {
@@ -193,31 +196,24 @@ export class StocksService {
     }
 
     try {
-      const api = new DefaultApi(new Configuration({ apiKey }));
-      const massiveType = type === 'ETF' ? ListTickersTypeEnum.Etf : ListTickersTypeEnum.Cs;
-      const resp = await api.listTickers(
-        undefined,
-        massiveType,
-        ListTickersMarketEnum.Stocks,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        true,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        1000,
+      const resp = await firstValueFrom(
+        this.httpService.get<PolygonTickersResponse>(
+          'https://api.polygon.io/v3/reference/tickers',
+          { params: { type, market: 'stocks', active: true, limit: 1000, apiKey } },
+        ),
       );
 
-      return (resp.results ?? [])
-        .filter((t): t is ListTickers200ResponseResultsInner => !!(t.ticker && t.name))
+      return (resp.data.results ?? [])
+        .filter(
+          (t): t is PolygonTickerResult & { ticker: string; name: string } =>
+            typeof t.ticker === 'string' &&
+            t.ticker !== '' &&
+            typeof t.name === 'string' &&
+            t.name !== '',
+        )
         .map((t) => ({
-          symbol: t.ticker!,
-          name: t.name!,
+          symbol: t.ticker,
+          name: t.name,
           exchange: t.primary_exchange ?? '',
           tradable: true,
           assetClass,

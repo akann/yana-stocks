@@ -1,7 +1,6 @@
 import { HttpService } from '@nestjs/axios';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { DefaultApi } from '@polygon.io/client-js';
 import { of, throwError } from 'rxjs';
 import type { AxiosResponse } from 'axios';
 import type { OHLCV } from '@yana-stocks/shared-types';
@@ -384,57 +383,45 @@ describe('StocksService', () => {
         { ticker: 'AAPL', name: 'Apple Inc.', primary_exchange: 'NASDAQ', active: true },
         { ticker: 'MSFT', name: 'Microsoft Corporation', primary_exchange: 'NASDAQ', active: true },
       ];
-      const listTickersSpy = jest
-        .spyOn(DefaultApi.prototype, 'listTickers')
-        .mockResolvedValue({ results: massiveResults } as never);
+      httpService.get.mockReturnValueOnce(
+        of({ data: { results: massiveResults } } as AxiosResponse<{
+          results: typeof massiveResults;
+        }>),
+      );
 
       const result = await service.getAssets('', 1, 10, 'us');
 
-      expect(listTickersSpy).toHaveBeenCalled();
+      expect(httpService.get).toHaveBeenCalledWith(
+        'https://api.polygon.io/v3/reference/tickers',
+        expect.objectContaining({ params: expect.objectContaining({ type: 'CS' }) }),
+      );
       expect(result.data).toHaveLength(2);
       expect(result.data[0]?.symbol).toBe('AAPL');
       expect(result.data[0]?.assetClass).toBe('us_equity');
       expect(redis.set).toHaveBeenCalledWith('papi:assets:us', expect.any(String), 86400);
-
-      listTickersSpy.mockRestore();
     });
 
     it('calls Massive with type=ETF when market=etf', async () => {
       redis.get.mockResolvedValue(null);
       (configService.get as jest.Mock).mockReturnValue('MY_MASSIVE_KEY');
 
-      const listTickersSpy = jest
-        .spyOn(DefaultApi.prototype, 'listTickers')
-        .mockResolvedValue({ results: [] } as never);
+      httpService.get.mockReturnValueOnce(
+        of({ data: { results: [] } } as AxiosResponse<{ results: never[] }>),
+      );
 
       await service.getAssets('', 1, 10, 'etf');
 
-      expect(listTickersSpy).toHaveBeenCalledWith(
-        undefined,
-        'ETF',
-        'stocks',
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        true,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        1000,
+      expect(httpService.get).toHaveBeenCalledWith(
+        'https://api.polygon.io/v3/reference/tickers',
+        expect.objectContaining({ params: expect.objectContaining({ type: 'ETF' }) }),
       );
-
-      listTickersSpy.mockRestore();
     });
 
     it('falls back to MOCK_ASSETS when Massive request fails', async () => {
       redis.get.mockResolvedValue(null);
       (configService.get as jest.Mock).mockReturnValue('MY_MASSIVE_KEY');
 
-      jest.spyOn(DefaultApi.prototype, 'listTickers').mockRejectedValue(new Error('massive down'));
+      httpService.get.mockReturnValueOnce(throwError(() => new Error('massive down')));
 
       const result = await service.getAssets('', 1, 10, 'us');
 
