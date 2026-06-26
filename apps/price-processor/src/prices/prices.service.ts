@@ -28,8 +28,11 @@ interface PolygonBar {
 
 interface PolygonSnapshotResp {
   ticker?: {
+    todaysChange?: number;
+    todaysChangePerc?: number;
     day?: { c?: number; v?: number };
-    prevDay?: { c?: number };
+    min?: { c?: number; av?: number };
+    prevDay?: { c?: number; v?: number };
   } | null;
 }
 
@@ -171,21 +174,22 @@ export class PricesService {
         { params: { apiKey: this.apiKey } },
       );
       const ticker = resp.data.ticker;
-      const close = ticker?.day?.c;
       const prevClose = ticker?.prevDay?.c;
-      const volume = ticker?.day?.v;
+      // When market is closed, day.c is 0; fall back to last-minute bar or prevDay
+      const price = ticker?.day?.c || ticker?.min?.c || prevClose;
 
-      if (!close || !prevClose) return null;
+      if (!price || !prevClose) return null;
 
-      const change = close - prevClose;
-      const changePercent = (change / prevClose) * 100;
+      const change = ticker?.todaysChange ?? price - prevClose;
+      const changePercent = ticker?.todaysChangePerc ?? ((price - prevClose) / prevClose) * 100;
+      const volume = ticker?.day?.v || ticker?.min?.av || ticker?.prevDay?.v || 0;
 
       const entry: QuoteEntry = {
-        price: close,
+        price,
         prevPrice: prevClose,
         change,
         changePercent,
-        volume: volume ?? 0,
+        volume,
         timestamp: new Date().toISOString(),
       };
 
