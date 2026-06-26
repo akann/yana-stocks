@@ -207,25 +207,42 @@ export class StocksService {
     return movers;
   }
 
+  private async loadMarketAssets(market: AssetMarket): Promise<AssetEntry[]> {
+    const CACHE_KEY = `papi:assets:${market}`;
+    const CACHE_TTL = 86400;
+    const cached = await this.redis.get(CACHE_KEY);
+    if (cached) return JSON.parse(cached) as AssetEntry[];
+    let all: AssetEntry[];
+    if (market === 'uk') {
+      all = MOCK_UK_ASSETS;
+    } else {
+      all = await this.fetchAssetsFromMassive(market === 'etf' ? 'ETF' : 'CS');
+    }
+    await this.redis.set(CACHE_KEY, JSON.stringify(all), CACHE_TTL);
+    return all;
+  }
+
   async getAssets(
     search: string,
     page: number,
     limit: number,
-    market: AssetMarket = 'us',
+    market: AssetMarket | 'all' = 'us',
   ): Promise<AssetsPage> {
-    const CACHE_KEY = `papi:assets:${market}`;
-    const CACHE_TTL = 86400;
-
     let all: AssetEntry[];
-    const cached = await this.redis.get(CACHE_KEY);
-    if (cached) {
-      all = JSON.parse(cached) as AssetEntry[];
-    } else if (market === 'uk') {
-      all = MOCK_UK_ASSETS;
-      await this.redis.set(CACHE_KEY, JSON.stringify(all), CACHE_TTL);
+    if (market === 'all') {
+      const [us, etf, uk] = await Promise.all([
+        this.loadMarketAssets('us'),
+        this.loadMarketAssets('etf'),
+        this.loadMarketAssets('uk'),
+      ]);
+      const seen = new Set<string>();
+      all = [...us, ...etf, ...uk].filter((a) => {
+        if (seen.has(a.symbol)) return false;
+        seen.add(a.symbol);
+        return true;
+      });
     } else {
-      all = await this.fetchAssetsFromMassive(market === 'etf' ? 'ETF' : 'CS');
-      await this.redis.set(CACHE_KEY, JSON.stringify(all), CACHE_TTL);
+      all = await this.loadMarketAssets(market);
     }
 
     const q = search.trim();

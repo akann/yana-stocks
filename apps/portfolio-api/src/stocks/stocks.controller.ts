@@ -13,7 +13,6 @@ import type { OHLCV } from '@yana-stocks/shared-types';
 import { UserFromTokenGuard } from '../common/current-user.decorator';
 import type {
   AggregateStockResponse,
-  AssetMarket,
   AssetsPage,
   MarketMovers,
   MarketOverview,
@@ -92,9 +91,16 @@ export class StocksController {
     @Query('search') search = '',
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
-    @Query('market') market: AssetMarket = 'us',
+    @Query('market') market: string = 'us',
   ): Promise<AssetsPage> {
-    const safeMarket: AssetMarket = market === 'etf' ? 'etf' : market === 'uk' ? 'uk' : 'us';
+    const safeMarket =
+      market === 'etf'
+        ? 'etf'
+        : market === 'uk'
+          ? 'uk'
+          : market === 'all'
+            ? 'all'
+            : ('us' as const);
     return this.stocksService.getAssets(search, page, Math.min(limit, 100), safeMarket);
   }
 }

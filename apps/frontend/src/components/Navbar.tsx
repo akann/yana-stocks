@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { SymbolSearch } from './SymbolSearch';
 
 function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
   const pathname = usePathname();
@@ -55,6 +56,8 @@ export function Navbar(): React.JSX.Element {
             )}
           </div>
         </div>
+
+        <SymbolSearch />
 
         {/* Right side */}
         <div className="flex items-center gap-2 text-sm">
