@@ -37,7 +37,7 @@ export function Navbar(): React.JSX.Element {
   }, []);
 
   return (
-    <nav className="bg-[#1B2A4A] border-b border-[#0D1A30]">
+    <nav className="sticky top-0 z-50 bg-[#1B2A4A] border-b border-[#0D1A30]">
       <div className="max-w-7xl mx-auto px-4 h-11 flex items-center justify-between">
         {/* Brand + nav links */}
         <div className="flex items-center gap-1">
