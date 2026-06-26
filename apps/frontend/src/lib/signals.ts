@@ -33,6 +33,7 @@ export function detectSignals(
 
   if (showRSI) {
     const rsiData = computeRSI(bars, 14, isDaily);
+    // Only emit RSI signals for the most recent bar (current state)
     const last = rsiData[rsiData.length - 1];
     if (last !== undefined) {
       if (last.value > 70) {
@@ -56,12 +57,13 @@ export function detectSignals(
   if (showMACD) {
     const { macdLine, signalLine } = computeMACD(bars, 12, 26, 9, isDaily);
     const n = signalLine.length;
-    if (n >= 2) {
-      const prevMACD = macdLine[n - 2]!.value;
-      const prevSig = signalLine[n - 2]!.value;
-      const currMACD = macdLine[n - 1]!.value;
-      const currSig = signalLine[n - 1]!.value;
-      const time = macdLine[n - 1]!.time;
+    // Scan all bars for MACD crossovers so arrows appear throughout the chart
+    for (let i = 1; i < n; i++) {
+      const prevMACD = macdLine[i - 1]!.value;
+      const prevSig = signalLine[i - 1]!.value;
+      const currMACD = macdLine[i]!.value;
+      const currSig = signalLine[i]!.value;
+      const time = macdLine[i]!.time;
 
       if (prevMACD <= prevSig && currMACD > currSig) {
         signals.push({
@@ -93,26 +95,32 @@ export function detectSignals(
       const slow = maDataMap.get(slowKey);
       if (!fast || !slow || fast.length < 2 || slow.length < 2) continue;
 
-      const currFast = fast[fast.length - 1]!.value;
-      const currSlow = slow[slow.length - 1]!.value;
-      const prevFast = fast[fast.length - 2]!.value;
-      const prevSlow = slow[slow.length - 2]!.value;
-      const time = fast[fast.length - 1]!.time;
+      // Align arrays by time — fast (EMA12) has fewer leading values than slow (EMA26)
+      const slowMap = new Map(slow.map((p) => [String(p.time), p.value]));
+      for (let i = 1; i < fast.length; i++) {
+        const currTime = String(fast[i]!.time);
+        const prevTime = String(fast[i - 1]!.time);
+        const currFast = fast[i]!.value;
+        const prevFast = fast[i - 1]!.value;
+        const currSlow = slowMap.get(currTime);
+        const prevSlow = slowMap.get(prevTime);
+        if (currSlow === undefined || prevSlow === undefined) continue;
 
-      if (prevFast <= prevSlow && currFast > currSlow) {
-        signals.push({
-          time,
-          type: 'buy',
-          source: 'ma-cross',
-          description: `${fastKey} crossed above ${slowKey}`,
-        });
-      } else if (prevFast >= prevSlow && currFast < currSlow) {
-        signals.push({
-          time,
-          type: 'sell',
-          source: 'ma-cross',
-          description: `${fastKey} crossed below ${slowKey}`,
-        });
+        if (prevFast <= prevSlow && currFast > currSlow) {
+          signals.push({
+            time: fast[i]!.time,
+            type: 'buy',
+            source: 'ma-cross',
+            description: `${fastKey} crossed above ${slowKey}`,
+          });
+        } else if (prevFast >= prevSlow && currFast < currSlow) {
+          signals.push({
+            time: fast[i]!.time,
+            type: 'sell',
+            source: 'ma-cross',
+            description: `${fastKey} crossed below ${slowKey}`,
+          });
+        }
       }
     }
   }
