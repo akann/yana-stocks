@@ -251,10 +251,7 @@ export class StocksService {
     if (cached) return JSON.parse(cached) as MarketOverview;
 
     const apiKey = this.config.get<string>('fmpApiKey') ?? '';
-    if (!apiKey) {
-      this.logger.warn('FMP_API_KEY not set — returning empty market overview');
-      return { indices: [], sectors: [], news: [] };
-    }
+    const polygonApiKey = this.config.get<string>('massiveApiKey') ?? '';
 
     const FMP_STABLE = 'https://financialmodelingprep.com/stable';
     const INDEX_SYMBOLS = ['^GSPC', '^IXIC', '^FTSE', '^GDAXI'];
@@ -264,24 +261,57 @@ export class StocksService {
       '^FTSE': 'FTSE 100',
       '^GDAXI': 'DAX',
     };
+    const SECTOR_ETFS: Record<string, string> = {
+      XLK: 'Technology',
+      XLF: 'Financials',
+      XLE: 'Energy',
+      XLV: 'Health Care',
+      XLY: 'Consumer Discretionary',
+      XLP: 'Consumer Staples',
+      XLI: 'Industrials',
+      XLB: 'Materials',
+      XLU: 'Utilities',
+      XLRE: 'Real Estate',
+      XLC: 'Communication Services',
+    };
 
-    const [indexResults, newsResult] = await Promise.all([
-      Promise.allSettled(
-        INDEX_SYMBOLS.map((sym) =>
-          firstValueFrom(
-            this.httpService.get<FmpIndexQuote[]>(`${FMP_STABLE}/quote`, {
-              params: { symbol: sym, apikey: apiKey },
+    const etfSymbols = Object.keys(SECTOR_ETFS);
+
+    const [indexResults, newsResult, sectorResults] = await Promise.all([
+      apiKey
+        ? Promise.allSettled(
+            INDEX_SYMBOLS.map((sym) =>
+              firstValueFrom(
+                this.httpService.get<FmpIndexQuote[]>(`${FMP_STABLE}/quote`, {
+                  params: { symbol: sym, apikey: apiKey },
+                  timeout: 5000,
+                }),
+              ),
+            ),
+          )
+        : Promise.resolve([] as PromiseSettledResult<{ data: FmpIndexQuote[] }>[]),
+      apiKey
+        ? firstValueFrom(
+            this.httpService.get<FmpNewsItem[]>(`${FMP_STABLE}/news/stock`, {
+              params: { limit: 8, apikey: apiKey },
               timeout: 5000,
             }),
+          ).catch(() => ({ data: [] as FmpNewsItem[] }))
+        : Promise.resolve({ data: [] as FmpNewsItem[] }),
+      polygonApiKey
+        ? Promise.allSettled(
+            etfSymbols.map((sym) =>
+              firstValueFrom(
+                this.httpService.get<{ ticker?: { todaysChangePerc?: number } }>(
+                  `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${sym}`,
+                  { params: { apiKey: polygonApiKey }, timeout: 5000 },
+                ),
+              ),
+            ),
+          )
+        : Promise.resolve(
+            [] as PromiseSettledResult<{ data: { ticker?: { todaysChangePerc?: number } } }>[],
           ),
-        ),
-      ),
-      firstValueFrom(
-        this.httpService.get<FmpNewsItem[]>(`${FMP_STABLE}/news/stock`, {
-          params: { limit: 8, apikey: apiKey },
-          timeout: 5000,
-        }),
-      ).catch(() => ({ data: [] as FmpNewsItem[] })),
     ]);
 
     const indices: IndexQuote[] = indexResults.flatMap((r) => {
@@ -295,7 +325,13 @@ export class StocksService {
       }));
     });
 
-    const sectors: SectorPerformance[] = [];
+    const sectors: SectorPerformance[] = sectorResults.flatMap((r, i) => {
+      if (r.status !== 'fulfilled') return [];
+      const changePerc = r.value.data?.ticker?.todaysChangePerc;
+      if (changePerc === undefined || changePerc === null) return [];
+      const sectorName = etfSymbols[i] !== undefined ? (SECTOR_ETFS[etfSymbols[i]] ?? '') : '';
+      return [{ sector: sectorName, changesPercentage: changePerc }];
+    });
 
     const news: MarketNewsItem[] = (newsResult.data ?? []).map((n) => ({
       title: n.title ?? '',

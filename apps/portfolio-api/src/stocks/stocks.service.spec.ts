@@ -508,30 +508,49 @@ describe('StocksService', () => {
       },
     ];
 
-    it('returns overview from FMP and caches it', async () => {
-      redis.get.mockResolvedValue(null);
-      (configService.get as jest.Mock).mockReturnValue('FMP_KEY');
+    const mockOverviewHttp = (opts: { indexFail?: boolean } = {}) => {
+      httpService.get.mockImplementation(
+        (url: string, config?: { params?: Record<string, unknown> }) => {
+          const sym = config?.params?.['symbol'] as string | undefined;
+          // FMP index quotes
+          if (url.includes('/stable/quote')) {
+            if (opts.indexFail && (sym === '^FTSE' || sym === '^GDAXI')) {
+              return throwError(() => new Error('timeout'));
+            }
+            if (sym === '^GSPC') return of({ data: [fmpIndices[0]] } as AxiosResponse);
+            if (sym === '^IXIC') return of({ data: [fmpIndices[1]] } as AxiosResponse);
+            return of({ data: [] } as AxiosResponse);
+          }
+          // FMP news
+          if (url.includes('/news/stock')) return of({ data: fmpNews } as AxiosResponse);
+          // Polygon sector ETFs
+          if (url.includes('polygon.io')) {
+            return of({ data: { ticker: { todaysChangePerc: 1.5 } } } as AxiosResponse);
+          }
+          return throwError(() => new Error('unexpected url'));
+        },
+      );
+    };
 
-      // 4 individual index calls (^GSPC, ^IXIC, ^FTSE, ^GDAXI) then news
-      httpService.get
-        .mockReturnValueOnce(of({ data: [fmpIndices[0]] } as AxiosResponse))
-        .mockReturnValueOnce(of({ data: [fmpIndices[1]] } as AxiosResponse))
-        .mockReturnValueOnce(of({ data: [] } as AxiosResponse))
-        .mockReturnValueOnce(of({ data: [] } as AxiosResponse))
-        .mockReturnValueOnce(of({ data: fmpNews } as AxiosResponse));
+    it('returns indices, sectors, and news', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('KEY');
+      mockOverviewHttp();
 
       const result = await service.getOverview();
 
       expect(result.indices).toHaveLength(2);
       expect(result.indices[0]?.symbol).toBe('^GSPC');
       expect(result.indices[0]?.name).toBe('S&P 500');
-      expect(result.sectors).toHaveLength(0);
+      expect(result.sectors).toHaveLength(11);
+      expect(result.sectors[0]?.sector).toBe('Technology');
+      expect(result.sectors[0]?.changesPercentage).toBeCloseTo(1.5);
       expect(result.news).toHaveLength(1);
       expect(result.news[0]?.title).toBe('Markets rally on Fed optimism');
       expect(redis.set).toHaveBeenCalledWith('papi:overview', expect.any(String), 300);
     });
 
-    it('returns cached overview without hitting FMP', async () => {
+    it('returns cached overview without hitting APIs', async () => {
       const cached = { indices: fmpIndices, sectors: [], news: [] };
       redis.get.mockResolvedValue(JSON.stringify(cached));
 
@@ -541,7 +560,7 @@ describe('StocksService', () => {
       expect(result.indices).toHaveLength(2);
     });
 
-    it('returns empty overview when FMP_API_KEY is not set', async () => {
+    it('returns empty overview when no API keys are set', async () => {
       redis.get.mockResolvedValue(null);
       (configService.get as jest.Mock).mockReturnValue('');
 
@@ -553,22 +572,15 @@ describe('StocksService', () => {
       expect(result.news).toHaveLength(0);
     });
 
-    it('returns partial data when some index calls fail', async () => {
+    it('returns partial indices when some FMP index calls fail', async () => {
       redis.get.mockResolvedValue(null);
-      (configService.get as jest.Mock).mockReturnValue('FMP_KEY');
-
-      // ^GSPC and ^IXIC succeed; ^FTSE and ^GDAXI fail; news succeeds
-      httpService.get
-        .mockReturnValueOnce(of({ data: [fmpIndices[0]] } as AxiosResponse))
-        .mockReturnValueOnce(of({ data: [fmpIndices[1]] } as AxiosResponse))
-        .mockReturnValueOnce(throwError(() => new Error('timeout')))
-        .mockReturnValueOnce(throwError(() => new Error('timeout')))
-        .mockReturnValueOnce(of({ data: fmpNews } as AxiosResponse));
+      (configService.get as jest.Mock).mockReturnValue('KEY');
+      mockOverviewHttp({ indexFail: true });
 
       const result = await service.getOverview();
 
       expect(result.indices).toHaveLength(2);
-      expect(result.sectors).toHaveLength(0);
+      expect(result.sectors).toHaveLength(11);
       expect(result.news).toHaveLength(1);
     });
   });
