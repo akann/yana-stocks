@@ -638,7 +638,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
       <div className="flex flex-col gap-2 mb-3">
         {/* Row 1: title + badges (left) | chart type + timeframe (right, pinned) */}
         <div className="flex items-center gap-4">
-          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
+          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider flex items-center gap-1.5 whitespace-nowrap">
             Price Chart
             {signalBadges.map(({ signal: s, count }) => (
               <span
