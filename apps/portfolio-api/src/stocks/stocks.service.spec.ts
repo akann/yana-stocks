@@ -495,12 +495,8 @@ describe('StocksService', () => {
 
   describe('getOverview', () => {
     const fmpIndices = [
-      { symbol: '^GSPC', name: 'S&P 500', price: 5200, change: 26, changesPercentage: 0.5 },
-      { symbol: '^IXIC', name: 'Nasdaq', price: 18000, change: -50, changesPercentage: -0.27 },
-    ];
-    const fmpSectors = [
-      { sector: 'Technology', changesPercentage: '+1.52%' },
-      { sector: 'Health Care', changesPercentage: '-0.23%' },
+      { symbol: '^GSPC', name: 'S&P 500', price: 5200, change: 26, changePercentage: 0.5 },
+      { symbol: '^IXIC', name: 'Nasdaq', price: 18000, change: -50, changePercentage: -0.27 },
     ];
     const fmpNews = [
       {
@@ -516,9 +512,12 @@ describe('StocksService', () => {
       redis.get.mockResolvedValue(null);
       (configService.get as jest.Mock).mockReturnValue('FMP_KEY');
 
+      // 4 individual index calls (^GSPC, ^IXIC, ^FTSE, ^GDAXI) then news
       httpService.get
-        .mockReturnValueOnce(of({ data: fmpIndices } as AxiosResponse))
-        .mockReturnValueOnce(of({ data: fmpSectors } as AxiosResponse))
+        .mockReturnValueOnce(of({ data: [fmpIndices[0]] } as AxiosResponse))
+        .mockReturnValueOnce(of({ data: [fmpIndices[1]] } as AxiosResponse))
+        .mockReturnValueOnce(of({ data: [] } as AxiosResponse))
+        .mockReturnValueOnce(of({ data: [] } as AxiosResponse))
         .mockReturnValueOnce(of({ data: fmpNews } as AxiosResponse));
 
       const result = await service.getOverview();
@@ -526,9 +525,7 @@ describe('StocksService', () => {
       expect(result.indices).toHaveLength(2);
       expect(result.indices[0]?.symbol).toBe('^GSPC');
       expect(result.indices[0]?.name).toBe('S&P 500');
-      expect(result.sectors).toHaveLength(2);
-      expect(result.sectors[0]?.changesPercentage).toBeCloseTo(1.52);
-      expect(result.sectors[1]?.changesPercentage).toBeCloseTo(-0.23);
+      expect(result.sectors).toHaveLength(0);
       expect(result.news).toHaveLength(1);
       expect(result.news[0]?.title).toBe('Markets rally on Fed optimism');
       expect(redis.set).toHaveBeenCalledWith('papi:overview', expect.any(String), 300);
@@ -556,13 +553,16 @@ describe('StocksService', () => {
       expect(result.news).toHaveLength(0);
     });
 
-    it('returns partial data when one FMP call fails', async () => {
+    it('returns partial data when some index calls fail', async () => {
       redis.get.mockResolvedValue(null);
       (configService.get as jest.Mock).mockReturnValue('FMP_KEY');
 
+      // ^GSPC and ^IXIC succeed; ^FTSE and ^GDAXI fail; news succeeds
       httpService.get
-        .mockReturnValueOnce(of({ data: fmpIndices } as AxiosResponse))
-        .mockReturnValueOnce(throwError(() => new Error('sectors down')))
+        .mockReturnValueOnce(of({ data: [fmpIndices[0]] } as AxiosResponse))
+        .mockReturnValueOnce(of({ data: [fmpIndices[1]] } as AxiosResponse))
+        .mockReturnValueOnce(throwError(() => new Error('timeout')))
+        .mockReturnValueOnce(throwError(() => new Error('timeout')))
         .mockReturnValueOnce(of({ data: fmpNews } as AxiosResponse));
 
       const result = await service.getOverview();
@@ -631,13 +631,15 @@ describe('StocksService', () => {
       expect(result[0]?.symbol).toBe('AAPL');
     });
 
-    it('fetches screener + batch quotes from FMP, merges, and caches', async () => {
+    it('fetches screener + individual quotes from FMP, merges, and caches', async () => {
       redis.get.mockResolvedValue(null);
       (configService.get as jest.Mock).mockReturnValue('FMP_KEY');
 
+      // screener returns 2 items, then 2 individual quote calls (one per symbol)
       httpService.get
         .mockReturnValueOnce(of({ data: fmpScreenerItems } as AxiosResponse))
-        .mockReturnValueOnce(of({ data: fmpQuotes } as AxiosResponse));
+        .mockReturnValueOnce(of({ data: [fmpQuotes[0]] } as AxiosResponse))
+        .mockReturnValueOnce(of({ data: [fmpQuotes[1]] } as AxiosResponse));
 
       const result = await service.getScreener({ limit: 25 });
 
