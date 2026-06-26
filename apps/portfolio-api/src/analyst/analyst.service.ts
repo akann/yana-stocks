@@ -5,19 +5,26 @@ import { firstValueFrom } from 'rxjs';
 import { RedisService } from '../redis/redis.service';
 import type { AnalystRating } from './analyst.types';
 
-const FMP_BASE = 'https://financialmodelingprep.com/api/v3';
+const FMP_STABLE = 'https://financialmodelingprep.com/stable';
 const FMP_V4 = 'https://financialmodelingprep.com/api/v4';
 const CACHE_TTL = 86_400; // 24 h
 
 interface FmpRecommendation {
   symbol?: string;
   date?: string;
+  // v3 analyst-stock-recommendations field names
   analystRatingsStrongBuy?: number;
   analystRatingsBuy?: number;
   analystRatingsbuy?: number; // FMP quirk: lowercase 'b' in some API versions
   analystRatingsHold?: number;
   analystRatingsSell?: number;
   analystRatingsStrongSell?: number;
+  // stable/analyst-consensus field names
+  strongBuy?: number;
+  buy?: number;
+  hold?: number;
+  sell?: number;
+  strongSell?: number;
 }
 
 interface FmpPriceTarget {
@@ -64,7 +71,7 @@ export class AnalystService {
     const [recResult, targetResult] = await Promise.allSettled([
       firstValueFrom(
         this.httpService.get<FmpRecommendation[]>(
-          `${FMP_BASE}/analyst-stock-recommendations/${symbol}?limit=1&apikey=${apiKey}`,
+          `${FMP_STABLE}/analyst-consensus?symbol=${symbol}&limit=1&apikey=${apiKey}`,
         ),
       ),
       firstValueFrom(
@@ -84,11 +91,12 @@ export class AnalystService {
       ? (rawTarget[0] ?? {})
       : (rawTarget ?? {});
 
-    const strongBuy = rec.analystRatingsStrongBuy ?? 0;
-    const buy = rec.analystRatingsBuy ?? rec.analystRatingsbuy ?? 0;
-    const hold = rec.analystRatingsHold ?? 0;
-    const sell = rec.analystRatingsSell ?? 0;
-    const strongSell = rec.analystRatingsStrongSell ?? 0;
+    // Support both stable field names (strongBuy) and v3 names (analystRatingsStrongBuy)
+    const strongBuy = rec.strongBuy ?? rec.analystRatingsStrongBuy ?? 0;
+    const buy = rec.buy ?? rec.analystRatingsBuy ?? rec.analystRatingsbuy ?? 0;
+    const hold = rec.hold ?? rec.analystRatingsHold ?? 0;
+    const sell = rec.sell ?? rec.analystRatingsSell ?? 0;
+    const strongSell = rec.strongSell ?? rec.analystRatingsStrongSell ?? 0;
 
     const rating: AnalystRating = {
       strongBuy,
@@ -102,7 +110,10 @@ export class AnalystService {
       asOf: rec.date ?? null,
     };
 
-    await this.redis.set(CACHE_KEY, JSON.stringify(rating), CACHE_TTL);
+    // Only cache non-empty results; empty results retry on next request
+    if (rating.analystCount > 0 || rating.priceTarget != null) {
+      await this.redis.set(CACHE_KEY, JSON.stringify(rating), CACHE_TTL);
+    }
     return rating;
   }
 

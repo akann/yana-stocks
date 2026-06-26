@@ -389,6 +389,7 @@ export class StocksService {
       return [];
     }
 
+    const FMP_V3 = 'https://financialmodelingprep.com/api/v3';
     const FMP_STABLE = 'https://financialmodelingprep.com/stable';
 
     const screenerParams: Record<string, string | number | boolean> = {
@@ -407,7 +408,7 @@ export class StocksService {
     let screenedItems: FmpScreenerResult[] = [];
     try {
       const resp = await firstValueFrom(
-        this.httpService.get<FmpScreenerResult[]>(`${FMP_STABLE}/stock-screener`, {
+        this.httpService.get<FmpScreenerResult[]>(`${FMP_V3}/stock-screener`, {
           params: screenerParams,
           timeout: 8000,
         }),
