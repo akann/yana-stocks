@@ -8,6 +8,30 @@ import { RedisService } from '../redis/redis.service';
 import type { AssetEntry, PriceCacheEntry, ScreenerResult } from './price-cache.types';
 import { StocksService } from './stocks.service';
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function makeBar(close: number): OHLCV {
+  return {
+    symbol: 'TEST',
+    timestamp: new Date(),
+    open: close,
+    high: close,
+    low: close,
+    close,
+    volume: 1_000_000,
+    interval: '1d',
+  };
+}
+
+/** Build N bars where the first bar has `startClose` and each subsequent bar
+ *  increases by `step`. Matches the price-processor history response order
+ *  (oldest → newest). */
+function makeBars(count: number, startClose = 100, step = 0): OHLCV[] {
+  return Array.from({ length: count }, (_, i) => makeBar(startClose + i * step));
+}
+
 const mockPriceCacheEntry: PriceCacheEntry = {
   price: 180,
   prevPrice: 175,
@@ -694,6 +718,232 @@ describe('StocksService', () => {
       expect(result).toHaveLength(1);
       expect(result[0]?.symbol).toBe('AAPL');
       expect(httpService.get).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // getSectorRotation
+  // -------------------------------------------------------------------------
+  describe('getSectorRotation', () => {
+    // FMP returns newest-first; we provide two entries to exercise the reversal.
+    const fmpResponse = [
+      {
+        date: '2024-01-12', // newest
+        technology: 1.2,
+        financialServices: 0.5,
+        healthcare: -0.3,
+        consumerCyclical: 0.8,
+        industrials: 0.4,
+        communicationServices: -0.1,
+        consumerDefensive: 0.2,
+        energy: 1.5,
+        realEstate: -0.7,
+        basicMaterials: 0.3,
+        utilities: -0.4,
+      },
+      {
+        date: '2024-01-05', // oldest
+        technology: 0.8,
+        financialServices: -0.3,
+        healthcare: 0.5,
+        consumerCyclical: 0.2,
+        industrials: 0.9,
+        communicationServices: 0.6,
+        consumerDefensive: -0.1,
+        energy: 0.7,
+        realEstate: 0.3,
+        basicMaterials: -0.2,
+        utilities: 0.1,
+      },
+    ];
+
+    it('returns cached data without calling FMP', async () => {
+      const cached = { dates: ['2024-01-05'], rows: [{ sector: 'Technology', changes: [0.8] }] };
+      redis.get.mockResolvedValue(JSON.stringify(cached));
+
+      const result = await service.getSectorRotation('sp500');
+
+      expect(httpService.get).not.toHaveBeenCalled();
+      expect(result.dates).toHaveLength(1);
+      expect(result.rows[0]?.sector).toBe('Technology');
+    });
+
+    it('returns empty data immediately for ftse100', async () => {
+      redis.get.mockResolvedValue(null);
+
+      const result = await service.getSectorRotation('ftse100');
+
+      expect(httpService.get).not.toHaveBeenCalled();
+      expect(result.dates).toHaveLength(0);
+      expect(result.rows).toHaveLength(0);
+    });
+
+    it('returns empty data when no FMP API key is configured', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('');
+
+      const result = await service.getSectorRotation('sp500');
+
+      expect(httpService.get).not.toHaveBeenCalled();
+      expect(result.rows).toHaveLength(0);
+    });
+
+    it('reverses FMP array so dates are in chronological order (oldest first)', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('FMP_KEY');
+      httpService.get.mockReturnValue(of({ data: fmpResponse } as AxiosResponse));
+
+      const result = await service.getSectorRotation('sp500');
+
+      // FMP returns newest-first ([jan12, jan05]); after reversal dates = [jan05, jan12]
+      expect(result.dates[0]).toBe('2024-01-05');
+      expect(result.dates[1]).toBe('2024-01-12');
+    });
+
+    it('maps FMP field names to display sector names and values', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('FMP_KEY');
+      httpService.get.mockReturnValue(of({ data: fmpResponse } as AxiosResponse));
+
+      const result = await service.getSectorRotation('sp500');
+
+      const techRow = result.rows.find((r) => r.sector === 'Technology');
+      expect(techRow).toBeDefined();
+      // After reversal: changes[0] = jan05 value (0.8), changes[1] = jan12 value (1.2)
+      expect(techRow!.changes[0]).toBeCloseTo(0.8);
+      expect(techRow!.changes[1]).toBeCloseTo(1.2);
+
+      const energyRow = result.rows.find((r) => r.sector === 'Energy');
+      expect(energyRow!.changes[0]).toBeCloseTo(0.7);
+      expect(energyRow!.changes[1]).toBeCloseTo(1.5);
+    });
+
+    it('returns all 11 sectors', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('FMP_KEY');
+      httpService.get.mockReturnValue(of({ data: fmpResponse } as AxiosResponse));
+
+      const result = await service.getSectorRotation('sp500');
+
+      expect(result.rows).toHaveLength(11);
+      const sectorNames = result.rows.map((r) => r.sector);
+      expect(sectorNames).toContain('Technology');
+      expect(sectorNames).toContain('Financials');
+      expect(sectorNames).toContain('Health Care');
+      expect(sectorNames).toContain('Energy');
+    });
+
+    it('caches the result with a 1-hour TTL', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('FMP_KEY');
+      httpService.get.mockReturnValue(of({ data: fmpResponse } as AxiosResponse));
+
+      await service.getSectorRotation('sp500');
+
+      expect(redis.set).toHaveBeenCalledWith(
+        'papi:sector:rotation:sp500',
+        expect.any(String),
+        3600,
+      );
+    });
+
+    it('returns empty dates and empty changes arrays when FMP request fails', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('FMP_KEY');
+      httpService.get.mockReturnValue(throwError(() => new Error('FMP down')));
+
+      const result = await service.getSectorRotation('sp500');
+
+      // dates is empty; sector rows are still present but each has no data points
+      expect(result.dates).toHaveLength(0);
+      expect(result.rows).toHaveLength(11);
+      expect(result.rows.every((r) => r.changes.length === 0)).toBe(true);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // getFactorPerformance
+  // -------------------------------------------------------------------------
+  describe('getFactorPerformance', () => {
+    it('returns cached tiles without calling price-processor', async () => {
+      const cached = [
+        { factor: 'Momentum', etf: 'MTUM', price: 200, change1d: 1, change1w: 2, change1m: 5 },
+      ];
+      redis.get.mockResolvedValue(JSON.stringify(cached));
+
+      const result = await service.getFactorPerformance();
+
+      expect(httpService.get).not.toHaveBeenCalled();
+      expect(result[0]?.etf).toBe('MTUM');
+    });
+
+    it('fetches 22-bar daily history for each of the 6 factor ETFs', async () => {
+      redis.get.mockResolvedValue(null);
+      httpService.get.mockReturnValue(of({ data: makeBars(22) } as AxiosResponse<OHLCV[]>));
+
+      await service.getFactorPerformance();
+
+      // 6 ETFs × 1 history call each
+      expect(httpService.get).toHaveBeenCalledTimes(6);
+      expect(httpService.get).toHaveBeenCalledWith(
+        expect.stringContaining('/prices/MTUM/history?limit=22&interval=1d'),
+        expect.objectContaining({ timeout: 5000 }),
+      );
+    });
+
+    it('computes 1D / 1W / 1M % changes with correct bar indices', async () => {
+      redis.get.mockResolvedValue(null);
+
+      // 22 bars: bar[0]=100, bar[1]=101, ..., bar[21]=121
+      // price  = bar[21].close = 121
+      // prev1d = bar[20].close = 120  → change1d = (121-120)/120*100 ≈ 0.833%
+      // prev1w = bar[16].close = 116  → change1w = (121-116)/116*100 ≈ 4.310%
+      // prev1m = bar[0].close  = 100  → change1m = (121-100)/100*100 = 21%
+      const bars = makeBars(22, 100, 1);
+      httpService.get.mockReturnValue(of({ data: bars } as AxiosResponse<OHLCV[]>));
+
+      const result = await service.getFactorPerformance();
+
+      const tile = result[0]!; // MTUM — all ETFs get the same history mock
+      expect(tile.price).toBe(121);
+      expect(tile.change1d).toBeCloseTo((1 / 120) * 100, 3);
+      expect(tile.change1w).toBeCloseTo((5 / 116) * 100, 3);
+      expect(tile.change1m).toBeCloseTo(21, 3);
+    });
+
+    it('returns six tiles, one per factor ETF', async () => {
+      redis.get.mockResolvedValue(null);
+      httpService.get.mockReturnValue(of({ data: makeBars(22) } as AxiosResponse<OHLCV[]>));
+
+      const result = await service.getFactorPerformance();
+
+      expect(result).toHaveLength(6);
+      const etfs = result.map((t) => t.etf);
+      expect(etfs).toEqual(['MTUM', 'VTV', 'VUG', 'VIG', 'USMV', 'QUAL']);
+    });
+
+    it('returns zero changes for an ETF when price-processor fails (Promise.allSettled)', async () => {
+      redis.get.mockResolvedValue(null);
+      httpService.get.mockReturnValue(throwError(() => new Error('price-processor down')));
+
+      const result = await service.getFactorPerformance();
+
+      expect(result).toHaveLength(6);
+      for (const tile of result) {
+        expect(tile.price).toBe(0);
+        expect(tile.change1d).toBe(0);
+        expect(tile.change1w).toBe(0);
+        expect(tile.change1m).toBe(0);
+      }
+    });
+
+    it('caches the result with a 15-minute TTL', async () => {
+      redis.get.mockResolvedValue(null);
+      httpService.get.mockReturnValue(of({ data: makeBars(22) } as AxiosResponse<OHLCV[]>));
+
+      await service.getFactorPerformance();
+
+      expect(redis.set).toHaveBeenCalledWith('papi:factors', expect.any(String), 900);
     });
   });
 });
