@@ -636,9 +636,9 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
     <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
       {/* Controls */}
       <div className="flex flex-col gap-2 mb-3">
-        {/* Row 1: title + signal badges (left) | chart type toggle (right) */}
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
+        {/* Row 1: title + badges (left) | chart type + timeframe (right) */}
+        <div className="flex items-center justify-between gap-4">
+          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
             Price Chart
             {signalBadges.map(({ signal: s, count }) => (
               <span
@@ -662,38 +662,39 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
               </span>
             ))}
           </h3>
-          <div className="flex gap-1">
-            {(['line', 'candlestick'] as ChartType[]).map((type) => (
-              <button
-                key={type}
-                onClick={() => setChartType(type)}
-                className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
-                  chartType === type
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
-                }`}
-              >
-                {type === 'line' ? 'Line' : 'Candle'}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1">
+              {(['line', 'candlestick'] as ChartType[]).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setChartType(type)}
+                  className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
+                    chartType === type
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  {type === 'line' ? 'Line' : 'Candle'}
+                </button>
+              ))}
+            </div>
+            <div className="w-px h-4 bg-gray-200" />
+            <div className="flex gap-1">
+              {RANGES.map((r) => (
+                <button
+                  key={r.label}
+                  onClick={() => setRange(r.label)}
+                  className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
+                    range === r.label
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-
-        {/* Row 2: timeframe buttons */}
-        <div className="flex items-center gap-1 -ml-2.5">
-          {RANGES.map((r) => (
-            <button
-              key={r.label}
-              onClick={() => setRange(r.label)}
-              className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
-                range === r.label
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-              }`}
-            >
-              {r.label}
-            </button>
-          ))}
         </div>
 
         {/* Indicator toggles — MAs + RSI */}
