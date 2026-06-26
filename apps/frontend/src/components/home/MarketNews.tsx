@@ -22,7 +22,7 @@ export function MarketNews(): React.JSX.Element {
   });
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col min-h-0">
+    <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col min-h-0 h-[350px]">
       <h2 className="text-sm font-semibold text-gray-700 mb-3">Market News</h2>
       {isLoading ? (
         <div className="space-y-3">
