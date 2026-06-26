@@ -60,10 +60,6 @@ export function AddToWatchlistButton({ symbol, excludeWatchlistId }: Props): Rea
       router.push('/watchlist');
       return;
     }
-    if (eligible.length === 1) {
-      mutate(eligible[0]!.id);
-      return;
-    }
     setOpen((prev) => !prev);
   }
 
