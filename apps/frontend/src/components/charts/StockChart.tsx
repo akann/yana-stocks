@@ -51,6 +51,28 @@ interface Props {
   currentPrice?: number | null;
 }
 
+interface NewsPopup {
+  x: number;
+  y: number;
+  articles: NewsArticle[];
+}
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const h = Math.floor(diff / 3_600_000);
+  if (h < 1) return 'just now';
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d ago`;
+  return `${Math.floor(d / 30)}mo ago`;
+}
+
+function sentimentColor(label: string | undefined): string {
+  if (label === 'positive') return 'text-green-600';
+  if (label === 'negative') return 'text-red-500';
+  return 'text-gray-400';
+}
+
 function buildMarkers(
   signals: ChartSignal[],
   newsArticles: NewsArticle[],
@@ -70,23 +92,26 @@ function buildMarkers(
     });
   }
 
-  // News markers on daily charts only — intraday minute-snapping is unreliable
+  // News markers on daily charts only — intraday minute-snapping is unreliable.
+  // Group articles by date so each trading day gets exactly one marker.
   if (isDaily && newsArticles.length > 0) {
     const barDates = new Set(clean.map((b) => b.timestamp.slice(0, 10)));
+    const byDate = new Map<string, NewsArticle[]>();
     for (const a of newsArticles) {
       const date = a.publishedAt.slice(0, 10);
       if (!barDates.has(date)) continue;
+      byDate.set(date, [...(byDate.get(date) ?? []), a]);
+    }
+    for (const [date, articles] of byDate) {
+      const hasNeg = articles.some((a) => a.sentimentLabel === 'negative');
+      const hasPos = articles.some((a) => a.sentimentLabel === 'positive');
       markers.push({
         time: date as Time,
         position: 'aboveBar',
-        color:
-          a.sentimentLabel === 'positive'
-            ? '#22c55e'
-            : a.sentimentLabel === 'negative'
-              ? '#ef4444'
-              : '#9ca3af',
+        color: hasNeg ? '#ef4444' : hasPos ? '#22c55e' : '#9ca3af',
         shape: 'circle',
         size: 1,
+        text: articles.length > 1 ? String(articles.length) : 'N',
       });
     }
   }
@@ -119,12 +144,15 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
   const macdSignalSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
   const macdHistSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const maSeriesMapRef = useRef<Map<MAKey, ISeriesApi<'Line'>>>(new Map());
+  // Stable ref for article-by-date lookup — avoids re-running the chart setup effect on news changes
+  const articlesByDateRef = useRef<Map<string, NewsArticle[]>>(new Map());
 
   const [range, setRange] = useState<RangeLabel>('1W');
   const [chartType, setChartType] = useState<ChartType>('candlestick');
   const [enabledMAs, setEnabledMAs] = useState<Set<MAKey>>(new Set());
   const [showRSI, setShowRSI] = useState(false);
   const [showMACD, setShowMACD] = useState(false);
+  const [newsPopup, setNewsPopup] = useState<NewsPopup | null>(null);
 
   const activeRange = RANGES.find((r) => r.label === range)!;
   const isDaily = activeRange.interval === '1d';
@@ -156,6 +184,28 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
     refetchInterval: isDaily ? 3_600_000 : 30_000,
     staleTime: isDaily ? 300_000 : 10_000,
   });
+
+  // Keep the article-by-date lookup ref in sync whenever news data changes
+  useEffect(() => {
+    const map = new Map<string, NewsArticle[]>();
+    for (const a of news) {
+      const d = a.publishedAt.slice(0, 10);
+      map.set(d, [...(map.get(d) ?? []), a]);
+    }
+    articlesByDateRef.current = map;
+  }, [news]);
+
+  // Close popup when the user clicks outside it
+  useEffect(() => {
+    if (!newsPopup) return;
+    const handler = (e: MouseEvent) => {
+      if (!(e.target as Element).closest('[data-news-popup]')) {
+        setNewsPopup(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [newsPopup]);
 
   // Chart setup — recreate on chart type or interval change (not on data or MAs)
   useEffect(() => {
@@ -201,6 +251,24 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
       },
     });
     chartRef.current = chart;
+
+    // Show headline popup when the user clicks a date that has news articles
+    chart.subscribeClick((param) => {
+      if (!param.time || !param.point) {
+        setNewsPopup(null);
+        return;
+      }
+      const date =
+        typeof param.time === 'string'
+          ? param.time
+          : new Date(Number(param.time) * 1000).toISOString().slice(0, 10);
+      const articles = articlesByDateRef.current.get(date);
+      if (!articles?.length) {
+        setNewsPopup(null);
+        return;
+      }
+      setNewsPopup({ x: param.point.x, y: param.point.y, articles });
+    });
 
     const volSeries = chart.addSeries(HistogramSeries, {
       priceFormat: { type: 'volume' },
@@ -757,6 +825,37 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
         {!isLoading && !data?.length && (
           <div className="h-[360px] flex items-center justify-center text-gray-500 text-sm">
             No price history available
+          </div>
+        )}
+
+        {/* News headline popup — shown when user clicks a date that has articles */}
+        {newsPopup && (
+          <div
+            data-news-popup="true"
+            className="absolute z-50 w-72 rounded-lg border border-gray-200 bg-white p-3 shadow-xl"
+            style={{
+              left: newsPopup.x + 12,
+              top: Math.max(0, newsPopup.y - 40),
+            }}
+          >
+            <button
+              className="absolute right-2 top-2 text-gray-300 hover:text-gray-500 text-base leading-none"
+              onClick={() => setNewsPopup(null)}
+            >
+              ✕
+            </button>
+            {newsPopup.articles.map((a, i) => (
+              <div key={i} className={i > 0 ? 'mt-2.5 border-t border-gray-100 pt-2.5' : ''}>
+                <p className="text-sm font-medium text-gray-800 leading-snug pr-5">{a.headline}</p>
+                <div className="mt-1 flex items-center gap-1.5 text-xs">
+                  <span className={sentimentColor(a.sentimentLabel)}>{a.sentimentLabel}</span>
+                  <span className="text-gray-300">·</span>
+                  <span className="text-gray-400">{a.source}</span>
+                  <span className="text-gray-300">·</span>
+                  <span className="text-gray-400">{timeAgo(a.publishedAt)}</span>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

@@ -203,20 +203,24 @@ from scratch.
 
 Sequenced to deliver value early, deferring items that need new integrations:
 
-| #   | Feature                                                               | Effort  | New data source?                                     | Status     |
-| --- | --------------------------------------------------------------------- | ------- | ---------------------------------------------------- | ---------- |
-| 0   | **Massive migration** — replace Alpaca + Yahoo Finance for US prices  | Medium  | Massive/Polygon.io ($29/mo)                          | ✓ complete |
-| 1   | Candlestick chart (switch to lightweight-charts)                      | Medium  | No                                                   | ✓ complete |
-| 2   | Volume histogram pane below price chart                               | Low     | No                                                   | ✓ complete |
-| 3   | Moving average overlays (SMA/EMA)                                     | Low     | No                                                   | ✓ complete |
-| 4   | RSI sub-chart                                                         | Medium  | No                                                   | ✓ complete |
-| 5   | MACD sub-chart + buy/sell signal badges                               | Medium  | No                                                   | ✓ complete |
-| 6   | Watchlist `+` button across all ticker appearances                    | Low     | No — backend already exists                          | ✓ complete |
-| 7   | ETF support in asset browser                                          | Trivial | No — Massive ticker reference includes ETFs natively | ✓ complete |
-| 8   | Analyst ratings (FMP) + news consolidation (FMP replaces Alpaca News) | Medium  | Financial Modeling Prep                              | ✓ complete |
-| 9   | Location-specific defaults + UK data (Twelve Data)                    | Medium  | Twelve Data                                          | ✓ complete |
-| 10  | Home screen with indices & sectors                                    | High    | FMP + Twelve Data                                    | ✓ complete |
-| 11  | Stock screener                                                        | High    | FMP + Twelve Data                                    | ✓ complete |
+| #   | Feature                                                                             | Effort  | New data source?                                     | Status     |
+| --- | ----------------------------------------------------------------------------------- | ------- | ---------------------------------------------------- | ---------- |
+| 0   | **Massive migration** — replace Alpaca + Yahoo Finance for US prices                | Medium  | Massive/Polygon.io ($29/mo)                          | ✓ complete |
+| 1   | Candlestick chart (switch to lightweight-charts)                                    | Medium  | No                                                   | ✓ complete |
+| 2   | Volume histogram pane below price chart                                             | Low     | No                                                   | ✓ complete |
+| 3   | Moving average overlays (SMA/EMA)                                                   | Low     | No                                                   | ✓ complete |
+| 4   | RSI sub-chart                                                                       | Medium  | No                                                   | ✓ complete |
+| 5   | MACD sub-chart + buy/sell signal badges                                             | Medium  | No                                                   | ✓ complete |
+| 6   | Watchlist `+` button across all ticker appearances                                  | Low     | No — backend already exists                          | ✓ complete |
+| 7   | ETF support in asset browser                                                        | Trivial | No — Massive ticker reference includes ETFs natively | ✓ complete |
+| 8   | Analyst ratings (FMP) + news consolidation (FMP replaces Alpaca News)               | Medium  | Financial Modeling Prep                              | ✓ complete |
+| 9   | Location-specific defaults + UK data (Twelve Data)                                  | Medium  | Twelve Data                                          | ✓ complete |
+| 10  | Home screen with indices & sectors                                                  | High    | FMP + Twelve Data                                    | ✓ complete |
+| 11  | Stock screener                                                                      | High    | FMP + Twelve Data                                    | ✓ complete |
+| 12  | News pin markers with headline popup on price chart                                 | Low     | No — news already fetched                            | pending    |
+| 13  | Home market preference UI (profile settings + home screen wiring)                   | Low     | No — backend schema already in place                 | pending    |
+| 14  | Sector rotation time-series heatmap (S&P 500 + FTSE 100)                            | Medium  | FMP historical-sectors-performance                   | pending    |
+| 15  | Factor performance tiles (Momentum / Value / Growth / Dividend / Low Vol / Quality) | Medium  | No — uses existing ETF price infrastructure          | pending    |
 
 > Step 0 (Massive) is a prerequisite for Steps 1–7 to have accurate, real-time
 > data underneath them. Steps 1–6 are pure frontend and can be done
@@ -740,11 +744,414 @@ score, dividend yield.
 
 ---
 
-## Out of Scope Until Above is Complete
+---
 
-- **Index rotation / factor analysis** — money flow between sectors and factors
-  (growth vs value, high-dividend vs speculative); requires sector
-  classification data
-- **Full universal watchlist button** on every ticker mention — partially
-  addressed in Step 6; deeper integration (stock page, movers, screener results)
-  follows naturally as each feature is built
+## Step 12 — News Pin Markers with Headline Popup
+
+News circle markers already exist on daily charts (coloured by sentiment,
+implemented in Step 5 gap completions). This step upgrades them to show the
+article headline when clicked.
+
+### What changes
+
+**No backend changes** — `GET /api/news/:symbol` is already called by the chart
+component and the articles are already in memory.
+
+### Frontend — `apps/frontend/src/components/charts/StockChart.tsx`
+
+**Marker shape upgrade:**
+
+```typescript
+// Before
+{
+  shape: 'circle',
+  size: 1,
+}
+
+// After — arrowDown acts as a downward-pointing pin above the bar
+{
+  shape: 'arrowDown',
+  size: 1,
+  text: articles.length > 1 ? `N:${articles.length}` : truncate(articles[0].title, 22),
+}
+```
+
+**Article lookup map** — built once when `newsArticles` prop changes:
+
+```typescript
+const articlesByDate = useMemo(() => {
+  const map = new Map<string, NewsArticle[]>();
+  for (const a of newsArticles) {
+    const d = a.publishedAt.slice(0, 10);
+    map.set(d, [...(map.get(d) ?? []), a]);
+  }
+  return map;
+}, [newsArticles]);
+```
+
+**Click subscriber** — added inside the chart `useEffect` after the chart is
+created:
+
+```typescript
+chart.subscribeClick((param) => {
+  if (!param.time) {
+    setNewsPopup(null);
+    return;
+  }
+  const date =
+    typeof param.time === 'string'
+      ? param.time
+      : new Date(Number(param.time) * 1000).toISOString().slice(0, 10);
+  const articles = articlesByDate.get(date);
+  if (!articles?.length) {
+    setNewsPopup(null);
+    return;
+  }
+  // param.point gives pixel coordinates relative to the chart container
+  setNewsPopup({ x: param.point!.x, y: param.point!.y, articles });
+});
+```
+
+**Popup state + JSX** —
+`newsPopup: { x: number; y: number; articles: NewsArticle[] } | null`
+
+```tsx
+{
+  newsPopup && (
+    <div
+      className="absolute z-50 w-72 rounded-lg border border-gray-200 bg-white p-3 shadow-lg"
+      style={{ left: newsPopup.x + 8, top: newsPopup.y - 8 }}
+    >
+      <button
+        className="absolute right-2 top-2 text-gray-400"
+        onClick={() => setNewsPopup(null)}
+      >
+        ✕
+      </button>
+      {newsPopup.articles.map((a, i) => (
+        <div key={i} className={i > 0 ? 'mt-2 border-t pt-2' : ''}>
+          <p className="text-sm font-medium text-gray-900 leading-snug">
+            {a.title}
+          </p>
+          <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+            <span className={sentimentColour(a.sentimentLabel)}>
+              {a.sentimentLabel}
+            </span>
+            <span>·</span>
+            <span>{a.source}</span>
+            <span>·</span>
+            <span>{timeAgo(a.publishedAt)}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+Close the popup on outside click via a `useEffect` that adds/removes a
+`document.addEventListener('click', ...)` when `newsPopup !== null`.
+
+**Files changed:** `StockChart.tsx` only.
+
+---
+
+## Step 13 — Home Market Preference UI
+
+The `profile-service` schema already has `defaultMarket: 'US' | 'UK' | 'global'`
+(added in Step 9). The `PUT /api/profile/me` endpoint already accepts it. This
+step adds the missing UI.
+
+### Frontend — `apps/frontend/src/app/profile/page.tsx`
+
+Add a "Home Market" select in the Profile settings tab, alongside the existing
+displayName / bio fields:
+
+```tsx
+<div>
+  <label className="block text-sm font-medium text-gray-700">Home Market</label>
+  <select
+    value={form.defaultMarket ?? 'US'}
+    onChange={(e) =>
+      setForm({
+        ...form,
+        defaultMarket: e.target.value as 'US' | 'UK' | 'global',
+      })
+    }
+    className="mt-1 block w-48 rounded-md border border-gray-300 px-3 py-2 text-sm"
+  >
+    <option value="US">🇺🇸 United States (S&P 500)</option>
+    <option value="UK">🇬🇧 United Kingdom (FTSE 100)</option>
+    <option value="global">🌐 Global</option>
+  </select>
+  <p className="mt-1 text-xs text-gray-500">
+    Sets the default index and market tab on the home screen.
+  </p>
+</div>
+```
+
+Include `defaultMarket` in the existing `PUT /api/profile/me` body — no new API
+call needed.
+
+### Frontend — `apps/frontend/src/components/home/HomePageView.tsx`
+
+Read profile in `HomePageView` (already done for watchlist state — reuse the
+same `useProfile()` query):
+
+```typescript
+const defaultTab = profile?.defaultMarket === 'UK' ? 'uk' : 'us';
+```
+
+Pass `defaultTab` to `<MarketBrowser defaultTab={defaultTab}>` and highlight the
+matching index tile in `<IndicesBar activeMarket={defaultTab}>`.
+
+**Files changed:** `profile/page.tsx`, `HomePageView.tsx`, `MarketBrowser.tsx`
+(add `defaultTab` prop).
+
+---
+
+## Step 14 — Sector Rotation Time-Series Heatmap
+
+Replaces the S&P 500 treemap with a grid showing **sector × timeframe**
+performance. Investors can immediately see which sectors have built momentum
+over 1D / 1W / 1M / 3M / 1Y, and switch between S&P 500 and FTSE 100.
+
+### Home screen layout after this step
+
+```
+IndicesBar
+────────────────────────────────────────────────────────────────────────
+SectorRotationHeatmap [S&P 500 | FTSE 100 tabs]  │  MarketNews
+  Sector        1D     1W     1M     3M     1Y    │  headlines...
+  Health Care  +3.1%  +1.2%  +4.8%  +8.1%  +12%  │
+  Technology   +0.5%  -2.1%  +8.3%  +15%   +28%  │
+  ...                                            │
+────────────────────────────────────────────────────────────────────────
+FactorTiles  (Step 15)
+Top Gainers │ Top Losers
+Market Browser / Stock Screener
+```
+
+### Backend — `portfolio-api`
+
+**New method** `getSectorRotation(index: 'sp500' | 'ftse100')` in
+`apps/portfolio-api/src/market/market.service.ts`:
+
+- **S&P 500 path:** call FMP
+  `GET /api/v3/historical-sectors-performance?limit=365&apikey={FMP_API_KEY}` —
+  returns an array of `{ date, basicMaterials, communicationServices, ... }`
+  rows, newest first. Compute cumulative compound returns for each sector:
+
+  ```typescript
+  // Indices for each window (trading days, not calendar days)
+  const windows = { '1D': 1, '1W': 5, '1M': 21, '3M': 63, '1Y': 252 };
+
+  function cumulativeReturn(
+    rows: SectorRow[],
+    sector: string,
+    n: number,
+  ): number {
+    // rows[0] = most recent day, rows[n-1] = n trading days ago
+    const slice = rows.slice(0, n);
+    return slice.reduce((acc, row) => acc * (1 + row[sector] / 100), 1) - 1;
+  }
+  ```
+
+- **FTSE 100 path:** FMP provides
+  `GET /api/v4/sector-performance?exchange=LSE&apikey={FMP_API_KEY}` for
+  current-day data; for historical, use
+  `GET /api/v4/historical-sectors-performance?exchange=LSE&limit=365`. Fall back
+  to US-only data with a flag if the UK endpoint returns empty (check on
+  implementation — LSE sector data availability varies by FMP plan tier).
+
+- Redis cache: `papi:sector:rotation:sp500` / `papi:sector:rotation:ftse100`,
+  TTL 1h.
+
+**New route** in `apps/portfolio-api/src/market/market.controller.ts`:
+
+```typescript
+@Get('sectors/rotation')
+@ApiQuery({ name: 'index', enum: ['sp500', 'ftse100'], required: false })
+getSectorRotation(@Query('index') index: 'sp500' | 'ftse100' = 'sp500') {
+  return this.marketService.getSectorRotation(index);
+}
+```
+
+**Response shape:**
+
+```typescript
+interface SectorRotationRow {
+  sector: string; // 'Technology', 'Health Care', ...
+  change1d: number; // % as decimal: 0.031 = 3.1%
+  change1w: number;
+  change1m: number;
+  change3m: number;
+  change1y: number;
+}
+```
+
+Kong: covered by existing `/api/market/*` public prefix — no manifest change.
+
+### Frontend
+
+**Delete** `apps/frontend/src/components/home/SectorHeatmap.tsx` (the treemap).
+
+**New file** `apps/frontend/src/components/home/SectorRotationHeatmap.tsx`:
+
+```typescript
+// Props
+interface Props {
+  defaultIndex?: 'sp500' | 'ftse100';
+}
+```
+
+- Tab toggle: `[🇺🇸 S&P 500]` / `[🇬🇧 FTSE 100]`
+- Fetches `/api/market/sectors/rotation?index={activeTab}` via TanStack Query
+  key `['sector-rotation', activeTab]`, 5min stale time
+- Table: `sector` column (sticky left) + `1D / 1W / 1M / 3M / 1Y` columns
+- Default sort: 1M descending — momentum leaders rise to the top
+- Column headers are clickable to re-sort by that timeframe
+- Cell colouring: scale each column independently between its min (red) and max
+  (green) value — a relative scale makes rotation visible even in flat markets
+- Fixed height `350px` with `overflow-y: auto` — matches `MarketNews` height so
+  the two panels sit level
+- Loading skeleton: 11 rows × 5 columns of grey rectangles
+
+**Update** `apps/frontend/src/components/home/HomePageView.tsx`:
+
+- Replace `<SectorHeatmap />` with
+  `<SectorRotationHeatmap defaultIndex={defaultTab} />` where `defaultTab` comes
+  from the profile preference (Step 13)
+
+**New query hook** (or inline in component):
+
+```typescript
+const { data, isLoading } = useQuery({
+  queryKey: ['sector-rotation', activeIndex],
+  queryFn: () =>
+    apiFetch<SectorRotationRow[]>(
+      `/market/sectors/rotation?index=${activeIndex}`,
+    ),
+  staleTime: 5 * 60 * 1000,
+});
+```
+
+**Files changed/created:**
+
+| File                                                          | Action                                   |
+| ------------------------------------------------------------- | ---------------------------------------- |
+| `apps/portfolio-api/src/market/market.service.ts`             | Add `getSectorRotation()`                |
+| `apps/portfolio-api/src/market/market.controller.ts`          | Add `GET /market/sectors/rotation` route |
+| `apps/frontend/src/components/home/SectorRotationHeatmap.tsx` | New component                            |
+| `apps/frontend/src/components/home/HomePageView.tsx`          | Swap component                           |
+| `apps/frontend/src/components/home/SectorHeatmap.tsx`         | Delete                                   |
+| `packages/shared-types/src/market.ts`                         | Add `SectorRotationRow` interface        |
+
+---
+
+## Step 15 — Factor Performance Tiles
+
+Shows which investment style (factor) is currently winning. Uses widely-held
+factor ETFs as proxies — these are normal tickers, so no new data source is
+needed.
+
+### Factor → ETF proxy mapping
+
+| Factor         | ETF  | What it tracks                   |
+| -------------- | ---- | -------------------------------- |
+| Momentum       | MTUM | iShares MSCI USA Momentum Factor |
+| Value          | VTV  | Vanguard Value ETF               |
+| Growth         | VUG  | Vanguard Growth ETF              |
+| Dividend       | VIG  | Vanguard Dividend Appreciation   |
+| Low Volatility | USMV | iShares MSCI USA Min Vol         |
+| Quality        | QUAL | iShares MSCI USA Quality Factor  |
+
+All six trade on US exchanges and flow through the existing Massive price
+pipeline. No new data source or API key.
+
+### Backend — `portfolio-api`
+
+**New method** `getFactorPerformance()` in `market.service.ts`:
+
+```typescript
+const FACTOR_ETFS = [
+  { factor: 'Momentum', etf: 'MTUM' },
+  { factor: 'Value', etf: 'VTV' },
+  { factor: 'Growth', etf: 'VUG' },
+  { factor: 'Dividend', etf: 'VIG' },
+  { factor: 'Low Volatility', etf: 'USMV' },
+  { factor: 'Quality', etf: 'QUAL' },
+];
+```
+
+- Batch-fetch quotes via Massive snapshot API (same code path used by
+  `getMovers()` — `mget` Redis keys `papi:price:*`, fallback to Polygon snapshot
+  for cache misses)
+- For 1W and 1M returns: fetch 21-day OHLCV history per ETF from price-processor
+  (`GET /stocks/:symbol/history?interval=1d&limit=22`);
+  `change1w = (close[0] - close[4]) / close[4]`,
+  `change1m = (close[0] - close[20]) / close[20]`
+- Redis cache: `papi:factors`, TTL 15min
+
+**Response shape:**
+
+```typescript
+interface FactorTile {
+  factor: string; // 'Momentum'
+  etf: string; // 'MTUM'
+  price: number;
+  change1d: number; // % as decimal
+  change1w: number;
+  change1m: number;
+}
+```
+
+**New route** in `market.controller.ts`:
+
+```typescript
+@Get('factors')
+getFactorPerformance() {
+  return this.marketService.getFactorPerformance();
+}
+```
+
+Kong: covered by `/api/market/*` — no manifest change.
+
+### Frontend
+
+**New file** `apps/frontend/src/components/home/FactorTiles.tsx`:
+
+- Timeframe toggle: `[1D]` / `[1W]` / `[1M]` — controls which change column is
+  shown as the primary value and which is used for sort order (best first)
+- 6 cards in a horizontal scrollable row:
+
+  ```
+  ┌──────────────────┐
+  │  Momentum        │
+  │  MTUM            │
+  │  +2.34%  ▲       │  ← primary value (selected timeframe, coloured)
+  │  1W +1.1% 1M +4% │  ← secondary values
+  └──────────────────┘
+  ```
+
+- Each card has a `title` attribute with a one-line description of the factor
+  (shown as native browser tooltip on hover — no extra component needed)
+- Cards sorted best-to-worst by the selected timeframe — winner is always first
+- Green/red colouring consistent with the rest of the app (`text-green-600` /
+  `text-red-600`)
+- Query:
+  `useQuery({ queryKey: ['factors'], queryFn: () => apiFetch('/market/factors'), staleTime: 15 * 60 * 1000 })`
+
+**Update** `apps/frontend/src/components/home/HomePageView.tsx`:
+
+Add `<FactorTiles />` between `<IndicesBar>` and `<SectorRotationHeatmap>`.
+
+**Files changed/created:**
+
+| File                                                 | Action                          |
+| ---------------------------------------------------- | ------------------------------- |
+| `apps/portfolio-api/src/market/market.service.ts`    | Add `getFactorPerformance()`    |
+| `apps/portfolio-api/src/market/market.controller.ts` | Add `GET /market/factors` route |
+| `apps/frontend/src/components/home/FactorTiles.tsx`  | New component                   |
+| `apps/frontend/src/components/home/HomePageView.tsx` | Add `<FactorTiles />`           |
+| `packages/shared-types/src/market.ts`                | Add `FactorTile` interface      |
