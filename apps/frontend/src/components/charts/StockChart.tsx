@@ -636,9 +636,9 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
     <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
       {/* Controls */}
       <div className="flex flex-col gap-2 mb-3">
-        {/* Row 1: title + badges (left) | chart type + timeframe (right) */}
-        <div className="flex items-center justify-between gap-4">
-          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+        {/* Row 1: title + badges (left) | chart type + timeframe (right, pinned) */}
+        <div className="flex items-center gap-4">
+          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
             Price Chart
             {signalBadges.map(({ signal: s, count }) => (
               <span
@@ -662,7 +662,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
               </span>
             ))}
           </h3>
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-2 shrink-0">
             <div className="flex gap-1">
               {(['line', 'candlestick'] as ChartType[]).map((type) => (
                 <button
