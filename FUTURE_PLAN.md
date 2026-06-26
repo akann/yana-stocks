@@ -438,11 +438,26 @@ indicators, no new data):
 | MA crossover buy  | Fast MA crosses above slow MA  | Green arrow marker on chart |
 | MA crossover sell | Fast MA crosses below slow MA  | Red arrow marker on chart   |
 
-**New file:** `apps/frontend/src/lib/signals.ts`
+Badges are **grouped by `source+type`** with a `×N` count (e.g., `↓ MACD ×16`)
+so the header never floods when a symbol has many historical crossovers. At most
+6 badges can appear (buy+sell for each of: macd, rsi, ma-cross).
+
+**Chart header layout (3-row):**
+
+```
+Row 1: [Price Chart] [↑ MACD ×10] [↓ MACD ×9] ...  |  [Line] [Candle]  (right-pinned)
+Row 2: RANGE  [1H] [1D] [1W] [1M] [3M] [6M] [1Y]
+Row 3: MA  [SMA20] [SMA50] ...  |  [RSI 14]  [MACD]
+```
+
+Line/Candle is pinned to the right of Row 1 via `ml-auto shrink-0` — position
+does not shift as badge count changes.
+
+**File:** `apps/frontend/src/lib/signals.ts`
 
 ```typescript
 export interface ChartSignal {
-  time: number;
+  time: Time; // lightweight-charts Time (string date for daily, unix seconds for intraday)
   type: 'buy' | 'sell';
   source: 'ma-cross' | 'rsi' | 'macd';
   description: string;
@@ -450,6 +465,10 @@ export interface ChartSignal {
 ```
 
 Markers rendered via `createSeriesMarkers()` from lightweight-charts v5.
+
+MA crossover pairs checked: EMA12/EMA26, SMA20/SMA50, SMA50/SMA200. Only pairs
+where both MAs are currently enabled in the chart (or all four in
+`SignalsPanel`) produce signals.
 
 ### Indicator selector UI
 
@@ -473,13 +492,18 @@ Floating control panel rendered above the chart:
 
 ### News markers on chart (no new data)
 
-In `StockChart.tsx`, when news articles are loaded (already fetched on the stock
-detail page):
+In `StockChart.tsx`, when news articles are loaded (query key `['news', symbol]`
+shared with `NewsPanel` — no extra network request):
 
-- Render small flag markers on the x-axis at each article's `publishedAt`
-  timestamp
+- Render small circle markers on the price series at each article's
+  `publishedAt` date
 - Colour by sentiment: green (positive), grey (neutral), red (negative)
-- Hover/click shows headline in a floating React DOM overlay
+- Daily ranges only — intraday minute-snapping is unreliable for article
+  timestamps
+- Markers are skipped for dates that have no price bar (weekends, holidays)
+- **Not implemented:** floating headline overlay on hover — articles are
+  readable in `NewsPanel` below the chart; hover overlay can be added later if
+  needed
 
 ---
 
@@ -495,8 +519,9 @@ Add a `+` watchlist button to every place a ticker appears:
 - Stock page header
 - Watchlist/portfolio tables (for adding to a different watchlist)
 
-Unauthenticated users see a login prompt on click. Authenticated users with
-multiple watchlists get a small dropdown to select which one.
+Unauthenticated users see a login prompt on click. Authenticated users always
+get a dropdown to select which watchlist — even when only one exists. If no
+watchlists exist yet, clicking `+` redirects to `/watchlist` to create one.
 
 ---
 

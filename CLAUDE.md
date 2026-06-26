@@ -917,12 +917,13 @@ runtime with missing `.so` errors.
 
 ## Known Bugs Fixed
 
-| Bug                                                 | Root cause                                                                                                                  | Fix                                                                                                              |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Chart goes blank when toggling Candle ↔ Line        | `chartType` missing from data effect deps — new series created but not populated (same `data` ref, effect skipped)          | Added `chartType` to `useEffect` deps array in `StockChart.tsx`                                                  |
-| lightweight-charts crash (`ensureNotNull`) on 6M/1Y | MongoDB stores duplicate daily bars at different UTC offsets (T00, T04, T05); same YYYY-MM-DD maps to duplicate `time` keys | Backend dedup in `getHistory` (keeps highest UTC per date); frontend defensive dedup before `setData()`          |
-| Volume bars invisible on 1D range                   | 390 bars in ~600px = ~1.5px/bar, below `HistogramSeries` render threshold                                                   | `minBarSpacing: 2` in `timeScale` options                                                                        |
-| Market dashboard shows only NVDA                    | `getMovers()` scans `papi:price:*` Redis keys — only symbols streamed via Kafka or previously visited have entries          | `getMovers()` now mget-checks 15 default symbols and fetches missing quotes via Polygon snapshot before scanning |
+| Bug                                                 | Root cause                                                                                                                  | Fix                                                                                                                             |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Chart goes blank when toggling Candle ↔ Line        | `chartType` missing from data effect deps — new series created but not populated (same `data` ref, effect skipped)          | Added `chartType` to `useEffect` deps array in `StockChart.tsx`                                                                 |
+| lightweight-charts crash (`ensureNotNull`) on 6M/1Y | MongoDB stores duplicate daily bars at different UTC offsets (T00, T04, T05); same YYYY-MM-DD maps to duplicate `time` keys | Backend dedup in `getHistory` (keeps highest UTC per date); frontend defensive dedup before `setData()`                         |
+| Volume bars invisible on 1D range                   | 390 bars in ~600px = ~1.5px/bar, below `HistogramSeries` render threshold                                                   | `minBarSpacing: 2` in `timeScale` options                                                                                       |
+| Market dashboard shows only NVDA                    | `getMovers()` scans `papi:price:*` Redis keys — only symbols streamed via Kafka or previously visited have entries          | `getMovers()` now mget-checks 15 default symbols and fetches missing quotes via Polygon snapshot before scanning                |
+| MACD signal scan only emitted current-bar crossover | `detectSignals()` compared only the last 2 `signalLine` entries; all historical crossovers were missed                      | Loop in `signals.ts` changed to `for (let i = 1; i < n; i++)` — scans all bars; MACD arrows now appear throughout chart history |
 
 ## Feature Implementation Progress
 
@@ -951,3 +952,26 @@ step.
   `market=all`
 - Sticky navbar (`sticky top-0 z-50`)
 - MarketNews fixed 350px height with internal scroll
+
+**Step 5 gap completions (shipped post-step):**
+
+- `ChartSignal.time: Time` — signals carry the bar timestamp so they can be
+  positioned as canvas markers, not just current-state badges
+- MA crossover detection — `detectSignals()` now accepts `maConfigs[]` and
+  checks EMA12/26, SMA20/50, SMA50/200 pairs; crossover markers rendered as
+  `arrowUp`/`arrowDown` on the price series via `createSeriesMarkers()`
+- News article markers on daily chart — circle markers coloured by sentiment;
+  uses shared `['news', symbol]` query key (no extra network request); intraday
+  ranges excluded (minute-snapping unreliable)
+- `SignalsPanel` updated to pass `SIGNALS_MA_CONFIGS` to `detectSignals()` so
+  the sidebar also surfaces MA crossover signals
+- Chart header badge renderer extended to handle `'ma-cross'` source
+- Signal badges collapsed by `source+type` with `×N` count (e.g., `↓ MACD ×16`)
+  — prevents badge flooding when many historical crossovers exist; at most 6
+  badges total (buy+sell per source)
+- 3-row chart header: Row 1 = "Price Chart" + signal badges + Line/Candle toggle
+  (right-pinned via `ml-auto shrink-0`); Row 2 = `RANGE` label +
+  1H/1D/1W/1M/3M/6M/1Y buttons (left-aligned); Row 3 = MA/RSI/MACD indicator
+  toggles
+- Watchlist `+` button always shows the dropdown regardless of watchlist count;
+  zero watchlists redirects to `/watchlist` instead of auto-adding
