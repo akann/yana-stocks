@@ -663,7 +663,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
         </h3>
 
         {/* Row 2: chart type toggle + range buttons — always one line */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 -ml-2.5">
           <div className="flex gap-1">
             {(['line', 'candlestick'] as ChartType[]).map((type) => (
               <button
