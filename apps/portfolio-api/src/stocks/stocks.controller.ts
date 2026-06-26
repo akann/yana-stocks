@@ -3,6 +3,7 @@ import {
   DefaultValuePipe,
   Get,
   Param,
+  ParseFloatPipe,
   ParseIntPipe,
   Query,
   UseGuards,
@@ -16,6 +17,7 @@ import type {
   AssetsPage,
   MarketMovers,
   MarketOverview,
+  ScreenerResult,
 } from './price-cache.types';
 import { StocksService } from './stocks.service';
 
@@ -58,6 +60,30 @@ export class StocksController {
     return this.stocksService.getOverview();
   }
 
+  @Get('market/screener')
+  @ApiOperation({
+    summary: 'Screen US stocks by market cap, volume, dividend yield, sector, and price change',
+  })
+  getScreener(
+    @Query('marketCapMin', new DefaultValuePipe(0), ParseIntPipe) marketCapMin: number,
+    @Query('marketCapMax', new DefaultValuePipe(0), ParseIntPipe) marketCapMax: number,
+    @Query('volumeMin', new DefaultValuePipe(0), ParseIntPipe) volumeMin: number,
+    @Query('dividendYieldMin', new DefaultValuePipe(0), ParseFloatPipe) dividendYieldMin: number,
+    @Query('changeMin', new DefaultValuePipe(0), ParseFloatPipe) changeMin: number,
+    @Query('sector') sector: string | undefined,
+    @Query('limit', new DefaultValuePipe(25), ParseIntPipe) limit: number,
+  ): Promise<ScreenerResult[]> {
+    return this.stocksService.getScreener({
+      marketCapMin: marketCapMin || undefined,
+      marketCapMax: marketCapMax || undefined,
+      volumeMin: volumeMin || undefined,
+      dividendYieldMin: dividendYieldMin || undefined,
+      changeMin: changeMin || undefined,
+      sector: sector || undefined,
+      limit,
+    });
+  }
+
   @Get('market/assets')
   @ApiOperation({
     summary: 'Browse tradable assets by market (us equities or etfs) with search and pagination',
@@ -68,7 +94,7 @@ export class StocksController {
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Query('market') market: AssetMarket = 'us',
   ): Promise<AssetsPage> {
-    const safeMarket: AssetMarket = market === 'etf' ? 'etf' : 'us';
+    const safeMarket: AssetMarket = market === 'etf' ? 'etf' : market === 'uk' ? 'uk' : 'us';
     return this.stocksService.getAssets(search, page, Math.min(limit, 100), safeMarket);
   }
 }

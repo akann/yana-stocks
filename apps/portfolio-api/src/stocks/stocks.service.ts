@@ -25,6 +25,32 @@ interface FmpNewsItem {
   text?: string;
 }
 
+interface FmpScreenerResult {
+  symbol?: string;
+  companyName?: string;
+  price?: number;
+  marketCap?: number;
+  sector?: string;
+  volume?: number;
+  lastAnnualDividendYield?: number;
+}
+
+interface FmpQuote {
+  symbol?: string;
+  change?: number;
+  changesPercentage?: number;
+}
+
+interface ScreenerParams {
+  marketCapMin?: number;
+  marketCapMax?: number;
+  volumeMin?: number;
+  dividendYieldMin?: number;
+  sector?: string;
+  changeMin?: number;
+  limit?: number;
+}
+
 interface PolygonTickerResult {
   ticker?: string;
   name?: string;
@@ -47,6 +73,7 @@ import type {
   MarketOverview,
   MoverEntry,
   PriceCacheEntry,
+  ScreenerResult,
   SectorPerformance,
 } from './price-cache.types';
 
@@ -294,6 +321,107 @@ export class StocksService {
     const overview: MarketOverview = { indices, sectors, news };
     await this.redis.set(CACHE_KEY, JSON.stringify(overview), 300);
     return overview;
+  }
+
+  async getScreener(params: ScreenerParams): Promise<ScreenerResult[]> {
+    const {
+      marketCapMin,
+      marketCapMax,
+      volumeMin,
+      dividendYieldMin,
+      sector,
+      changeMin,
+      limit = 25,
+    } = params;
+
+    const CACHE_KEY = `papi:screener:${marketCapMin ?? ''}:${marketCapMax ?? ''}:${volumeMin ?? ''}:${dividendYieldMin ?? ''}:${sector ?? ''}:${limit}`;
+    const cached = await this.redis.get(CACHE_KEY);
+    if (cached) {
+      const results = JSON.parse(cached) as ScreenerResult[];
+      return changeMin !== undefined
+        ? results.filter((r) => r.changesPercentage >= changeMin)
+        : results;
+    }
+
+    const apiKey = this.config.get<string>('fmpApiKey') ?? '';
+    if (!apiKey) {
+      this.logger.warn('FMP_API_KEY not set — returning empty screener');
+      return [];
+    }
+
+    const FMP_BASE = 'https://financialmodelingprep.com/api/v3';
+
+    const screenerParams: Record<string, string | number | boolean> = {
+      isEtf: false,
+      isActivelyTrading: true,
+      exchange: 'NYSE,NASDAQ',
+      limit: Math.min(limit, 50),
+      apikey: apiKey,
+    };
+    if (marketCapMin) screenerParams['marketCapMoreThan'] = marketCapMin;
+    if (marketCapMax) screenerParams['marketCapLowerThan'] = marketCapMax;
+    if (volumeMin) screenerParams['volumeMoreThan'] = volumeMin;
+    if (dividendYieldMin) screenerParams['dividendMoreThan'] = dividendYieldMin;
+    if (sector) screenerParams['sector'] = sector;
+
+    let screenedItems: FmpScreenerResult[] = [];
+    try {
+      const resp = await firstValueFrom(
+        this.httpService.get<FmpScreenerResult[]>(`${FMP_BASE}/stock-screener`, {
+          params: screenerParams,
+          timeout: 8000,
+        }),
+      );
+      screenedItems = resp.data ?? [];
+    } catch (err) {
+      this.logger.error(`FMP screener failed: ${String(err)}`);
+      return [];
+    }
+
+    if (!screenedItems.length) return [];
+
+    const symbols = screenedItems.map((s) => s.symbol ?? '').filter(Boolean);
+    const quoteMap = new Map<string, { change: number; changesPercentage: number }>();
+    try {
+      const quoteResp = await firstValueFrom(
+        this.httpService.get<FmpQuote[]>(`${FMP_BASE}/quote/${symbols.join(',')}`, {
+          params: { apikey: apiKey },
+          timeout: 8000,
+        }),
+      );
+      for (const q of quoteResp.data ?? []) {
+        if (q.symbol) {
+          quoteMap.set(q.symbol, {
+            change: q.change ?? 0,
+            changesPercentage: q.changesPercentage ?? 0,
+          });
+        }
+      }
+    } catch {
+      // quotes optional — price change will default to 0
+    }
+
+    const results: ScreenerResult[] = screenedItems.map((s) => {
+      const sym = s.symbol ?? '';
+      const quote = quoteMap.get(sym);
+      return {
+        symbol: sym,
+        name: s.companyName ?? '',
+        price: s.price ?? 0,
+        change: quote?.change ?? 0,
+        changesPercentage: quote?.changesPercentage ?? 0,
+        marketCap: s.marketCap ?? 0,
+        sector: s.sector ?? '',
+        volume: s.volume ?? 0,
+        dividendYield: s.lastAnnualDividendYield ?? 0,
+      };
+    });
+
+    await this.redis.set(CACHE_KEY, JSON.stringify(results), 300);
+
+    return changeMin !== undefined
+      ? results.filter((r) => r.changesPercentage >= changeMin)
+      : results;
   }
 
   private async fetchAssetsFromMassive(type: 'CS' | 'ETF'): Promise<AssetEntry[]> {

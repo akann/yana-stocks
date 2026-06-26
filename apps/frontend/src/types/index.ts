@@ -135,6 +135,18 @@ export interface MarketOverview {
   news: MarketNewsItem[];
 }
 
+export interface ScreenerResult {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  changesPercentage: number;
+  marketCap: number;
+  sector: string;
+  volume: number;
+  dividendYield: number;
+}
+
 export interface AnalystRating {
   strongBuy: number;
   buy: number;

@@ -5,7 +5,7 @@ import { of, throwError } from 'rxjs';
 import type { AxiosResponse } from 'axios';
 import type { OHLCV } from '@yana-stocks/shared-types';
 import { RedisService } from '../redis/redis.service';
-import type { AssetEntry, PriceCacheEntry } from './price-cache.types';
+import type { AssetEntry, PriceCacheEntry, ScreenerResult } from './price-cache.types';
 import { StocksService } from './stocks.service';
 
 const mockPriceCacheEntry: PriceCacheEntry = {
@@ -542,6 +542,120 @@ describe('StocksService', () => {
       expect(result.indices).toHaveLength(2);
       expect(result.sectors).toHaveLength(0);
       expect(result.news).toHaveLength(1);
+    });
+  });
+
+  describe('getScreener', () => {
+    const fmpScreenerItems = [
+      {
+        symbol: 'AAPL',
+        companyName: 'Apple Inc.',
+        price: 195,
+        marketCap: 3_000_000_000_000,
+        sector: 'Technology',
+        volume: 50_000_000,
+        lastAnnualDividendYield: 0.005,
+      },
+      {
+        symbol: 'MSFT',
+        companyName: 'Microsoft Corp',
+        price: 410,
+        marketCap: 3_100_000_000_000,
+        sector: 'Technology',
+        volume: 25_000_000,
+        lastAnnualDividendYield: 0.007,
+      },
+    ];
+    const fmpQuotes = [
+      { symbol: 'AAPL', change: 2.5, changesPercentage: 1.3 },
+      { symbol: 'MSFT', change: -1.2, changesPercentage: -0.3 },
+    ];
+
+    it('returns empty array when FMP_API_KEY is not set', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('');
+
+      const result = await service.getScreener({});
+
+      expect(httpService.get).not.toHaveBeenCalled();
+      expect(result).toHaveLength(0);
+    });
+
+    it('returns cached results without hitting FMP', async () => {
+      const cached: ScreenerResult[] = [
+        {
+          symbol: 'AAPL',
+          name: 'Apple Inc.',
+          price: 195,
+          change: 2.5,
+          changesPercentage: 1.3,
+          marketCap: 3_000_000_000_000,
+          sector: 'Technology',
+          volume: 50_000_000,
+          dividendYield: 0.005,
+        },
+      ];
+      redis.get.mockResolvedValue(JSON.stringify(cached));
+
+      const result = await service.getScreener({});
+
+      expect(httpService.get).not.toHaveBeenCalled();
+      expect(result[0]?.symbol).toBe('AAPL');
+    });
+
+    it('fetches screener + batch quotes from FMP, merges, and caches', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('FMP_KEY');
+
+      httpService.get
+        .mockReturnValueOnce(of({ data: fmpScreenerItems } as AxiosResponse))
+        .mockReturnValueOnce(of({ data: fmpQuotes } as AxiosResponse));
+
+      const result = await service.getScreener({ limit: 25 });
+
+      expect(result).toHaveLength(2);
+      expect(result[0]?.symbol).toBe('AAPL');
+      expect(result[0]?.changesPercentage).toBeCloseTo(1.3);
+      expect(result[1]?.changesPercentage).toBeCloseTo(-0.3);
+      expect(redis.set).toHaveBeenCalledWith(
+        expect.stringContaining('papi:screener:'),
+        expect.any(String),
+        300,
+      );
+    });
+
+    it('applies changeMin filter on cached results without extra API calls', async () => {
+      const cached: ScreenerResult[] = [
+        {
+          symbol: 'AAPL',
+          name: 'Apple Inc.',
+          price: 195,
+          change: 2.5,
+          changesPercentage: 1.3,
+          marketCap: 3e12,
+          sector: 'Technology',
+          volume: 50e6,
+          dividendYield: 0.005,
+        },
+        {
+          symbol: 'MSFT',
+          name: 'Microsoft Corp',
+          price: 410,
+          change: -1.2,
+          changesPercentage: -0.3,
+          marketCap: 3.1e12,
+          sector: 'Technology',
+          volume: 25e6,
+          dividendYield: 0.007,
+        },
+      ];
+      redis.get.mockResolvedValue(JSON.stringify(cached));
+
+      const result = await service.getScreener({ changeMin: 1 });
+
+      expect(result).toHaveLength(1);
+      expect(result[0]?.symbol).toBe('AAPL');
+      expect(httpService.get).not.toHaveBeenCalled();
     });
   });
 });
