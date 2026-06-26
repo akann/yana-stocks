@@ -17,7 +17,7 @@ import { StocksModule } from './stocks/stocks.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
-    HttpModule,
+    HttpModule.register({ timeout: 10_000 }),
     RedisModule,
     KafkaModule,
     StocksModule,

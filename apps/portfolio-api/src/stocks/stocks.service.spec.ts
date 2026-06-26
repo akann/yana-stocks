@@ -133,7 +133,10 @@ describe('StocksService', () => {
       const result = await service.getStock('AAPL');
 
       expect(result.price).toBe(180);
-      expect(httpService.get).toHaveBeenCalledWith(expect.stringContaining('/prices/AAPL/quote'));
+      expect(httpService.get).toHaveBeenCalledWith(
+        expect.stringContaining('/prices/AAPL/quote'),
+        expect.objectContaining({ timeout: 3000 }),
+      );
       expect(redis.set).toHaveBeenCalledWith(
         'papi:price:AAPL',
         JSON.stringify(mockPriceCacheEntry),

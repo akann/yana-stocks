@@ -68,7 +68,12 @@ export class StocksService {
     if (!price) {
       try {
         const resp = await firstValueFrom(
-          this.httpService.get<PriceCacheEntry>(`${this.priceProcessorUrl}/prices/${symbol}/quote`),
+          this.httpService.get<PriceCacheEntry>(
+            `${this.priceProcessorUrl}/prices/${symbol}/quote`,
+            {
+              timeout: 3000,
+            },
+          ),
         );
         if (resp.data?.price) {
           price = resp.data;
