@@ -644,7 +644,7 @@ export function StockChart({ symbol, currentPrice }: Props): React.JSX.Element {
               <span
                 key={`${s.source}-${s.type}`}
                 title={count > 1 ? `${count} crossovers — ${s.description}` : s.description}
-                className={`text-xs px-1.5 py-0.5 rounded font-medium normal-case tracking-normal ${
+                className={`text-xs px-1.5 py-0.5 rounded font-medium normal-case tracking-normal whitespace-nowrap ${
                   s.type === 'buy' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                 }`}
               >
