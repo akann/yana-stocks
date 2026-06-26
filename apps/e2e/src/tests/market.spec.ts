@@ -1,5 +1,5 @@
 import { test, expect, setupStockMocks } from '../fixtures/base.fixture';
-import { MOCK_MOVERS, fulfill, mockMovers } from '../fixtures/api-mocks';
+import { fulfill, mockMovers, mockAssets, MOCK_UK_ASSETS_PAGE } from '../fixtures/api-mocks';
 
 test.describe('Market dashboard (homepage)', () => {
   test('shows heading, search input, and Go button', async ({ page }) => {
@@ -84,5 +84,106 @@ test.describe('Market dashboard (homepage)', () => {
     const noDataNodes = page.getByText('No data');
     await expect(noDataNodes.first()).toBeVisible();
     await expect(noDataNodes).toHaveCount(2);
+  });
+});
+
+test.describe('MarketBrowser', () => {
+  async function setup(page: Parameters<typeof mockMovers>[0]): Promise<void> {
+    await mockMovers(page);
+    await mockAssets(page);
+    // AddToWatchlistButton fetches watchlists; return empty list to avoid unrouted requests.
+    await page.route(/\/api\/portfolio\/watchlists$/, (route) => fulfill(route, []));
+  }
+
+  test('renders US Equities tab by default with US symbols', async ({ page }) => {
+    await setup(page);
+    await page.goto('/');
+
+    await expect(page.getByRole('button', { name: '🇺🇸 US Equities' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'AAPL' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'MSFT' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'NVDA' })).toBeVisible();
+  });
+
+  test('clicking UK tab shows .L symbols', async ({ page }) => {
+    await setup(page);
+    await page.goto('/');
+
+    await page.getByRole('button', { name: '🇬🇧 UK Equities' }).click();
+
+    await expect(page.getByRole('link', { name: 'HSBA.L' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'BARC.L' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'BP.L' })).toBeVisible();
+  });
+
+  test('clicking a UK stock link navigates to /stocks/HSBA.L preserving .L suffix', async ({
+    page,
+  }) => {
+    await setup(page);
+    // Mock the UK stock page endpoints so navigation succeeds.
+    await page.route(/\/api\/stocks\/HSBA\.L$/, (route) =>
+      fulfill(route, { symbol: 'HSBA.L', price: 640.5, change: 2.3, changePercent: 0.36 }),
+    );
+    await page.route(/\/api\/stocks\/HSBA\.L\/history/, (route) => fulfill(route, []));
+    await page.route(/\/api\/signals\/HSBA\.L$/, (route) =>
+      fulfill(route, { symbol: 'HSBA.L', sentiment: null, prediction: null }),
+    );
+    await page.route(/\/api\/predict\/HSBA\.L$/, (route) =>
+      fulfill(route, { symbol: 'HSBA.L', predictions: [] }),
+    );
+    await page.route(/\/api\/news\/HSBA\.L$/, (route) => fulfill(route, []));
+
+    await page.goto('/');
+    await page.getByRole('button', { name: '🇬🇧 UK Equities' }).click();
+    await page.getByRole('link', { name: 'HSBA.L' }).click();
+
+    await page.waitForURL(/\/stocks\/HSBA\.L/, { timeout: 10_000 });
+    await expect(page).toHaveURL(/\/stocks\/HSBA\.L/);
+  });
+
+  test('clicking ETF tab shows ETF symbols', async ({ page }) => {
+    await setup(page);
+    await page.goto('/');
+
+    await page.getByRole('button', { name: '📊 ETFs' }).click();
+
+    await expect(page.getByRole('link', { name: 'SPY' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'QQQ' })).toBeVisible();
+  });
+
+  test('search with no match shows empty state message', async ({ page }) => {
+    await setup(page);
+    // Override to return empty results for any search query
+    await page.route(/\/api\/market\/assets/, (route) => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get('search'))
+        return fulfill(route, { data: [], total: 0, page: 1, limit: 20 });
+      const market = url.searchParams.get('market') ?? 'us';
+      const fixture =
+        market === 'uk'
+          ? MOCK_UK_ASSETS_PAGE
+          : market === 'etf'
+            ? { data: [], total: 0, page: 1, limit: 20 }
+            : {
+                data: [
+                  {
+                    symbol: 'AAPL',
+                    name: 'Apple Inc.',
+                    exchange: 'NASDAQ',
+                    tradable: true,
+                    assetClass: 'us_equity',
+                  },
+                ],
+                total: 1,
+                page: 1,
+                limit: 20,
+              };
+      return fulfill(route, fixture);
+    });
+    await page.goto('/');
+
+    await page.getByPlaceholder('Search symbol or name…').fill('ZZZZ');
+
+    await expect(page.getByText(/No results for/)).toBeVisible();
   });
 });

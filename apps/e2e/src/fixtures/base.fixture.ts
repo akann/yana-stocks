@@ -12,7 +12,12 @@ const MOCK_PROFILE = {
   displayName: 'Test User',
   avatar: '',
   bio: '',
-  preferences: { theme: 'light', defaultCurrency: 'USD', emailNotifications: false },
+  preferences: {
+    theme: 'light',
+    defaultCurrency: 'USD',
+    emailNotifications: false,
+    defaultMarket: 'US',
+  },
 };
 const MOCK_STOCK = { symbol: 'NVDA', price: 500.0, change: 5.0, changePercent: 1.0 };
 const MOCK_SIGNALS = { symbol: 'NVDA', sentiment: null, prediction: null };
