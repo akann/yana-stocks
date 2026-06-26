@@ -24,8 +24,7 @@ class Settings(BaseSettings):
 
     kafka_brokers: str = "localhost:19092"
     mongodb_uri: str = "mongodb://localhost:27017/sentiment"
-    alpaca_api_key: str
-    alpaca_api_secret: str
+    fmp_api_key: str
     huggingface_model: str = "ProsusAI/finbert"
     poll_interval_seconds: float = 300.0
     # Format: AAPL:Apple|GOOGL:Google OR Alphabet|MSFT:Microsoft

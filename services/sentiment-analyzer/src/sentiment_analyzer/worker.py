@@ -5,15 +5,15 @@ from datetime import UTC, datetime, timedelta
 
 from .analyzer import SentimentAnalyzer
 from .config import Settings
+from .fmp_news_client import FmpNewsClient, NewsApiError
 from .kafka_producer import KafkaProducer
-from .news_client import AlpacaNewsClient, NewsApiError
 from .storage import ArticleStorage
 
 logger = logging.getLogger(__name__)
 
 
 def run(settings: Settings) -> None:
-    news = AlpacaNewsClient(api_key=settings.alpaca_api_key, api_secret=settings.alpaca_api_secret)
+    news = FmpNewsClient(api_key=settings.fmp_api_key)
     analyzer = SentimentAnalyzer(model_name=settings.huggingface_model)
     storage = ArticleStorage(uri=settings.mongodb_uri)
     producer = KafkaProducer(brokers=settings.kafka_brokers)
@@ -47,7 +47,7 @@ def run(settings: Settings) -> None:
         try:
             articles = news.fetch_articles(symbols=symbols, since=since)
         except NewsApiError as exc:
-            logger.warning("Alpaca news error: %s", exc)
+            logger.warning("FMP news error: %s", exc)
             articles = []
         except Exception as exc:
             logger.error("Unexpected error fetching news: %s", exc)
@@ -63,12 +63,11 @@ def run(settings: Settings) -> None:
                 continue
 
             analyzed_at = datetime.now(tz=UTC)
-            published_at = AlpacaNewsClient.parse_published_at(article.get("created_at"))
+            published_at = FmpNewsClient.parse_published_at(article.get("created_at"))
 
-            # Publish one signal per symbol the article mentions
             matched = [s for s in (article_symbols if isinstance(article_symbols, list) else []) if s in symbols]
             if not matched:
-                matched = symbols  # fallback: treat as general market news
+                matched = symbols
 
             for symbol in matched:
                 try:
@@ -82,7 +81,7 @@ def run(settings: Settings) -> None:
                         url=url,
                         symbol=symbol,
                         headline=headline,
-                        source=str(article.get("source", "alpaca")),
+                        source=str(article.get("source", "fmp")),
                         published_at=published_at,
                         sentiment_label=result["label"],
                         sentiment_score=result["score"],

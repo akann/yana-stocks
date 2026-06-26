@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { AnalystPanel } from '@/components/analyst/AnalystPanel';
 import { NewsPanel } from '@/components/news/NewsPanel';
 import { StockChart } from '@/components/charts/StockChart';
 import { SignalsPanel } from '@/components/signals/SignalsPanel';
@@ -159,8 +160,9 @@ export default function StockPage(): React.JSX.Element | null {
         <div className="lg:col-span-2">
           <StockChart symbol={upperSymbol} currentPrice={price} />
         </div>
-        <div>
+        <div className="space-y-4">
           <SignalsPanel symbol={upperSymbol} />
+          <AnalystPanel symbol={upperSymbol} currentPrice={price} />
         </div>
       </div>
 
