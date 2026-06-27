@@ -461,5 +461,267 @@ describe('StocksController (integration)', () => {
 
       expect(body.data.length).toBeLessThanOrEqual(100);
     });
+
+    it('returns paginated MOCK_UK_ASSETS for market=uk', async () => {
+      const { body } = await request(server)
+        .get('/market/assets?market=uk&page=1&limit=5')
+        .expect(200);
+
+      expect(body.data.length).toBeGreaterThan(0);
+      expect(body.data[0]).toHaveProperty('assetClass', 'uk_equity');
+      // UK symbols have the .L suffix
+      expect(body.data[0].symbol).toMatch(/\.L$/);
+    });
+
+    it('returns merged assets for market=all including UK symbols', async () => {
+      // Searching for a UK-specific symbol (HSBA.L) proves the merge includes uk_equity.
+      // The first page of an unfiltered market=all result is dominated by MOCK_ASSETS
+      // (230+ us_equity entries), so we filter by symbol instead.
+      const { body } = await request(server)
+        .get('/market/assets?market=all&search=HSBA.L&page=1&limit=10')
+        .expect(200);
+
+      expect(body.data.length).toBeGreaterThan(0);
+      expect(body.data[0].symbol).toBe('HSBA.L');
+      expect(body.data[0]).toHaveProperty('assetClass', 'uk_equity');
+    });
+  });
+
+  // ─── GET /market/screener ─────────────────────────────────────────────────
+
+  describe('GET /market/screener', () => {
+    it('does not require authentication', async () => {
+      const { body } = await request(server).get('/market/screener').expect(200);
+      expect(Array.isArray(body)).toBe(true);
+    });
+
+    it('returns empty array when FMP_API_KEY is not configured', async () => {
+      const saved = process.env['FMP_API_KEY'];
+      delete process.env['FMP_API_KEY'];
+
+      const { body } = await request(server).get('/market/screener').expect(200);
+      expect(Array.isArray(body)).toBe(true);
+      expect(body).toHaveLength(0);
+
+      if (saved !== undefined) process.env['FMP_API_KEY'] = saved;
+    });
+
+    it('serves cached screener results from Redis', async () => {
+      const cached = [
+        {
+          symbol: 'CACHE_SCR',
+          name: 'Cache Test Corp',
+          price: 100,
+          changesPercentage: 1.5,
+          marketCap: 1_000_000_000,
+          volume: 500_000,
+          dividendYield: 1.2,
+          sector: 'Technology',
+        },
+      ];
+      await rawRedis.setex('papi:screener:profiles', 3600, JSON.stringify(cached));
+
+      try {
+        const { body } = await request(server).get('/market/screener').expect(200);
+        expect(body[0]?.symbol).toBe('CACHE_SCR');
+      } finally {
+        await rawRedis.del('papi:screener:profiles');
+      }
+    });
+
+    it('filters by sector when sector param is provided', async () => {
+      const profiles = [
+        {
+          symbol: 'TECH1',
+          name: 'Tech One',
+          price: 100,
+          changesPercentage: 1,
+          marketCap: 500_000_000,
+          volume: 100_000,
+          dividendYield: 0,
+          sector: 'Technology',
+        },
+        {
+          symbol: 'HEALTH1',
+          name: 'Health One',
+          price: 50,
+          changesPercentage: 0.5,
+          marketCap: 300_000_000,
+          volume: 50_000,
+          dividendYield: 0.5,
+          sector: 'Health Care',
+        },
+      ];
+      await rawRedis.setex('papi:screener:profiles', 3600, JSON.stringify(profiles));
+
+      try {
+        const { body } = await request(server)
+          .get('/market/screener?sector=Technology')
+          .expect(200);
+        expect(body.every((r: { sector: string }) => r.sector === 'Technology')).toBe(true);
+      } finally {
+        await rawRedis.del('papi:screener:profiles');
+      }
+    });
+
+    it('respects the limit query parameter', async () => {
+      const profiles = Array.from({ length: 10 }, (_, i) => ({
+        symbol: `SCR${i}`,
+        name: `Screener ${i}`,
+        price: 100 + i,
+        changesPercentage: i,
+        marketCap: (10 - i) * 100_000_000,
+        volume: 100_000,
+        dividendYield: 0,
+        sector: 'Technology',
+      }));
+      await rawRedis.setex('papi:screener:profiles', 3600, JSON.stringify(profiles));
+
+      try {
+        const { body } = await request(server).get('/market/screener?limit=3').expect(200);
+        expect(body).toHaveLength(3);
+      } finally {
+        await rawRedis.del('papi:screener:profiles');
+      }
+    });
+  });
+
+  // ─── GET /market/sectors/rotation ────────────────────────────────────────
+
+  describe('GET /market/sectors/rotation', () => {
+    const ROTATION_KEY_SP500 = 'papi:sector:rotation:sp500';
+    const ROTATION_KEY_FTSE = 'papi:sector:rotation:ftse100';
+
+    afterEach(async () => {
+      await rawRedis.del(ROTATION_KEY_SP500, ROTATION_KEY_FTSE);
+    });
+
+    it('does not require authentication', async () => {
+      const { body } = await request(server).get('/market/sectors/rotation').expect(200);
+      expect(body).toHaveProperty('dates');
+      expect(body).toHaveProperty('rows');
+    });
+
+    it('returns empty dates and rows when no API keys are configured (sp500)', async () => {
+      const saved = process.env['FMP_API_KEY'];
+      delete process.env['FMP_API_KEY'];
+
+      const { body } = await request(server)
+        .get('/market/sectors/rotation?index=sp500')
+        .expect(200);
+      expect(Array.isArray(body.dates)).toBe(true);
+      expect(Array.isArray(body.rows)).toBe(true);
+
+      if (saved !== undefined) process.env['FMP_API_KEY'] = saved;
+    });
+
+    it('serves cached sp500 rotation from Redis', async () => {
+      const cached = {
+        dates: ['2026-01-06', '2026-01-07'],
+        rows: [
+          { sector: 'Technology', changes: [1.5, 2.1] },
+          { sector: 'Financials', changes: [0.8, -0.3] },
+        ],
+      };
+      await rawRedis.setex(ROTATION_KEY_SP500, 3600, JSON.stringify(cached));
+
+      const { body } = await request(server)
+        .get('/market/sectors/rotation?index=sp500')
+        .expect(200);
+
+      expect(body.dates).toEqual(['2026-01-06', '2026-01-07']);
+      expect(body.rows[0].sector).toBe('Technology');
+      expect(body.rows[0].changes).toHaveLength(2);
+    });
+
+    it('serves cached ftse100 rotation from Redis', async () => {
+      const cached = {
+        dates: ['2026-01-06'],
+        rows: [{ sector: 'Financials', changes: [0.4] }],
+      };
+      await rawRedis.setex(ROTATION_KEY_FTSE, 3600, JSON.stringify(cached));
+
+      const { body } = await request(server)
+        .get('/market/sectors/rotation?index=ftse100')
+        .expect(200);
+
+      expect(body.rows[0].sector).toBe('Financials');
+    });
+
+    it('defaults to sp500 when index param is not provided', async () => {
+      const cached = {
+        dates: ['2026-01-06'],
+        rows: [{ sector: 'Technology', changes: [1.0] }],
+      };
+      await rawRedis.setex(ROTATION_KEY_SP500, 3600, JSON.stringify(cached));
+
+      const { body } = await request(server).get('/market/sectors/rotation').expect(200);
+      expect(body.rows[0].sector).toBe('Technology');
+    });
+  });
+
+  // ─── GET /market/factors ─────────────────────────────────────────────────
+
+  describe('GET /market/factors', () => {
+    const FACTORS_KEY = 'papi:factors';
+
+    afterEach(async () => {
+      await rawRedis.del(FACTORS_KEY);
+    });
+
+    it('does not require authentication', async () => {
+      jest.spyOn(httpService, 'get').mockReturnValue(throwError(() => new Error('offline')));
+      const { body } = await request(server).get('/market/factors').expect(200);
+      expect(Array.isArray(body)).toBe(true);
+    });
+
+    it('returns 6 factor tiles when HttpService is offline', async () => {
+      jest.spyOn(httpService, 'get').mockReturnValue(throwError(() => new Error('offline')));
+
+      const { body } = await request(server).get('/market/factors').expect(200);
+
+      expect(body).toHaveLength(6);
+      const factors = (body as Array<{ factor: string }>).map((t) => t.factor);
+      expect(factors).toContain('Momentum');
+      expect(factors).toContain('Value');
+      expect(factors).toContain('Growth');
+      expect(factors).toContain('Dividend');
+      expect(factors).toContain('Low Volatility');
+      expect(factors).toContain('Quality');
+    });
+
+    it('factor tiles have the expected shape', async () => {
+      jest.spyOn(httpService, 'get').mockReturnValue(throwError(() => new Error('offline')));
+
+      const { body } = await request(server).get('/market/factors').expect(200);
+
+      const tile = body[0];
+      expect(tile).toHaveProperty('factor');
+      expect(tile).toHaveProperty('etf');
+      expect(tile).toHaveProperty('price');
+      expect(tile).toHaveProperty('change1d');
+      expect(tile).toHaveProperty('change1w');
+      expect(tile).toHaveProperty('change1m');
+    });
+
+    it('serves cached factor tiles from Redis', async () => {
+      const cached = [
+        {
+          factor: 'Momentum',
+          etf: 'MTUM',
+          price: 200,
+          change1d: 1.2,
+          change1w: 3.4,
+          change1m: 8.1,
+        },
+      ];
+      await rawRedis.setex(FACTORS_KEY, 900, JSON.stringify(cached));
+
+      const { body } = await request(server).get('/market/factors').expect(200);
+
+      expect(body).toHaveLength(1);
+      expect(body[0].factor).toBe('Momentum');
+      expect(body[0].price).toBe(200);
+    });
   });
 });
