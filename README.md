@@ -65,7 +65,8 @@ pnpm docker:up
 ```
 
 This starts Redpanda (Kafka, port 19092), MongoDB (27017), Redis (6379),
-PostgreSQL (5432), and MinIO (9000/9001).
+PostgreSQL (5432), MinIO (9000/9001), and the api-docs Swagger hub (3009). The
+api-docs image is rebuilt automatically on every `docker:up`.
 
 ### 2. Install dependencies
 
@@ -238,5 +239,7 @@ Notable patterns:
   initContainer)
 - **ESO** — ExternalSecrets pulls from Infisical project `k8s-homelab`
 - **api-docs** — static nginx serving per-service Swagger UIs at
-  `api-docs.yanatech.co.uk`; built from `generate-openapi.ts` in each NestJS
-  service, Authentik-protected
+  `api-docs.yanatech.co.uk` (Authentik-protected); covers portfolio-api,
+  portfolio-service, profile-service, price-processor, and auth-service. NestJS
+  specs generated via `generate-openapi.ts` + `@nestjs/swagger` plugin;
+  auth-service spec generated via `swaggo/swag`. Available locally at port 3009.

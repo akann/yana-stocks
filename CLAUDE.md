@@ -155,6 +155,12 @@ yana-stocks/
     hash, deletes token; public route (cors only, no JWT)
   - `PUT /api/auth/password` — change password (JWT required)
   - `DELETE /api/auth/account` — delete account and all data (JWT required)
+  - `GET /api/auth/mfa` — get MFA enabled status (JWT required)
+  - `POST /api/auth/mfa/setup` — generate TOTP secret (JWT required)
+  - `POST /api/auth/mfa/enable` — verify TOTP code and activate MFA (JWT
+    required)
+  - `DELETE /api/auth/mfa` — disable MFA (JWT required)
+  - `POST /api/auth/mfa/verify` — complete MFA login with TOTP code (public)
 
 ### 5b. profile-service (NestJS)
 
@@ -239,9 +245,23 @@ yana-stocks/
   (Authentik-protected)
 - **Source:** `apps/api-docs/` — `index.html` + `nginx.conf` + `Dockerfile`
 - **Serves:** Per-service OpenAPI pages for portfolio-api, portfolio-service,
-  profile-service
-- **Build:** Each NestJS service has `src/generate-openapi.ts` — run during CI
-  to emit `<service>.html` bundled into the api-docs Docker image
+  profile-service, price-processor, auth-service
+- **Build:** Multi-stage Dockerfile:
+  - Go stage (`auth-spec-builder`): installs `swaggo/swag`, runs `swag init` on
+    auth-service to emit `swagger.json`
+  - Node stage (`spec-builder`): runs `nest build` + `generate-openapi.js` for
+    each NestJS service to emit per-service OpenAPI JSON
+  - Node stage (`docs-builder`): `@redocly/cli@2.35.1` builds static HTML per
+    service
+  - `nginx:alpine` serves the HTML files
+- **NestJS Swagger plugin:** All NestJS services use `nest build` (not plain
+  `tsc`) so the `@nestjs/swagger` AST plugin auto-infers request body schemas.
+  Response schemas use `@ApiOkResponse({ type: SomeClass })` on all controllers.
+- **auth-service Swagger:** Uses `swaggo/swag` comment annotations in
+  `internal/handler/auth.go` and `swagger_types.go` for typed request/response
+  structs; `BearerAuth` security definition for JWT-protected endpoints
+- **Local dev:** Available at `http://localhost:3009` via docker-compose
+  (`pull_policy: build` — auto-rebuilds on every `docker:up`)
 - **No backend** — pure static files, health check at `GET /health → 200 ok`
 
 ### 11. e2e (Playwright)
@@ -436,11 +456,12 @@ apps/yana-stocks/
 
 ```yaml
 services:
-  kafka: # Redpanda (lightweight Kafka)
-  mongodb: # MongoDB 8
-  redis: # Redis 8
-  postgres: # PostgreSQL 16
-  minio: # MinIO
+  kafka: # Redpanda (lightweight Kafka)  :19092
+  mongodb: # MongoDB 8                     :27017
+  redis: # Redis 8                       :6379
+  postgres: # PostgreSQL 16                 :5432
+  minio: # MinIO                         :9000/:9001
+  api-docs: # Static nginx Swagger hub      :3009  (pull_policy: build — always rebuilt on docker:up)
 ```
 
 ## Production Infrastructure
