@@ -188,3 +188,105 @@ export interface PortfolioData {
   stocks: { symbol: string; shares: number; avgCostBasis: number }[];
   totalValue?: number;
 }
+
+// News articles for /api/news/:symbol — matches NewsPanel NewsArticle interface
+export const MOCK_NEWS_ARTICLES = [
+  {
+    headline: 'NVIDIA Reports Record Revenue',
+    source: 'Reuters',
+    url: 'https://example.com/nvda-1',
+    publishedAt: new Date().toISOString(),
+    sentimentLabel: 'positive',
+    sentimentScore: 0.82,
+  },
+  {
+    headline: 'AI Chip Demand Surges Ahead of Earnings',
+    source: 'Bloomberg',
+    url: 'https://example.com/nvda-2',
+    publishedAt: new Date().toISOString(),
+    sentimentLabel: 'positive',
+    sentimentScore: 0.74,
+  },
+];
+
+// Analyst rating for /api/stocks/:symbol/analyst — matches AnalystRating interface
+export const MOCK_ANALYST_RATING = {
+  strongBuy: 20,
+  buy: 10,
+  hold: 5,
+  sell: 2,
+  strongSell: 1,
+  analystCount: 38,
+  priceTarget: 650,
+  consensus: 'strongBuy' as const,
+  asOf: new Date().toISOString(),
+};
+
+// Market overview for /api/market/overview — matches MarketOverview interface
+export const MOCK_OVERVIEW = {
+  indices: [
+    { symbol: '^GSPC', name: 'S&P 500', price: 5250.2, change: 30.1, changesPercentage: 0.57 },
+    { symbol: '^IXIC', name: 'Nasdaq', price: 16400.5, change: -50.3, changesPercentage: -0.31 },
+    { symbol: '^FTSE', name: 'FTSE 100', price: 8200.1, change: 20.4, changesPercentage: 0.25 },
+  ],
+  sectors: [
+    { sector: 'Technology', changesPercentage: 1.2 },
+    { sector: 'Healthcare', changesPercentage: -0.5 },
+  ],
+  news: [
+    {
+      title: 'Fed holds rates steady amid inflation concerns',
+      url: 'https://example.com/news-1',
+      publishedAt: new Date().toISOString(),
+      source: 'Reuters',
+      summary: 'The Federal Reserve held rates at current levels.',
+    },
+    {
+      title: 'Market rally continues into Q3',
+      url: 'https://example.com/news-2',
+      publishedAt: new Date().toISOString(),
+      source: 'Bloomberg',
+      summary: 'Equities extended gains for a third consecutive week.',
+    },
+  ],
+};
+
+// Screener results for /api/market/screener — matches ScreenerResult interface
+export const MOCK_SCREENER_RESULTS = [
+  {
+    symbol: 'AAPL',
+    name: 'Apple Inc.',
+    price: 180.5,
+    change: 3.7,
+    changesPercentage: 2.1,
+    marketCap: 2_800_000_000_000,
+    sector: 'Technology',
+    volume: 800_000,
+    dividendYield: 0.5,
+  },
+  {
+    symbol: 'MSFT',
+    name: 'Microsoft Corporation',
+    price: 420.0,
+    change: 6.2,
+    changesPercentage: 1.5,
+    marketCap: 3_100_000_000_000,
+    sector: 'Technology',
+    volume: 500_000,
+    dividendYield: 0.7,
+  },
+];
+
+export async function mockMarketOverview(page: Page, data = MOCK_OVERVIEW): Promise<void> {
+  await page.route(/\/api\/market\/overview/, (route) => fulfill(route, data));
+}
+
+export async function mockScreener(page: Page, results = MOCK_SCREENER_RESULTS): Promise<void> {
+  await page.route(/\/api\/market\/screener/, (route) => fulfill(route, results));
+}
+
+export async function mockSectorRotation(page: Page): Promise<void> {
+  await page.route(/\/api\/market\/sectors\/rotation/, (route) =>
+    fulfill(route, { dates: [], rows: [] }),
+  );
+}

@@ -50,6 +50,29 @@ export function makeDailyBars(count: number, symbol = 'NVDA'): MockOHLCVBar[] {
   return bars;
 }
 
+// Steadily declining closes — every bar down by 3 from the previous.
+// computeRSI(14) on this data produces RSI ≈ 0 (all losses, no gains), triggering the
+// "Oversold" badge in StockChart when showRSI is true.
+export function makeDecliningDailyBars(count: number, symbol = 'NVDA'): MockOHLCVBar[] {
+  const bars: MockOHLCVBar[] = [];
+  const base = new Date('2023-01-03T14:30:00.000Z');
+  for (let i = 0; i < count; i++) {
+    const ts = new Date(base.getTime() + i * 86_400_000);
+    const close = 500 - i * 3;
+    bars.push({
+      symbol,
+      timestamp: ts.toISOString(),
+      open: close + 1,
+      high: close + 2,
+      low: close - 1,
+      close,
+      volume: 50_000_000,
+      interval: '1d',
+    });
+  }
+  return bars;
+}
+
 // Adds a T00 duplicate for every bar, simulating the MongoDB duplicate-UTC-offset bug.
 // The frontend dedup should collapse these before passing data to the chart.
 export function makeDailyBarsWithDuplicates(count: number, symbol = 'NVDA'): MockOHLCVBar[] {
