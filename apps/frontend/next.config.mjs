@@ -4,15 +4,11 @@ const config = {
   // technicalindicators ESM entry (lib/index.js) has bare imports without .js extensions
   // which break under strict ESM. Force webpack to bundle it via transpilePackages.
   transpilePackages: ['technicalindicators'],
-  experimental: {
-    serverComponentsExternalPackages: [
-      '@opentelemetry/sdk-node',
-      '@opentelemetry/auto-instrumentations-node',
-      '@opentelemetry/exporter-trace-otlp-http',
-    ],
-    turbo: {},
-    instrumentationHook: true,
-  },
+  serverExternalPackages: [
+    '@opentelemetry/sdk-node',
+    '@opentelemetry/auto-instrumentations-node',
+    '@opentelemetry/exporter-trace-otlp-http',
+  ],
   // In production Kong handles /api/* routing. In dev, proxy to local services.
   async rewrites() {
     if (process.env.NODE_ENV === 'production') return [];
