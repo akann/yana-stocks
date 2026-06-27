@@ -75,7 +75,9 @@
       "!**/*.module.ts",
       "!**/*.decorator.ts",
       "!**/config/configuration.ts",
-      "!**/scripts/**"
+      "!**/scripts/**",
+      "!**/generate-openapi.ts",
+      "!**/tracing.ts"
     ],
     "coverageDirectory": "../coverage",
     "coverageReporters": [
