@@ -24,9 +24,10 @@ test.describe('AddToWatchlistButton', () => {
     await page.goto('/');
 
     await expect(page.getByText('NVDA').first()).toBeVisible();
-    await expect(page.getByTitle('Add NVDA to watchlist')).toBeVisible();
-    await expect(page.getByTitle('Add AAPL to watchlist')).toBeVisible();
-    await expect(page.getByTitle('Add TSLA to watchlist')).toBeVisible();
+    // NVDA and AAPL also appear in the MarketBrowser table, so each has ≥2 watchlist buttons.
+    await expect(page.getByTitle('Add NVDA to watchlist').first()).toBeVisible();
+    await expect(page.getByTitle('Add AAPL to watchlist').first()).toBeVisible();
+    await expect(page.getByTitle('Add TSLA to watchlist').first()).toBeVisible();
   });
 
   test('unauthenticated click on + navigates to /login', async ({ page }) => {
@@ -34,13 +35,13 @@ test.describe('AddToWatchlistButton', () => {
     await page.goto('/');
 
     await expect(page.getByText('NVDA').first()).toBeVisible();
-    await page.getByTitle('Add NVDA to watchlist').click();
+    await page.getByTitle('Add NVDA to watchlist').first().click();
     await page.waitForURL(/\/login/, { timeout: 5_000 });
 
     await expect(page).toHaveURL(/\/login/);
   });
 
-  test('authenticated, single watchlist: + on stock page immediately adds and shows ✓', async ({
+  test('authenticated, single watchlist: + on stock page shows dropdown and adds on click', async ({
     page,
   }) => {
     await setupStockMocks(page);
@@ -59,6 +60,10 @@ test.describe('AddToWatchlistButton', () => {
     const addBtn = page.getByTitle('Add NVDA to watchlist');
     await expect(addBtn).toBeVisible();
     await addBtn.click();
+
+    // The button always shows a dropdown (even with 1 watchlist). Click the watchlist item.
+    await expect(page.getByRole('button', { name: 'My Stocks' })).toBeVisible({ timeout: 5_000 });
+    await page.getByRole('button', { name: 'My Stocks' }).dispatchEvent('click');
 
     await expect(addBtn).toHaveText('✓', { timeout: 5_000 });
   });

@@ -28,7 +28,8 @@ test.describe('Stock detail — OHLV header stats', () => {
     await stockPage.waitForLoad();
 
     // makeDailyBars returns volume starting at 50_000_000 — formatVolume renders as "50.0M" or similar.
-    await expect(page.getByText(/\d+(\.\d+)?[MBK]/)).toBeVisible();
+    // .first() avoids strict mode: "1M"/"3M"/"6M" time range buttons also match the regex.
+    await expect(page.getByText(/\d+(\.\d+)?[MBK]/).first()).toBeVisible();
   });
 });
 
@@ -151,7 +152,8 @@ test.describe('Stock detail — MA indicator toggles', () => {
       await stockPage.goto(SYMBOL);
       await stockPage.waitForLoad();
 
-      await expect(page.getByRole('button', { name: label })).toBeVisible();
+      // exact: true prevents 'SMA 20' from also matching 'SMA 200'.
+      await expect(page.getByRole('button', { name: label, exact: true })).toBeVisible();
     });
   }
 
@@ -161,7 +163,7 @@ test.describe('Stock detail — MA indicator toggles', () => {
     await stockPage.goto(SYMBOL);
     await stockPage.waitForLoad();
 
-    const btn = page.getByRole('button', { name: 'SMA 20' });
+    const btn = page.getByRole('button', { name: 'SMA 20', exact: true });
     await btn.click();
     await page.waitForTimeout(300);
     await btn.click();
@@ -181,7 +183,7 @@ test.describe('Stock detail — MA indicator toggles', () => {
     await stockPage.waitForLoad();
 
     for (const label of MA_BUTTONS) {
-      await page.getByRole('button', { name: label }).click();
+      await page.getByRole('button', { name: label, exact: true }).click();
       await page.waitForTimeout(100);
     }
     await page.waitForTimeout(300);
@@ -196,11 +198,11 @@ test.describe('Stock detail — MA indicator toggles', () => {
     await stockPage.goto(SYMBOL);
     await stockPage.waitForLoad();
 
-    await page.getByRole('button', { name: 'SMA 20' }).click();
+    await page.getByRole('button', { name: 'SMA 20', exact: true }).click();
     await page.waitForTimeout(100);
-    await page.getByRole('button', { name: 'RSI 14' }).click();
+    await page.getByRole('button', { name: 'RSI 14', exact: true }).click();
     await page.waitForTimeout(100);
-    await page.getByRole('button', { name: 'MACD' }).click();
+    await page.getByRole('button', { name: 'MACD', exact: true }).click();
     await page.waitForTimeout(300);
 
     expect(jsErrors, `JS errors with SMA+RSI+MACD: ${jsErrors.join('; ')}`).toHaveLength(0);
@@ -213,7 +215,7 @@ test.describe('Stock detail — MA indicator toggles', () => {
     await stockPage.goto(SYMBOL);
     await stockPage.waitForLoad();
 
-    await page.getByRole('button', { name: 'EMA 26' }).click();
+    await page.getByRole('button', { name: 'EMA 26', exact: true }).click();
     await page.waitForTimeout(200);
 
     await page.getByRole('button', { name: 'Line', exact: true }).click();
@@ -247,10 +249,11 @@ test.describe('Stock detail — RSI signal badge', () => {
     await page.waitForTimeout(300);
 
     // Enable RSI — detectSignals() only emits RSI signals when showRSI=true
-    await page.getByRole('button', { name: 'RSI 14' }).click();
+    await page.getByRole('button', { name: 'RSI 14', exact: true }).click();
     await page.waitForTimeout(400);
 
-    await expect(page.getByText('Oversold')).toBeVisible({ timeout: 5_000 });
+    // exact: true avoids strict mode: 'Oversold' is also a substring of the tooltip "RSI 0.0 — Oversold".
+    await expect(page.getByText('Oversold', { exact: true })).toBeVisible({ timeout: 5_000 });
     expect(jsErrors).toHaveLength(0);
   });
 });

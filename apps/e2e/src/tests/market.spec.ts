@@ -1,16 +1,40 @@
 import { test, expect, setupStockMocks } from '../fixtures/base.fixture';
 import { fulfill, mockMovers, mockAssets, MOCK_UK_ASSETS_PAGE } from '../fixtures/api-mocks';
 
-test.describe('Market dashboard (homepage)', () => {
-  test('shows heading, search input, and Go button', async ({ page }) => {
+// SymbolSearch is in the Navbar with `hidden md:block` — only visible at ≥768 px width.
+// These tests use a desktop viewport so the component is rendered and interactive.
+test.describe('Market dashboard — Navbar SymbolSearch (desktop only)', () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test('Navbar symbol search input is visible on the home page', async ({ page }) => {
     await mockMovers(page);
     await page.goto('/');
+    await page.waitForLoadState('networkidle');
 
-    await expect(page.getByText('Stock Market Dashboard')).toBeVisible();
-    await expect(page.getByPlaceholder('Search symbol (e.g. AAPL)')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Go' })).toBeVisible();
+    await expect(page.getByPlaceholder('Search symbol…')).toBeVisible();
   });
 
+  test('Navbar symbol search uppercases and navigates to /stocks/:SYMBOL on Enter', async ({
+    page,
+  }) => {
+    await mockMovers(page);
+    await setupStockMocks(page); // auth + NVDA stock page mocks
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // SymbolSearch: pressing Enter with no dropdown selection navigates to
+    // query.trim().toUpperCase() — no need to wait for the autocomplete dropdown.
+    const input = page.getByPlaceholder('Search symbol…');
+    await input.fill('nvda');
+    await input.press('Enter');
+    await page.waitForURL(/\/stocks\/NVDA/, { timeout: 10_000 });
+
+    await expect(page).toHaveURL(/\/stocks\/NVDA/);
+  });
+});
+
+test.describe('Market dashboard (homepage)', () => {
   test('shows Top Gainers and Top Losers section headings', async ({ page }) => {
     await mockMovers(page);
     await page.goto('/');
@@ -35,32 +59,6 @@ test.describe('Market dashboard (homepage)', () => {
     await expect(page.getByText('$194.92')).toBeVisible();
     await expect(page.getByText('+5.70%')).toBeVisible();
     await expect(page.getByText('-11.76%')).toBeVisible();
-  });
-
-  test('symbol search uppercases input and navigates to /stocks/:SYMBOL', async ({ page }) => {
-    await mockMovers(page);
-    await setupStockMocks(page); // NVDA stock page mocks
-
-    await page.goto('/');
-    await page.getByPlaceholder('Search symbol (e.g. AAPL)').fill('nvda');
-    // press('Enter') on the focused input is more reliable than button click on
-    // WebKit mobile simulation where synthetic mouse events can drop intermittently.
-    await page.getByPlaceholder('Search symbol (e.g. AAPL)').press('Enter');
-    await page.waitForURL(/\/stocks\/NVDA/, { timeout: 10_000 });
-
-    await expect(page).toHaveURL(/\/stocks\/NVDA/);
-  });
-
-  test('pressing Enter in search box also navigates', async ({ page }) => {
-    await mockMovers(page);
-    await setupStockMocks(page);
-
-    await page.goto('/');
-    await page.getByPlaceholder('Search symbol (e.g. AAPL)').fill('NVDA');
-    await page.getByPlaceholder('Search symbol (e.g. AAPL)').press('Enter');
-    await page.waitForURL(/\/stocks\/NVDA/, { timeout: 10_000 });
-
-    await expect(page).toHaveURL(/\/stocks\/NVDA/);
   });
 
   test('clicking a mover link navigates to its stock page', async ({ page }) => {
@@ -100,9 +98,11 @@ test.describe('MarketBrowser', () => {
     await page.goto('/');
 
     await expect(page.getByRole('button', { name: '🇺🇸 US Equities' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'AAPL' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'MSFT' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'NVDA' })).toBeVisible();
+    // AAPL also appears in the movers section, so use exact name (just the ticker) to
+    // target only the MarketBrowser row link.
+    await expect(page.getByRole('link', { name: 'AAPL', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'MSFT', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'NVDA', exact: true })).toBeVisible();
   });
 
   test('clicking UK tab shows .L symbols', async ({ page }) => {

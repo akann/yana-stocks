@@ -62,6 +62,23 @@ export async function setupStockMocks(
     return fulfill(route, historyFactory(limit, interval));
   });
 
+  // Analyst ratings — AnalystPanel calls this on every stock page. Without a mock it
+  // hits the real portfolio-api (JWT-validated), which returns 401 for the mock token,
+  // triggering the Axios refresh flow and eventually redirecting to /login.
+  await page.route(/\/api\/stocks\/NVDA\/analyst$/, (route) =>
+    fulfill(route, {
+      strongBuy: 0,
+      buy: 0,
+      hold: 0,
+      sell: 0,
+      strongSell: 0,
+      analystCount: 0,
+      priceTarget: null,
+      consensus: null,
+      asOf: null,
+    }),
+  );
+
   // Default empty watchlists so AddToWatchlistButton doesn't hit an unrouted endpoint.
   // Tests that need specific watchlist data can register their own route after this call
   // (Playwright LIFO route ordering means the later registration wins).
