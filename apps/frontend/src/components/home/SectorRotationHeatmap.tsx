@@ -332,14 +332,18 @@ export function SectorRotationHeatmap(): React.JSX.Element {
   });
 
   // Overview is only needed as a fallback for the S&P 500 treemap when rotation has no data
-  const { data: overviewData } = useQuery<MarketOverview>({
+  const needsOverview = activeIndex === 'sp500' && view === 'today';
+  const { data: overviewData, isLoading: overviewLoading } = useQuery<MarketOverview>({
     queryKey: ['market-overview'],
     queryFn: () => api.get<MarketOverview>('/market/overview').then((r) => r.data),
     staleTime: 5 * 60 * 1000,
-    enabled: activeIndex === 'sp500' && view === 'today',
+    enabled: needsOverview,
   });
 
-  const isLoading = rotLoading;
+  // Hold the skeleton until we have a settled data source: if rotation came back empty
+  // and we might fall back to overview, wait for overview too before revealing the treemap.
+  const rotationHasData = !!rotationData?.rows.length;
+  const isLoading = rotLoading || (needsOverview && !rotationHasData && overviewLoading);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4">
