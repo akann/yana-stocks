@@ -11,7 +11,7 @@
         "src/**/*.{test,spec}.{ts,tsx}",
         "jest.setup.ts"
       ],
-      "ignore": ["src/__mocks__/**", "jest.config.js"]
+      "ignore": ["src/__mocks__/**"]
     },
     "apps/portfolio-api": {
       "entry": ["src/main.ts", "src/scripts/**/*.ts"],
