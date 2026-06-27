@@ -86,7 +86,7 @@ describe('AddToWatchlistButton', () => {
     expect(mockPush).toHaveBeenCalledWith('/watchlist');
   });
 
-  it('immediately adds to the sole eligible watchlist without showing a dropdown', async () => {
+  it('opens a dropdown showing the sole eligible watchlist', async () => {
     const user = userEvent.setup();
     mockUseAuth.mockReturnValue({ isAuthenticated: true, isLoading: false });
     mockApiGet.mockResolvedValue({ data: [WL_A] });
@@ -94,10 +94,8 @@ describe('AddToWatchlistButton', () => {
     render(<AddToWatchlistButton symbol="AAPL" />, { wrapper });
     await waitFor(() => expect(mockApiGet).toHaveBeenCalled());
     await user.click(screen.getByRole('button', { name: 'Add AAPL to watchlist' }));
-    expect(mockApiPost).toHaveBeenCalledWith('/portfolio/watchlists/wl-1/symbols', {
-      symbol: 'AAPL',
-    });
-    expect(screen.queryByText('Tech Stocks')).not.toBeInTheDocument();
+    expect(screen.getByText('Tech Stocks')).toBeInTheDocument();
+    expect(mockApiPost).not.toHaveBeenCalled();
   });
 
   it('opens a dropdown listing all watchlists when there are multiple', async () => {
@@ -125,19 +123,17 @@ describe('AddToWatchlistButton', () => {
     });
   });
 
-  it('excludeWatchlistId adds directly to the only remaining watchlist', async () => {
+  it('excludeWatchlistId shows dropdown with only the remaining watchlist', async () => {
     const user = userEvent.setup();
     mockUseAuth.mockReturnValue({ isAuthenticated: true, isLoading: false });
     mockApiGet.mockResolvedValue({ data: [WL_A, WL_B] });
-    mockApiPost.mockResolvedValue({ data: {} });
     render(<AddToWatchlistButton symbol="AAPL" excludeWatchlistId="wl-1" />, { wrapper });
     await waitFor(() => expect(mockApiGet).toHaveBeenCalled());
     await user.click(screen.getByRole('button', { name: 'Add AAPL to watchlist' }));
-    // wl-1 excluded → only wl-2 eligible → immediate add, no dropdown
-    expect(mockApiPost).toHaveBeenCalledWith('/portfolio/watchlists/wl-2/symbols', {
-      symbol: 'AAPL',
-    });
-    expect(screen.queryByText('Value Plays')).not.toBeInTheDocument();
+    // wl-1 excluded → only wl-2 shown in dropdown
+    expect(screen.getByText('Value Plays')).toBeInTheDocument();
+    expect(screen.queryByText('Tech Stocks')).not.toBeInTheDocument();
+    expect(mockApiPost).not.toHaveBeenCalled();
   });
 
   it('excludeWatchlistId removes one entry from the dropdown when there are 3 watchlists', async () => {

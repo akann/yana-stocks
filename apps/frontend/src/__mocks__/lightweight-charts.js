@@ -12,6 +12,8 @@ const mockChart = {
   timeScale: jest.fn(() => ({ fitContent: jest.fn() })),
   priceScale: jest.fn(() => ({ applyOptions: jest.fn() })),
   applyOptions: jest.fn(),
+  subscribeClick: jest.fn(),
+  unsubscribeClick: jest.fn(),
 };
 
 const CandlestickSeries = function () {};
