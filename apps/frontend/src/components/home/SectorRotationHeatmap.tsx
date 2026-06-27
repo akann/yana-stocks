@@ -90,49 +90,103 @@ interface ContentProps {
   pct?: number;
 }
 
+const ABBREV: Record<string, string> = {
+  'Consumer Discretionary': 'Cons. Disc.',
+  'Consumer Staples': 'Cons. Staples',
+  'Communication Services': 'Comm. Svcs',
+};
+
+function abbrev(name: string): string {
+  return ABBREV[name] ?? name;
+}
+
 function CustomContent(props: ContentProps): React.JSX.Element | null {
   const { x = 0, y = 0, width = 0, height = 0, name = '', pct = 0 } = props;
-  if (width < 30 || height < 24) return null;
-  const label = name
-    .replace('Consumer Discretionary', 'Cons. Disc.')
-    .replace('Consumer Staples', 'Cons. Staples')
-    .replace('Communication Services', 'Comm. Svcs')
-    .replace('Health Care', 'Health Care');
+  if (width < 28 || height < 22) return null;
+
+  const base = cellColor(pct);
+  // Unique gradient ID per sector (safe — no spaces/special chars after replace)
+  const gradId = `cg-${name.replace(/[^a-z]/gi, '')}`;
+  const rx = 8;
+  const pctStr = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
+  const label = abbrev(name);
+
+  // Layout thresholds
+  const showBoth = width > 64 && height > 44;
+  const showPctOnly = !showBoth && width > 36 && height > 28;
+
+  // Font sizes scale with cell size, clamped
+  const nameFontSize = Math.max(9, Math.min(11, width / 7));
+  const pctFontSize = Math.max(10, Math.min(14, width / 5.5));
+
+  const cx = x + width / 2;
+  const cy = y + height / 2;
+
   return (
     <g>
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity={0.18} />
+          <stop offset="100%" stopColor="#000000" stopOpacity={0.12} />
+        </linearGradient>
+      </defs>
+
+      {/* Base colour */}
       <rect
         x={x}
         y={y}
         width={width}
         height={height}
-        fill={cellColor(pct)}
-        rx={4}
-        stroke="#fff"
-        strokeWidth={2}
+        fill={base}
+        rx={rx}
+        stroke="#f8fafc"
+        strokeWidth={3}
       />
-      {width > 55 && height > 36 && (
+      {/* Gradient overlay for depth */}
+      <rect x={x} y={y} width={width} height={height} fill={`url(#${gradId})`} rx={rx} />
+
+      {showBoth && (
         <>
+          {/* Sector name — smaller, above centre */}
           <text
-            x={x + width / 2}
-            y={y + height / 2 - 7}
+            x={cx}
+            y={cy - pctFontSize * 0.6}
             textAnchor="middle"
-            fill="#fff"
-            fontSize={Math.min(12, width / 8)}
-            fontWeight={600}
+            dominantBaseline="auto"
+            fill="rgba(255,255,255,0.85)"
+            fontSize={nameFontSize}
+            fontWeight={500}
+            letterSpacing={0.2}
           >
             {label}
           </text>
+          {/* % change — larger, hero number */}
           <text
-            x={x + width / 2}
-            y={y + height / 2 + 9}
+            x={cx}
+            y={cy + pctFontSize * 0.85}
             textAnchor="middle"
-            fill="#fff"
-            fontSize={Math.min(11, width / 9)}
+            dominantBaseline="auto"
+            fill="#ffffff"
+            fontSize={pctFontSize}
+            fontWeight={700}
           >
-            {pct >= 0 ? '+' : ''}
-            {pct.toFixed(2)}%
+            {pctStr}
           </text>
         </>
+      )}
+
+      {showPctOnly && !showBoth && (
+        <text
+          x={cx}
+          y={cy + 4}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill="#ffffff"
+          fontSize={Math.max(9, Math.min(12, width / 5))}
+          fontWeight={700}
+        >
+          {pctStr}
+        </text>
       )}
     </g>
   );
