@@ -3,7 +3,16 @@ import type { OHLCVBar } from '@/types';
 
 function makeBar(close: number, i: number): OHLCVBar {
   const d = new Date(2026, 0, i + 1).toISOString();
-  return { symbol: 'TEST', timestamp: d, open: close, high: close, low: close, close, volume: 1 };
+  return {
+    symbol: 'TEST',
+    timestamp: d,
+    open: close,
+    high: close,
+    low: close,
+    close,
+    volume: 1,
+    interval: '1d',
+  };
 }
 
 /** N bars rising by `step` from `start` */
