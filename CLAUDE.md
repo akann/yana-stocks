@@ -490,6 +490,24 @@ services:
 - **ESLint:** Frontend uses ESLint 9 with flat config (`eslint.config.mjs`);
   `eslint-config-next@16` requires ESLint ≥9
 
+CI job pipeline (`.github/workflows/ci.yml`):
+
+| Job                | Runs when                 | Purpose                                   |
+| ------------------ | ------------------------- | ----------------------------------------- |
+| `changes`          | always                    | Detect changed files (turbo filter)       |
+| `secret-scan`      | always                    | Gitleaks full-history secret scan         |
+| `ts-quality`       | TS changed                | lint + type-check + test                  |
+| `integration-test` | TS changed                | Jest integration suite                    |
+| `e2e`              | TS changed                | Playwright end-to-end (full local stack)  |
+| `knip`             | TS changed                | Dead code / unused dep scan               |
+| `audit`            | always                    | `pnpm audit --audit-level=high` CVE check |
+| `python-quality`   | Python changed            | Ruff lint + pytest                        |
+| `docker`           | all above pass, on `main` | Build + push images → gitops              |
+| `gitops`           | docker success            | Update image tags in k8s-apps             |
+
+`docker` only runs when all non-skipped quality gates succeed — `secret-scan`
+must be `success`; all others may be `success` or `skipped`.
+
 ## Local Dev Quick-Start
 
 Requires Go ≥ 1.22 installed (Mac: `brew install go`).
@@ -546,7 +564,13 @@ A pre-commit hook runs automatically on every `git commit`:
 
 ```bash
 # .husky/pre-commit
-pnpm exec lint-staged
+pnpm exec lint-staged                                          # 1. Prettier
+pnpm turbo type-check --filter='[HEAD^1]'                     # 2. Type-check (changed packages)
+if command -v gitleaks >/dev/null 2>&1; then                  # 3. Secret scan
+  gitleaks protect --staged --redact
+else
+  echo "warning: gitleaks not found (brew install gitleaks)"
+fi
 ```
 
 `lint-staged` config (root `package.json`):
@@ -557,7 +581,11 @@ pnpm exec lint-staged
 }
 ```
 
-This auto-formats all staged files with Prettier before the commit is recorded.
+Gitleaks must be installed locally (`brew install gitleaks`). The hook skips
+with a warning if missing — CI always runs the full scan regardless.
+
+False positives are suppressed via `.gitleaksignore` (fingerprint-based) and
+inline `// gitleaks:allow` comments on known dev-seed credentials.
 
 ### Format + lint tasks (turbo.json)
 
@@ -572,11 +600,40 @@ auth-service Go passthrough uses `gofmt -w ./cmd ./internal`.
 
 Root convenience scripts:
 
-| Command             | What it does                                 |
-| ------------------- | -------------------------------------------- |
-| `pnpm format`       | `prettier --write` across the whole monorepo |
-| `pnpm format:check` | `prettier --check` (exits non-zero on diff)  |
-| `pnpm lint`         | `turbo lint` — lints all packages            |
+| Command             | What it does                                                   |
+| ------------------- | -------------------------------------------------------------- |
+| `pnpm format`       | `prettier --write` across the whole monorepo                   |
+| `pnpm format:check` | `prettier --check` (exits non-zero on diff)                    |
+| `pnpm lint`         | `turbo lint` — lints all packages                              |
+| `pnpm audit`        | `pnpm audit --audit-level=high` — fail on high/critical CVEs   |
+| `pnpm scan`         | `gitleaks detect --redact` — scan full git history for secrets |
+| `pnpm knip`         | Knip dead-code + unused dependency scan (`--no-hints`)         |
+
+### Security scanning
+
+**CVE auditing (`pnpm audit`):** Runs on every CI push. Fails on high or
+critical severity. Overrides for transitive deps that can't be fixed upstream
+live in `pnpm-workspace.yaml` under `overrides:`. Accepted CVEs that have no
+upstream fix path are listed in `auditConfig.ignoreCves` with a documented
+rationale comment.
+
+**Secret scanning (Gitleaks):** Runs on staged files in pre-commit and on full
+history in CI (`secret-scan` job, always runs). Suppression in `.gitleaksignore`
+(fingerprint-based, one entry per false positive).
+
+### Dead code detection (Knip)
+
+Knip scans for unused files, exports, and dependencies across all workspaces.
+Config in `knip.json` at repo root. Run with `pnpm knip`.
+
+Key config decisions:
+
+- `ignoreExportsUsedInFile: true` — suppresses exports only consumed within
+  their own file (common in NestJS schema files).
+- `apps/frontend` — `jest.config.js` excluded (triggers a known Knip+Next.js
+  jest plugin issue); `jest.setup.ts` added to `entry` explicitly.
+- Workspace-level `ignoreDependencies` used for deps that Knip can't trace (e.g.
+  `@nestjs/schematics` for NestJS CLI, `typescript-eslint` peer dep).
 
 ## Code Style
 

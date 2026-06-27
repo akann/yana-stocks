@@ -118,15 +118,21 @@ pnpm --filter price-processor dev
 | `pnpm type-check`   | TypeScript type-check all packages                                         |
 | `pnpm format`       | Format all files with Prettier (write)                                     |
 | `pnpm format:check` | Check formatting without writing                                           |
+| `pnpm audit`        | `pnpm audit --audit-level=high` — fail on high/critical CVEs               |
+| `pnpm scan`         | `gitleaks detect --redact` — scan full git history for secrets             |
+| `pnpm knip`         | Dead code and unused dependency scan (Knip)                                |
 | `pnpm seed`         | Seed dev user (`dev@example.com`) into PostgreSQL auth tables (idempotent) |
 | `pnpm docker:up`    | Start local infrastructure                                                 |
 | `pnpm docker:down`  | Stop local infrastructure                                                  |
 | `pnpm docker:reset` | Destroy volumes and restart fresh (run `pnpm seed` afterwards)             |
 
-A **pre-commit hook** (husky + lint-staged) auto-formats all staged
-`*.{ts,tsx,js,mjs,json,md,css}` files with Prettier before every commit. Every
-package also has its own `format` / `format:check` scripts (gofmt for
-auth-service); `turbo format` runs them in parallel.
+A **pre-commit hook** (husky + lint-staged) runs on every `git commit`:
+
+1. **Prettier** — auto-formats all staged `*.{ts,tsx,js,mjs,json,md,css}` files
+2. **Type-check** — `turbo type-check --filter=[HEAD^1]` on changed packages
+   only
+3. **Gitleaks** — `gitleaks protect --staged --redact` (skips with a warning if
+   not installed; install with `brew install gitleaks`)
 
 ## Kafka Topics
 

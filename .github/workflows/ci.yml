@@ -303,7 +303,7 @@ jobs:
   e2e:
     runs-on: runners-yana-stocks
     needs: [changes, ts-quality, integration-test]
-    if: false
+    if: needs.changes.outputs.ts == 'true'
     services:
       postgres:
         image: harbor.yanatech.co.uk/library/postgres:16-alpine
