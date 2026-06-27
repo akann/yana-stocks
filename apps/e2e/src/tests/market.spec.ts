@@ -1,5 +1,12 @@
 import { test, expect, setupStockMocks } from '../fixtures/base.fixture';
-import { fulfill, mockMovers, mockAssets, MOCK_UK_ASSETS_PAGE } from '../fixtures/api-mocks';
+import {
+  fulfill,
+  mockMovers,
+  mockAssets,
+  mockMarketOverview,
+  mockSectorRotation,
+  MOCK_UK_ASSETS_PAGE,
+} from '../fixtures/api-mocks';
 
 // SymbolSearch is in the Navbar with `hidden md:block` — only visible at ≥768 px width.
 // These tests use a desktop viewport so the component is rendered and interactive.
@@ -77,6 +84,10 @@ test.describe('Market dashboard (homepage)', () => {
     await page.route(/\/api\/market\/movers/, (route) =>
       fulfill(route, { gainers: [], losers: [] }),
     );
+    // SectorRotationHeatmap is on the homepage — give it data so it renders the
+    // treemap instead of its own "No data" placeholder, which would skew the count.
+    await mockSectorRotation(page);
+    await mockMarketOverview(page);
     await page.goto('/');
 
     const noDataNodes = page.getByText('No data');
@@ -183,6 +194,9 @@ test.describe('MarketBrowser', () => {
     await page.goto('/');
 
     await page.getByPlaceholder('Search symbol or name…').fill('ZZZZ');
+    // TanStack Query's placeholderData keeps showing old results while the new fetch
+    // is in flight. Wait for network to settle so React has committed the empty state.
+    await page.waitForLoadState('networkidle');
 
     await expect(page.getByText(/No results for/)).toBeVisible();
   });
