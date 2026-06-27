@@ -171,11 +171,11 @@ from scratch.
 
 ### New keys required
 
-| Key                   | Service                                        | Used by                                                                                                        | Infisical path                     | Status         |
-| --------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------- |
-| `MASSIVE_API_KEY`     | Massive (formerly Polygon.io) Starter ($29/mo) | `price-ingestor` (WebSocket), `price-processor` (REST history + snapshots), `portfolio-api` (ticker reference) | `/yana-stocks/MASSIVE_API_KEY`     | ✓ in Infisical |
-| `FMP_API_KEY`         | Financial Modeling Prep (free)                 | `portfolio-api` (analyst ratings, sector performance), `sentiment-analyzer` (news)                             | `/yana-stocks/FMP_API_KEY`         | ✓ in Infisical |
-| `TWELVE_DATA_API_KEY` | Twelve Data (free, 800 req/day)                | `price-processor` (UK/international on-demand history + quotes)                                                | `/yana-stocks/TWELVE_DATA_API_KEY` | ✓ in Infisical |
+| Key                   | Service                                        | Used by                                                                                                                                      | Infisical path                     | Status         |
+| --------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------- |
+| `MASSIVE_API_KEY`     | Massive (formerly Polygon.io) Starter ($29/mo) | `price-ingestor` (WebSocket), `price-processor` (REST history + snapshots), `portfolio-api` (ticker reference)                               | `/yana-stocks/MASSIVE_API_KEY`     | ✓ in Infisical |
+| `FMP_API_KEY`         | Financial Modeling Prep (free)                 | `portfolio-api` (analyst ratings, sector performance), `sentiment-analyzer` (news)                                                           | `/yana-stocks/FMP_API_KEY`         | ✓ in Infisical |
+| `TWELVE_DATA_API_KEY` | Twelve Data (free, 800 req/day)                | `price-processor` (UK/international on-demand history + quotes); `portfolio-api` (FTSE 100 sector rotation — 31 LSE stocks, daily % changes) | `/yana-stocks/TWELVE_DATA_API_KEY` | ✓ in Infisical |
 
 ### Keys being retired
 
@@ -196,6 +196,7 @@ from scratch.
 | 0 (Massive)          | `MASSIVE_API_KEY` ✓ already in Infisical; update `price-ingestor` and `price-processor` ExternalSecrets to reference it; remove Alpaca refs from both               |
 | 8 (FMP)              | `FMP_API_KEY` ✓ already in Infisical; update `portfolio-api` ExternalSecret to add it; update `sentiment-analyzer` ExternalSecret (remove Alpaca keys, add FMP key) |
 | 9 (UK / Twelve Data) | `TWELVE_DATA_API_KEY` ✓ already in Infisical; update `price-processor` ExternalSecret to reference it                                                               |
+| 14 (Sector rotation) | `TWELVE_DATA_API_KEY` added to `portfolio-api` ExternalSecret and deployment (FTSE 100 path); `portfolio-api` fetches 31 LSE stocks via Twelve Data time-series API |
 
 ---
 
@@ -217,10 +218,10 @@ Sequenced to deliver value early, deferring items that need new integrations:
 | 9   | Location-specific defaults + UK data (Twelve Data)                                  | Medium  | Twelve Data                                          | ✓ complete |
 | 10  | Home screen with indices & sectors                                                  | High    | FMP + Twelve Data                                    | ✓ complete |
 | 11  | Stock screener                                                                      | High    | FMP + Twelve Data                                    | ✓ complete |
-| 12  | News pin markers with headline popup on price chart                                 | Low     | No — news already fetched                            | pending    |
-| 13  | Home market preference UI (profile settings + home screen wiring)                   | Low     | No — backend schema already in place                 | pending    |
-| 14  | Sector rotation time-series heatmap (S&P 500 + FTSE 100)                            | Medium  | FMP historical-sectors-performance                   | pending    |
-| 15  | Factor performance tiles (Momentum / Value / Growth / Dividend / Low Vol / Quality) | Medium  | No — uses existing ETF price infrastructure          | pending    |
+| 12  | News pin markers with headline popup on price chart                                 | Low     | No — news already fetched                            | ✓ complete |
+| 13  | Home market preference UI (profile settings + home screen wiring)                   | Low     | No — backend schema already in place                 | ✓ complete |
+| 14  | Sector rotation time-series heatmap (S&P 500 + FTSE 100)                            | Medium  | FMP (S&P 500) + Twelve Data (FTSE 100)               | ✓ complete |
+| 15  | Factor performance tiles (Momentum / Value / Growth / Dividend / Low Vol / Quality) | Medium  | No — uses existing ETF price infrastructure          | ✓ complete |
 
 > Step 0 (Massive) is a prerequisite for Steps 1–7 to have accurate, real-time
 > data underneath them. Steps 1–6 are pure frontend and can be done
@@ -910,142 +911,105 @@ matching index tile in `<IndicesBar activeMarket={defaultTab}>`.
 
 ---
 
-## Step 14 — Sector Rotation Time-Series Heatmap
+## Step 14 — Sector Rotation Time-Series Heatmap ✓ complete
 
-Replaces the S&P 500 treemap with a grid showing **sector × timeframe**
-performance. Investors can immediately see which sectors have built momentum
-over 1D / 1W / 1M / 3M / 1Y, and switch between S&P 500 and FTSE 100.
+Replaces the static S&P 500 treemap with a dual-view component: a **treemap
+snapshot** (today's sector performance as market-cap-weighted squares) and a
+**12-day history grid** (colour-coded daily % changes per sector). Users toggle
+between views and switch between S&P 500 and FTSE 100.
 
-### Home screen layout after this step
+> **Note:** The original plan described 5 time-window columns (1D/1W/1M/3M/1Y).
+> The actual implementation uses 12 rolling daily % changes (1 change per bar
+> for 12 trading days), which gives richer day-by-day rotation data. The treemap
+> replaces the old `SectorHeatmap.tsx` treemap but also serves as the "Today"
+> snapshot — it is not deleted.
 
-```
-IndicesBar
-────────────────────────────────────────────────────────────────────────
-SectorRotationHeatmap [S&P 500 | FTSE 100 tabs]  │  MarketNews
-  Sector        1D     1W     1M     3M     1Y    │  headlines...
-  Health Care  +3.1%  +1.2%  +4.8%  +8.1%  +12%  │
-  Technology   +0.5%  -2.1%  +8.3%  +15%   +28%  │
-  ...                                            │
-────────────────────────────────────────────────────────────────────────
-FactorTiles  (Step 15)
-Top Gainers │ Top Losers
-Market Browser / Stock Screener
-```
+### Data sources (as built)
 
-### Backend — `portfolio-api`
+| Index    | Source                                                                                                                                                    |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S&P 500  | FMP `/api/v3/historical-sectors-performance` — daily sector % changes for 13 days (12 deltas)                                                             |
+| FTSE 100 | Twelve Data `/time_series` for 31 representative LSE stocks (2–3 per ICB sector), `outputsize=13` — compute daily % changes per stock, average per sector |
 
-**New method** `getSectorRotation(index: 'sp500' | 'ftse100')` in
-`apps/portfolio-api/src/market/market.service.ts`:
+FMP returns empty for FTSE via LSE exchange; Polygon / Massive does not cover UK
+markets — Twelve Data with `exchange=LSE` is the correct source.
 
-- **S&P 500 path:** call FMP
-  `GET /api/v3/historical-sectors-performance?limit=365&apikey={FMP_API_KEY}` —
-  returns an array of `{ date, basicMaterials, communicationServices, ... }`
-  rows, newest first. Compute cumulative compound returns for each sector:
+### FTSE 100 stock basket (31 stocks, 11 ICB sectors)
 
-  ```typescript
-  // Indices for each window (trading days, not calendar days)
-  const windows = { '1D': 1, '1W': 5, '1M': 21, '3M': 63, '1Y': 252 };
+| Sector           | Symbols (Twelve Data) |
+| ---------------- | --------------------- |
+| Technology       | SAGE, EXPN, HLMA      |
+| Financials       | HSBA, LLOY, BARC      |
+| Health Care      | AZN, GSK, HLN         |
+| Consumer Disc.   | JD, MKS, CPG          |
+| Industrials      | BA, RR, WEIR          |
+| Comm. Services   | BT.A, VOD             |
+| Consumer Staples | DGE, TSCO, BATS       |
+| Energy           | BP, SHEL              |
+| Real Estate      | SGRO, BLND, LAND      |
+| Materials        | RIO, GLEN, AAL        |
+| Utilities        | NG, SSE, SVT          |
 
-  function cumulativeReturn(
-    rows: SectorRow[],
-    sector: string,
-    n: number,
-  ): number {
-    // rows[0] = most recent day, rows[n-1] = n trading days ago
-    const slice = rows.slice(0, n);
-    return slice.reduce((acc, row) => acc * (1 + row[sector] / 100), 1) - 1;
-  }
-  ```
+> BT Group must be requested as `BT.A` — bare `BT` with `exchange=LSE` returns a
+> 404 on Twelve Data.
 
-- **FTSE 100 path:** FMP provides
-  `GET /api/v4/sector-performance?exchange=LSE&apikey={FMP_API_KEY}` for
-  current-day data; for historical, use
-  `GET /api/v4/historical-sectors-performance?exchange=LSE&limit=365`. Fall back
-  to US-only data with a flag if the UK endpoint returns empty (check on
-  implementation — LSE sector data availability varies by FMP plan tier).
-
-- Redis cache: `papi:sector:rotation:sp500` / `papi:sector:rotation:ftse100`,
-  TTL 1h.
-
-**New route** in `apps/portfolio-api/src/market/market.controller.ts`:
+### Response shape (as built)
 
 ```typescript
-@Get('sectors/rotation')
-@ApiQuery({ name: 'index', enum: ['sp500', 'ftse100'], required: false })
-getSectorRotation(@Query('index') index: 'sp500' | 'ftse100' = 'sp500') {
-  return this.marketService.getSectorRotation(index);
+interface SectorRotationData {
+  dates: string[]; // ISO date strings, 12 most recent trading days, chronological
+  rows: SectorRotationRow[]; // one row per sector
 }
-```
 
-**Response shape:**
-
-```typescript
 interface SectorRotationRow {
-  sector: string; // 'Technology', 'Health Care', ...
-  change1d: number; // % as decimal: 0.031 = 3.1%
-  change1w: number;
-  change1m: number;
-  change3m: number;
-  change1y: number;
+  sector: string; // e.g. 'Technology', 'Consumer Disc.'
+  changes: number[]; // daily % change per date, same length as dates[]
 }
 ```
 
-Kong: covered by existing `/api/market/*` public prefix — no manifest change.
+### Backend implementation
 
-### Frontend
+- **`getSectorRotation(index, cacheKey)`** in `stocks.service.ts`
+- S&P 500: FMP `historical-sectors-performance` → 13 daily rows → 12 % changes
+- FTSE 100: `Promise.allSettled` for 31 Twelve Data `/time_series?outputsize=13`
+  calls → aggregate `sector → date → avg(changes)` → sort chronologically → keep
+  last 12 dates
+- Falls back to `{ dates: [], rows: [] }` on total failure (no API key, all
+  requests fail)
+- Redis cache: `papi:sector:rotation:sp500` / `papi:sector:rotation:ftse100`,
+  TTL 1h
 
-**Delete** `apps/frontend/src/components/home/SectorHeatmap.tsx` (the treemap).
+### Frontend — `SectorRotationHeatmap.tsx`
 
-**New file** `apps/frontend/src/components/home/SectorRotationHeatmap.tsx`:
+- **Today view** (default): Recharts `<Treemap>` with `CustomContent` SVG
+  renderer; cell size = market-cap weight; colour = last column's % change
+  - `SP500_WEIGHTS` and `FTSE_WEIGHTS` maps defined for both indices
+  - S&P 500 today falls back to `/market/overview` sectors when rotation data
+    absent
+  - Custom SVG: `rx=8` rounded corners, gradient overlay (white 18% → black
+    12%), sector name + % change at two font sizes
+- **History view**: 12-column colour-coded table matching the old heatmap style
+- **Toggle**: `[Today] [History]` segmented pill + `[S&P 500] [FTSE 100]`
+  buttons
+- staleTime: 1 hour (matches cache TTL)
 
-```typescript
-// Props
-interface Props {
-  defaultIndex?: 'sp500' | 'ftse100';
-}
-```
+### k8s changes (`k8s-apps` repo)
 
-- Tab toggle: `[🇺🇸 S&P 500]` / `[🇬🇧 FTSE 100]`
-- Fetches `/api/market/sectors/rotation?index={activeTab}` via TanStack Query
-  key `['sector-rotation', activeTab]`, 5min stale time
-- Table: `sector` column (sticky left) + `1D / 1W / 1M / 3M / 1Y` columns
-- Default sort: 1M descending — momentum leaders rise to the top
-- Column headers are clickable to re-sort by that timeframe
-- Cell colouring: scale each column independently between its min (red) and max
-  (green) value — a relative scale makes rotation visible even in flat markets
-- Fixed height `350px` with `overflow-y: auto` — matches `MarketNews` height so
-  the two panels sit level
-- Loading skeleton: 11 rows × 5 columns of grey rectangles
-
-**Update** `apps/frontend/src/components/home/HomePageView.tsx`:
-
-- Replace `<SectorHeatmap />` with
-  `<SectorRotationHeatmap defaultIndex={defaultTab} />` where `defaultTab` comes
-  from the profile preference (Step 13)
-
-**New query hook** (or inline in component):
-
-```typescript
-const { data, isLoading } = useQuery({
-  queryKey: ['sector-rotation', activeIndex],
-  queryFn: () =>
-    apiFetch<SectorRotationRow[]>(
-      `/market/sectors/rotation?index=${activeIndex}`,
-    ),
-  staleTime: 5 * 60 * 1000,
-});
-```
+- `apps/yana-stocks/portfolio-api/external-secret.yaml` — added
+  `TWELVE_DATA_API_KEY` entry
+- `apps/yana-stocks/portfolio-api/deployment.yaml` — added `TWELVE_DATA_API_KEY`
+  env var
 
 **Files changed/created:**
 
-| File                                                          | Action                                   |
-| ------------------------------------------------------------- | ---------------------------------------- |
-| `apps/portfolio-api/src/market/market.service.ts`             | Add `getSectorRotation()`                |
-| `apps/portfolio-api/src/market/market.controller.ts`          | Add `GET /market/sectors/rotation` route |
-| `apps/frontend/src/components/home/SectorRotationHeatmap.tsx` | New component                            |
-| `apps/frontend/src/components/home/HomePageView.tsx`          | Swap component                           |
-| `apps/frontend/src/components/home/SectorHeatmap.tsx`         | Delete                                   |
-| `packages/shared-types/src/market.ts`                         | Add `SectorRotationRow` interface        |
+| File                                                           | Action                                            |
+| -------------------------------------------------------------- | ------------------------------------------------- |
+| `apps/portfolio-api/src/stocks/stocks.service.ts`              | Added `getFtse100SectorRotation()` private method |
+| `apps/portfolio-api/src/config/configuration.ts`               | Added `twelveDataApiKey`                          |
+| `apps/portfolio-api/.env`                                      | Added `TWELVE_DATA_API_KEY` (gitignored)          |
+| `apps/frontend/src/components/home/SectorRotationHeatmap.tsx`  | Rewritten: treemap + history toggle               |
+| `k8s-apps/apps/yana-stocks/portfolio-api/external-secret.yaml` | Added `TWELVE_DATA_API_KEY`                       |
+| `k8s-apps/apps/yana-stocks/portfolio-api/deployment.yaml`      | Added `TWELVE_DATA_API_KEY` env var               |
 
 ---
 

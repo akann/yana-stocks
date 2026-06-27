@@ -912,18 +912,24 @@ runtime with missing `.so` errors.
 ### Twelve Data — UK / international prices
 
 - **Free tier:** 800 requests/day
-- **Used by:** `price-processor` (on-demand UK/international history + quotes)
+- **Used by:** `price-processor` (on-demand UK/international history + quotes);
+  `portfolio-api` (FTSE 100 sector rotation — 31 LSE stocks via
+  `/time_series?exchange=LSE&outputsize=13`, daily % changes averaged per
+  sector)
 - **Env var:** `TWELVE_DATA_API_KEY`
+- **LSE quirk:** BT Group must be requested as `BT.A` — bare `BT` with
+  `exchange=LSE` returns 404
 
 ## Known Bugs Fixed
 
-| Bug                                                 | Root cause                                                                                                                  | Fix                                                                                                                             |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| Chart goes blank when toggling Candle ↔ Line        | `chartType` missing from data effect deps — new series created but not populated (same `data` ref, effect skipped)          | Added `chartType` to `useEffect` deps array in `StockChart.tsx`                                                                 |
-| lightweight-charts crash (`ensureNotNull`) on 6M/1Y | MongoDB stores duplicate daily bars at different UTC offsets (T00, T04, T05); same YYYY-MM-DD maps to duplicate `time` keys | Backend dedup in `getHistory` (keeps highest UTC per date); frontend defensive dedup before `setData()`                         |
-| Volume bars invisible on 1D range                   | 390 bars in ~600px = ~1.5px/bar, below `HistogramSeries` render threshold                                                   | `minBarSpacing: 2` in `timeScale` options                                                                                       |
-| Market dashboard shows only NVDA                    | `getMovers()` scans `papi:price:*` Redis keys — only symbols streamed via Kafka or previously visited have entries          | `getMovers()` now mget-checks 15 default symbols and fetches missing quotes via Polygon snapshot before scanning                |
-| MACD signal scan only emitted current-bar crossover | `detectSignals()` compared only the last 2 `signalLine` entries; all historical crossovers were missed                      | Loop in `signals.ts` changed to `for (let i = 1; i < n; i++)` — scans all bars; MACD arrows now appear throughout chart history |
+| Bug                                                 | Root cause                                                                                                                                                                                 | Fix                                                                                                                             |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| Chart goes blank when toggling Candle ↔ Line        | `chartType` missing from data effect deps — new series created but not populated (same `data` ref, effect skipped)                                                                         | Added `chartType` to `useEffect` deps array in `StockChart.tsx`                                                                 |
+| lightweight-charts crash (`ensureNotNull`) on 6M/1Y | MongoDB stores duplicate daily bars at different UTC offsets (T00, T04, T05); same YYYY-MM-DD maps to duplicate `time` keys                                                                | Backend dedup in `getHistory` (keeps highest UTC per date); frontend defensive dedup before `setData()`                         |
+| Volume bars invisible on 1D range                   | 390 bars in ~600px = ~1.5px/bar, below `HistogramSeries` render threshold                                                                                                                  | `minBarSpacing: 2` in `timeScale` options                                                                                       |
+| Market dashboard shows only NVDA                    | `getMovers()` scans `papi:price:*` Redis keys — only symbols streamed via Kafka or previously visited have entries                                                                         | `getMovers()` now mget-checks 15 default symbols and fetches missing quotes via Polygon snapshot before scanning                |
+| MACD signal scan only emitted current-bar crossover | `detectSignals()` compared only the last 2 `signalLine` entries; all historical crossovers were missed                                                                                     | Loop in `signals.ts` changed to `for (let i = 1; i < n; i++)` — scans all bars; MACD arrows now appear throughout chart history |
+| `chart.subscribeClick is not a function` in Jest    | `src/__mocks__/lightweight-charts.js` `mockChart` was missing `subscribeClick` and `unsubscribeClick` methods; `StockChart.tsx:256` calls `chart.subscribeClick()` for news headline popup | Added `subscribeClick: jest.fn()` and `unsubscribeClick: jest.fn()` to `mockChart` in the mock file                             |
 
 ## Feature Implementation Progress
 
