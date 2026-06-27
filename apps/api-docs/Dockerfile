@@ -1,3 +1,12 @@
+FROM golang:1.25-alpine AS auth-spec-builder
+WORKDIR /app
+RUN apk add --no-cache git
+RUN go install github.com/swaggo/swag/cmd/swag@latest
+COPY apps/auth-service/go.mod apps/auth-service/go.sum ./
+RUN go mod download
+COPY apps/auth-service/ ./
+RUN swag init -g cmd/server/main.go -d . --outputTypes json -o /tmp/auth-docs
+
 FROM node:24-alpine AS spec-builder
 WORKDIR /app
 ENV HUSKY=0
@@ -49,16 +58,19 @@ COPY --from=spec-builder /tmp/portfolio-api.json ./
 COPY --from=spec-builder /tmp/portfolio-service.json ./
 COPY --from=spec-builder /tmp/profile-service.json ./
 COPY --from=spec-builder /tmp/price-processor.json ./
+COPY --from=auth-spec-builder /tmp/auth-docs/swagger.json ./auth-service.json
 
 RUN redocly build-docs portfolio-api.json --output portfolio-api.html && \
     redocly build-docs portfolio-service.json --output portfolio-service.html && \
     redocly build-docs profile-service.json --output profile-service.html && \
-    redocly build-docs price-processor.json --output price-processor.html
+    redocly build-docs price-processor.json --output price-processor.html && \
+    redocly build-docs auth-service.json --output auth-service.html
 
 FROM nginx:alpine
 COPY --from=docs-builder /app/portfolio-api.html /usr/share/nginx/html/
 COPY --from=docs-builder /app/portfolio-service.html /usr/share/nginx/html/
 COPY --from=docs-builder /app/profile-service.html /usr/share/nginx/html/
 COPY --from=docs-builder /app/price-processor.html /usr/share/nginx/html/
+COPY --from=docs-builder /app/auth-service.html /usr/share/nginx/html/
 COPY apps/api-docs/index.html /usr/share/nginx/html/
 COPY apps/api-docs/nginx.conf /etc/nginx/conf.d/default.conf

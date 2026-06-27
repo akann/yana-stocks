@@ -36,6 +36,17 @@ func NewAuthHandler(svc *service.AuthService) *AuthHandler {
 	return &AuthHandler{svc: svc}
 }
 
+// Register godoc
+// @Summary      Register a new user
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      RegisterRequest  true  "Email and password"
+// @Success      201   {object}  MessageResponse
+// @Failure      400   {object}  ErrorResponse
+// @Failure      409   {object}  ErrorResponse
+// @Failure      500   {object}  ErrorResponse
+// @Router       /api/auth/register [post]
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Email    string `json:"email"`
@@ -62,6 +73,16 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"message": "check your inbox to verify your email"}, http.StatusCreated)
 }
 
+// Verify godoc
+// @Summary      Verify email address
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      VerifyEmailRequest  true  "Verification token from email"
+// @Success      200   {object}  MessageResponse
+// @Failure      400   {object}  ErrorResponse
+// @Failure      500   {object}  ErrorResponse
+// @Router       /api/auth/verify [post]
 func (h *AuthHandler) Verify(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Token string `json:"token"`
@@ -83,6 +104,18 @@ func (h *AuthHandler) Verify(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"message": "email verified, you can now log in"}, http.StatusOK)
 }
 
+// Login godoc
+// @Summary      Login with email and password
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      LoginRequest       true  "Credentials"
+// @Success      200   {object}  TokenPairResponse  "Tokens issued (or MFA challenge if MFA is enabled)"
+// @Failure      400   {object}  ErrorResponse
+// @Failure      401   {object}  ErrorResponse
+// @Failure      403   {object}  ErrorResponse
+// @Failure      500   {object}  ErrorResponse
+// @Router       /api/auth/login [post]
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Email    string `json:"email"`
@@ -114,6 +147,17 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, result.Tokens, http.StatusOK)
 }
 
+// VerifyMFALogin godoc
+// @Summary      Complete MFA login with TOTP code
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      MFAVerifyLoginRequest  true  "MFA session token and 6-digit TOTP code"
+// @Success      200   {object}  TokenPairResponse
+// @Failure      400   {object}  ErrorResponse
+// @Failure      401   {object}  ErrorResponse
+// @Failure      500   {object}  ErrorResponse
+// @Router       /api/auth/mfa/verify [post]
 func (h *AuthHandler) VerifyMFALogin(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		MFAToken string `json:"mfaToken"`
@@ -137,6 +181,17 @@ func (h *AuthHandler) VerifyMFALogin(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, tokens, http.StatusOK)
 }
 
+// Refresh godoc
+// @Summary      Rotate refresh token and issue new access token
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      RefreshRequest    true  "Current refresh token"
+// @Success      200   {object}  TokenPairResponse
+// @Failure      400   {object}  ErrorResponse
+// @Failure      401   {object}  ErrorResponse
+// @Failure      500   {object}  ErrorResponse
+// @Router       /api/auth/refresh [post]
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		RefreshToken string `json:"refreshToken"`
@@ -159,6 +214,15 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, tokens, http.StatusOK)
 }
 
+// Logout godoc
+// @Summary      Invalidate refresh token
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      LogoutRequest   true  "Refresh token to revoke"
+// @Success      200   {object}  MessageResponse
+// @Failure      400   {object}  ErrorResponse
+// @Router       /api/auth/logout [post]
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		RefreshToken string `json:"refreshToken"`
@@ -172,6 +236,19 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"message": "logged out"}, http.StatusOK)
 }
 
+// ChangePassword godoc
+// @Summary      Change password (JWT required)
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body      ChangePasswordRequest  true  "Current and new password"
+// @Success      200   {object}  MessageResponse
+// @Failure      400   {object}  ErrorResponse
+// @Failure      401   {object}  ErrorResponse
+// @Failure      404   {object}  ErrorResponse
+// @Failure      500   {object}  ErrorResponse
+// @Router       /api/auth/password [put]
 func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(middleware.ContextKeyUserID).(string)
 	if userID == "" {
@@ -207,6 +284,19 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"message": "password updated"}, http.StatusOK)
 }
 
+// DeleteAccount godoc
+// @Summary      Delete account permanently (JWT required)
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body      DeleteAccountRequest  true  "Password confirmation"
+// @Success      200   {object}  MessageResponse
+// @Failure      400   {object}  ErrorResponse
+// @Failure      401   {object}  ErrorResponse
+// @Failure      404   {object}  ErrorResponse
+// @Failure      500   {object}  ErrorResponse
+// @Router       /api/auth/account [delete]
 func (h *AuthHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(middleware.ContextKeyUserID).(string)
 	if userID == "" {
@@ -237,6 +327,16 @@ func (h *AuthHandler) DeleteAccount(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"message": "account deleted"}, http.StatusOK)
 }
 
+// Me godoc
+// @Summary      Get current user info (JWT required)
+// @Tags         auth
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200   {object}  MeSwaggerResponse
+// @Failure      401   {object}  ErrorResponse
+// @Failure      404   {object}  ErrorResponse
+// @Failure      500   {object}  ErrorResponse
+// @Router       /api/auth/me [get]
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(middleware.ContextKeyUserID).(string)
 	if userID == "" {
@@ -257,6 +357,15 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, me, http.StatusOK)
 }
 
+// RequestPasswordReset godoc
+// @Summary      Request a password reset email
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      PasswordResetRequestBody  true  "Registered email address"
+// @Success      200   {object}  MessageResponse           "Always 200 — no email enumeration"
+// @Failure      400   {object}  ErrorResponse
+// @Router       /api/auth/password/reset-request [post]
 func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Email string `json:"email"`
@@ -271,6 +380,16 @@ func (h *AuthHandler) RequestPasswordReset(w http.ResponseWriter, r *http.Reques
 	jsonOK(w, map[string]string{"message": "if that email is registered you will receive a reset link"}, http.StatusOK)
 }
 
+// ResetPassword godoc
+// @Summary      Reset password using emailed token
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      ResetPasswordRequest  true  "Reset token and new password"
+// @Success      200   {object}  MessageResponse
+// @Failure      400   {object}  ErrorResponse
+// @Failure      500   {object}  ErrorResponse
+// @Router       /api/auth/password/reset [post]
 func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Token       string `json:"token"`
@@ -297,6 +416,15 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"message": "password reset successfully"}, http.StatusOK)
 }
 
+// GetMFAStatus godoc
+// @Summary      Get MFA enabled status (JWT required)
+// @Tags         mfa
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  MFAStatusResponse
+// @Failure      401  {object}  ErrorResponse
+// @Failure      500  {object}  ErrorResponse
+// @Router       /api/auth/mfa [get]
 func (h *AuthHandler) GetMFAStatus(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(middleware.ContextKeyUserID).(string)
 	if userID == "" {
@@ -311,6 +439,15 @@ func (h *AuthHandler) GetMFAStatus(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]bool{"enabled": enabled}, http.StatusOK)
 }
 
+// SetupMFA godoc
+// @Summary      Generate TOTP secret for MFA setup (JWT required)
+// @Tags         mfa
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  MFASetupResponse
+// @Failure      401  {object}  ErrorResponse
+// @Failure      500  {object}  ErrorResponse
+// @Router       /api/auth/mfa/setup [post]
 func (h *AuthHandler) SetupMFA(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(middleware.ContextKeyUserID).(string)
 	email, _ := r.Context().Value(middleware.ContextKeyEmail).(string)
@@ -326,6 +463,17 @@ func (h *AuthHandler) SetupMFA(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"otpAuthURL": result.OTPAuthURL, "secret": result.Secret}, http.StatusOK)
 }
 
+// EnableMFA godoc
+// @Summary      Verify TOTP code and enable MFA (JWT required)
+// @Tags         mfa
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body      MFAEnableRequest  true  "6-digit TOTP code from authenticator app"
+// @Success      200   {object}  MessageResponse
+// @Failure      400   {object}  ErrorResponse
+// @Failure      401   {object}  ErrorResponse
+// @Router       /api/auth/mfa/enable [post]
 func (h *AuthHandler) EnableMFA(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Code string `json:"code"`
@@ -346,6 +494,15 @@ func (h *AuthHandler) EnableMFA(w http.ResponseWriter, r *http.Request) {
 	jsonOK(w, map[string]string{"message": "MFA enabled"}, http.StatusOK)
 }
 
+// DisableMFA godoc
+// @Summary      Disable MFA (JWT required)
+// @Tags         mfa
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  MessageResponse
+// @Failure      401  {object}  ErrorResponse
+// @Failure      500  {object}  ErrorResponse
+// @Router       /api/auth/mfa [delete]
 func (h *AuthHandler) DisableMFA(w http.ResponseWriter, r *http.Request) {
 	userID, _ := r.Context().Value(middleware.ContextKeyUserID).(string)
 	if userID == "" {

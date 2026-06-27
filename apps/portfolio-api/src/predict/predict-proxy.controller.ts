@@ -1,14 +1,18 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
-import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { firstValueFrom } from 'rxjs';
-import type { PredictionSignal } from '@yana-stocks/shared-types';
+import { PredictionSignal } from '@yana-stocks/shared-types';
 import { RedisService } from '../redis/redis.service';
 
-interface PredictResponse {
-  symbol: string;
-  predictions: PredictionSignal[];
+class PredictResponse {
+  @ApiProperty({ example: 'AAPL' })
+  symbol!: string;
+
+  @ApiProperty({ type: () => [PredictionSignal] })
+  predictions!: PredictionSignal[];
 }
 
 @ApiTags('predict')
@@ -27,6 +31,7 @@ export class PredictProxyController {
   @Get(':symbol')
   @ApiOperation({ summary: 'Get ML predictions for a symbol' })
   @ApiParam({ name: 'symbol', example: 'AAPL' })
+  @ApiOkResponse({ type: PredictResponse })
   async predict(@Param('symbol') symbol: string): Promise<PredictResponse> {
     const upper = symbol.toUpperCase();
 

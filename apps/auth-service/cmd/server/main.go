@@ -1,3 +1,11 @@
+// @title           Auth Service
+// @version         1.0
+// @description     JWT authentication, email verification, MFA, and account management for yana-stocks
+// @BasePath        /
+// @securityDefinitions.apikey BearerAuth
+// @in              header
+// @name            Authorization
+// @description     JWT access token — prefix with "Bearer "
 package main
 
 import (

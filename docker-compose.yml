@@ -83,6 +83,14 @@ services:
       timeout: 5s
       retries: 5
 
+  api-docs:
+    build:
+      context: .
+      dockerfile: apps/api-docs/Dockerfile
+    pull_policy: build
+    ports:
+      - "3009:80"
+
 volumes:
   mongodb-data:
   redis-data:
