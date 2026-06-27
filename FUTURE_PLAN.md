@@ -47,11 +47,11 @@
 | Need                             | Source                                   | Cost               | Notes                                                                                                                           |
 | -------------------------------- | ---------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
 | US real-time prices + history    | **Massive (formerly Polygon.io)**        | $29/mo (Starter)   | WebSocket minute aggregates (push, not poll); REST for full history up to 2 years; official ticker reference with ETFs natively |
-| UK / international prices        | **Twelve Data**                          | Free (800 req/day) | Official REST API covering UK, EU, global markets; on-demand only (no streaming needed)                                         |
+| UK / international prices        | **Twelve Data**                          | Grow plan          | Official REST API covering UK, EU, global markets; on-demand only (no streaming needed)                                         |
 | News (all markets)               | **Financial Modeling Prep (FMP)**        | Free (250 req/day) | Single provider for US + international; finance-specific; same key as analyst ratings                                           |
 | Analyst ratings + price targets  | **FMP** `/analyst-stock-recommendations` | Free (250 req/day) | Ratings, consensus, price targets                                                                                               |
 | Sector performance               | **FMP** `/sector-performance`            | Free (250 req/day) | Same account, no extra key                                                                                                      |
-| Index values (^FTSE, ^GSPC etc.) | **Twelve Data**                          | Free (800 req/day) | Covers major global indices                                                                                                     |
+| Index values (^FTSE, ^GSPC etc.) | **Twelve Data**                          | Grow plan          | Covers major global indices                                                                                                     |
 
 ### What Massive replaces — component by component
 
@@ -175,7 +175,7 @@ from scratch.
 | --------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------- |
 | `MASSIVE_API_KEY`     | Massive (formerly Polygon.io) Starter ($29/mo) | `price-ingestor` (WebSocket), `price-processor` (REST history + snapshots), `portfolio-api` (ticker reference)                               | `/yana-stocks/MASSIVE_API_KEY`     | ✓ in Infisical |
 | `FMP_API_KEY`         | Financial Modeling Prep (free)                 | `portfolio-api` (analyst ratings, sector performance), `sentiment-analyzer` (news)                                                           | `/yana-stocks/FMP_API_KEY`         | ✓ in Infisical |
-| `TWELVE_DATA_API_KEY` | Twelve Data (free, 800 req/day)                | `price-processor` (UK/international on-demand history + quotes); `portfolio-api` (FTSE 100 sector rotation — 31 LSE stocks, daily % changes) | `/yana-stocks/TWELVE_DATA_API_KEY` | ✓ in Infisical |
+| `TWELVE_DATA_API_KEY` | Twelve Data (Grow plan)                        | `price-processor` (UK/international on-demand history + quotes); `portfolio-api` (FTSE 100 sector rotation — 31 LSE stocks, daily % changes) | `/yana-stocks/TWELVE_DATA_API_KEY` | ✓ in Infisical |
 
 ### Keys being retired
 
@@ -653,7 +653,7 @@ Placed below `SignalsPanel` in the right column of the stock detail page.
 ### Data source: Twelve Data
 
 Twelve Data provides an official REST API covering UK, EU, and international
-markets. Free tier: 800 requests/day.
+markets (Grow plan).
 
 New env var: `TWELVE_DATA_API_KEY`
 

@@ -911,7 +911,7 @@ runtime with missing `.so` errors.
 
 ### Twelve Data — UK / international prices
 
-- **Free tier:** 800 requests/day
+- **Plan:** Grow
 - **Used by:** `price-processor` (on-demand UK/international history + quotes);
   `portfolio-api` (FTSE 100 sector rotation — 31 LSE stocks via
   `/time_series?exchange=LSE&outputsize=13`, daily % changes averaged per

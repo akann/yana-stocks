@@ -46,7 +46,7 @@ packages/
 | Databases       | PostgreSQL 16 (auth), MongoDB 8 (OHLCV/portfolios/profiles), Redis 8 (cache/tokens) |
 | Messaging       | Kafka (Redpanda locally, Strimzi in production)                                     |
 | ML storage      | MinIO (`yana-stocks-models` bucket)                                                 |
-| Data source     | Massive (Polygon.io) Starter — US prices; FMP — news/analyst; Twelve Data — UK      |
+| Data source     | Massive (Polygon.io) Starter — US prices; FMP — news/analyst; Twelve Data Grow — UK |
 
 ## Prerequisites
 
