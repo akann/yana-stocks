@@ -25,3 +25,11 @@ minimumReleaseAgeExclude:
 overrides:
   '@types/react': ^18.3.18
   '@types/react-dom': ^18.3.5
+  multer: ^2.2.0
+  postcss: ^8.5.10
+
+# GHSA-h67p-54hq-rp68 targets js-yaml v4 <=4.1.1; @istanbuljs/load-nyc-config
+# pulls in js-yaml v3 (^3.13.1) — different major, different API. False positive.
+auditConfig:
+  ignoreCves:
+    - GHSA-h67p-54hq-rp68
