@@ -169,3 +169,7 @@ test-results/
 
 # Claude Code
 .claude/
+
+# Spec audit artifacts
+COMPLETED.md
+COMPLETED.pdf
