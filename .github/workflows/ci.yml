@@ -516,7 +516,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   # 6. Dead code / unused deps (Knip)
   # ─────────────────────────────────────────────────────────────────
-  knip:
+  dead-code:
     runs-on: runners-yana-stocks
     needs: changes
     if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
@@ -618,7 +618,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   docker:
     runs-on: runners-yana-stocks
-    needs: [changes, secret-scan, ts-quality, integration-test, e2e, python-quality, audit, knip]
+    needs: [changes, secret-scan, ts-quality, integration-test, e2e, python-quality, audit, dead-code]
     if: |
       always() &&
       github.ref == 'refs/heads/main' &&
@@ -629,7 +629,7 @@ jobs:
       (needs.e2e.result               == 'success' || needs.e2e.result               == 'skipped') &&
       (needs.python-quality.result    == 'success' || needs.python-quality.result    == 'skipped') &&
       (needs.audit.result             == 'success' || needs.audit.result             == 'skipped') &&
-      (needs.knip.result              == 'success' || needs.knip.result              == 'skipped')
+      (needs.dead-code.result         == 'success' || needs.dead-code.result         == 'skipped')
     strategy:
       fail-fast: false
       max-parallel: 3

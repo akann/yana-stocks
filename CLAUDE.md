@@ -499,7 +499,7 @@ CI job pipeline (`.github/workflows/ci.yml`):
 | `ts-quality`       | TS changed                | lint + type-check + test                  |
 | `integration-test` | TS changed                | Jest integration suite                    |
 | `e2e`              | TS changed                | Playwright end-to-end (full local stack)  |
-| `knip`             | TS changed                | Dead code / unused dep scan               |
+| `dead-code`        | TS changed                | Dead code / unused dep scan (Knip)        |
 | `audit`            | always                    | `pnpm audit --audit-level=high` CVE check |
 | `python-quality`   | Python changed            | Ruff lint + pytest                        |
 | `docker`           | all above pass, on `main` | Build + push images → gitops              |
