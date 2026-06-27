@@ -499,7 +499,7 @@ CI job pipeline (`.github/workflows/ci.yml`):
 | `ts-quality`       | TS changed                | lint + type-check + test                  |
 | `integration-test` | TS changed                | Jest integration suite                    |
 | `e2e`              | TS changed                | Playwright end-to-end (full local stack)  |
-| `dead-code`        | TS changed                | Dead code / unused dep scan (Knip)        |
+| `dead-code-scan`   | TS changed                | Dead code / unused dep scan (Knip)        |
 | `audit`            | always                    | `pnpm audit --audit-level=high` CVE check |
 | `python-quality`   | Python changed            | Ruff lint + pytest                        |
 | `docker`           | all above pass, on `main` | Build + push images → gitops              |
@@ -607,7 +607,7 @@ Root convenience scripts:
 | `pnpm lint`         | `turbo lint` — lints all packages                              |
 | `pnpm audit`        | `pnpm audit --audit-level=high` — fail on high/critical CVEs   |
 | `pnpm scan`         | `gitleaks detect --redact` — scan full git history for secrets |
-| `pnpm knip`         | Knip dead-code + unused dependency scan (`--no-hints`)         |
+| `pnpm knip`         | Knip dead-code-scan + unused dependency scan (`--no-hints`)    |
 
 ### Security scanning
 
