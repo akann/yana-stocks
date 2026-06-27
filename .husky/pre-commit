@@ -1,1 +1,2 @@
 pnpm exec lint-staged
+pnpm turbo type-check --filter='[HEAD^1]'
