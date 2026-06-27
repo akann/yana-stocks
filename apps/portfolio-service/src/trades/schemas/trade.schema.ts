@@ -1,9 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import type { TradeType } from '@yana-stocks/shared-types';
-import { HydratedDocument } from 'mongoose';
-
-export type TradeDocument = HydratedDocument<Trade>;
-
 @Schema({ collection: 'trades', timestamps: false })
 export class Trade {
   @Prop({ required: true })

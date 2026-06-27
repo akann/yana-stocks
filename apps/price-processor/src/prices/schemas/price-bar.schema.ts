@@ -1,8 +1,4 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument } from 'mongoose';
-
-export type PriceBarDocument = HydratedDocument<PriceBar>;
-
 @Schema({ collection: 'price_bars', timestamps: false })
 export class PriceBar {
   @Prop({ required: true })

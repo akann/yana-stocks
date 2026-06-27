@@ -1,10 +1,3 @@
-export interface UserProfile {
-  id: string;
-  email: string;
-  name: string | null;
-  isVerified: boolean;
-}
-
 export interface PortfolioStock {
   symbol: string;
   shares: number;

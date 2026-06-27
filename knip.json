@@ -1,0 +1,40 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreBinaries": ["go", "gofmt", "gitleaks"],
+  "ignoreDependencies": ["typescript-eslint", "jest-environment-jsdom"],
+  "workspaces": {
+    ".": {},
+    "apps/frontend": {
+      "entry": [
+        "src/app/**/{page,layout,loading,error,not-found,route}.{tsx,ts}",
+        "src/instrumentation.{ts,node.ts}",
+        "src/**/*.{test,spec}.{ts,tsx}",
+        "jest.setup.ts"
+      ],
+      "ignore": ["src/__mocks__/**", "jest.config.js"]
+    },
+    "apps/portfolio-api": {
+      "entry": ["src/main.ts", "src/scripts/**/*.ts"],
+      "ignore": ["src/generate-openapi.ts"]
+    },
+    "apps/portfolio-service": {
+      "entry": ["src/main.ts"],
+      "ignore": ["src/generate-openapi.ts"]
+    },
+    "apps/price-processor": {
+      "entry": ["src/main.ts"]
+    },
+    "apps/profile-service": {
+      "entry": ["src/main.ts"],
+      "ignore": ["src/generate-openapi.ts"],
+      "ignoreDependencies": ["@nestjs/schematics"]
+    },
+    "apps/e2e": {
+      "entry": ["src/**/*.spec.ts"]
+    },
+    "packages/typescript-config": {
+      "ignoreDependencies": ["next"]
+    }
+  },
+  "ignoreExportsUsedInFile": true
+}

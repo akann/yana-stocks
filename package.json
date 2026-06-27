@@ -19,11 +19,13 @@
     "seed": "pnpm --filter @yana-stocks/portfolio-api seed",
     "prepare": "husky",
     "audit": "pnpm audit --audit-level=high",
-    "scan": "gitleaks detect --redact"
+    "scan": "gitleaks detect --redact",
+    "knip": "knip --no-hints"
   },
   "devDependencies": {
     "@yana-stocks/prettier-config": "workspace:*",
     "husky": "^9.1.7",
+    "knip": "^6.21.0",
     "lint-staged": "^17.0.7",
     "prettier": "^3.8.4",
     "turbo": "^2.10.0",
