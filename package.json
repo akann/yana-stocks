@@ -18,7 +18,8 @@
     "docker:reset": "docker compose down -v && docker compose up -d",
     "seed": "pnpm --filter @yana-stocks/portfolio-api seed",
     "prepare": "husky",
-    "audit": "pnpm audit --audit-level=high"
+    "audit": "pnpm audit --audit-level=high",
+    "scan": "gitleaks detect --redact"
   },
   "devDependencies": {
     "@yana-stocks/prettier-config": "workspace:*",
