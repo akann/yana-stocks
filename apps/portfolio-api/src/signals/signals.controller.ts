@@ -1,8 +1,7 @@
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserFromTokenGuard } from '../common/current-user.decorator';
-import type { SignalsResponse } from './signals.service';
-import { SignalsService } from './signals.service';
+import { SignalsResponse, SignalsService } from './signals.service';
 
 @ApiTags('signals')
 @UseGuards(UserFromTokenGuard)
@@ -12,6 +11,7 @@ export class SignalsController {
 
   @Get(':symbol')
   @ApiOperation({ summary: 'Get latest sentiment and prediction signals for a symbol' })
+  @ApiOkResponse({ type: SignalsResponse })
   getSignals(@Param('symbol') symbol: string): Promise<SignalsResponse> {
     return this.signalsService.getSignals(symbol.toUpperCase());
   }

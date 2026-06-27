@@ -17,6 +17,23 @@ import { TwelveDataService } from './twelve-data.service';
 
 export const POLYGON_HTTP = 'POLYGON_HTTP';
 
+import { ApiProperty } from '@nestjs/swagger';
+
+export class QuoteEntry {
+  @ApiProperty({ example: 182.5 })
+  price!: number;
+  @ApiProperty({ example: 180.0 })
+  prevPrice!: number;
+  @ApiProperty({ example: 2.5 })
+  change!: number;
+  @ApiProperty({ example: 1.39 })
+  changePercent!: number;
+  @ApiProperty({ example: 54321000 })
+  volume!: number;
+  @ApiProperty({ example: '2024-01-15T16:00:00.000Z' })
+  timestamp!: string;
+}
+
 interface PolygonBar {
   t?: number;
   o?: number;

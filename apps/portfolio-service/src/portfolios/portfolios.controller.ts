@@ -10,11 +10,11 @@ import {
   UseGuards,
   ValidationPipe,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AddStockDto, CreatePortfolioDto } from '@yana-stocks/shared-dto';
-import type { Portfolio } from '@yana-stocks/shared-types';
 import { AuthUser, CurrentUser, UserFromTokenGuard } from '../common/current-user.decorator';
 import { UpdatePortfolioDto } from './dto/update-portfolio.dto';
+import { Portfolio } from './schemas/portfolio.schema';
 import { PortfoliosService } from './portfolios.service';
 
 @ApiTags('portfolios')
@@ -25,18 +25,21 @@ export class PortfoliosController {
 
   @Get()
   @ApiOperation({ summary: 'List portfolios for the authenticated user' })
+  @ApiOkResponse({ type: [Portfolio] })
   findAll(): Promise<Portfolio[]> {
     return this.portfoliosService.findAll();
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a portfolio by ID' })
+  @ApiOkResponse({ type: Portfolio })
   findOne(@Param('id') id: string): Promise<Portfolio> {
     return this.portfoliosService.findOne(id);
   }
 
   @Post()
   @ApiOperation({ summary: 'Create a portfolio' })
+  @ApiOkResponse({ type: Portfolio })
   create(
     @Body(ValidationPipe) dto: CreatePortfolioDto,
     @CurrentUser() user: AuthUser,
@@ -46,6 +49,7 @@ export class PortfoliosController {
 
   @Put(':id')
   @ApiOperation({ summary: 'Rename a portfolio' })
+  @ApiOkResponse({ type: Portfolio })
   update(
     @Param('id') id: string,
     @Body(ValidationPipe) dto: UpdatePortfolioDto,
@@ -62,6 +66,7 @@ export class PortfoliosController {
 
   @Post(':id/stocks')
   @ApiOperation({ summary: 'Add a stock to a portfolio (records a buy trade)' })
+  @ApiOkResponse({ type: Portfolio })
   addStock(
     @Param('id') id: string,
     @Body(ValidationPipe) dto: AddStockDto,

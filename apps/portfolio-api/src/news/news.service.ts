@@ -1,13 +1,20 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ApiProperty } from '@nestjs/swagger';
 import { MongoClient } from 'mongodb';
 
-export interface NewsArticle {
-  headline: string;
-  source: string;
-  url: string;
-  publishedAt: string;
-  sentimentLabel: 'positive' | 'neutral' | 'negative';
-  sentimentScore: number;
+export class NewsArticle {
+  @ApiProperty({ example: 'Apple reports record earnings' })
+  headline!: string;
+  @ApiProperty({ example: 'Reuters' })
+  source!: string;
+  @ApiProperty({ example: 'https://example.com/article' })
+  url!: string;
+  @ApiProperty({ example: '2024-01-15T12:00:00.000Z' })
+  publishedAt!: string;
+  @ApiProperty({ enum: ['positive', 'neutral', 'negative'], example: 'positive' })
+  sentimentLabel!: 'positive' | 'neutral' | 'negative';
+  @ApiProperty({ example: 0.85, description: 'FinBERT confidence score 0–1' })
+  sentimentScore!: number;
 }
 
 @Injectable()

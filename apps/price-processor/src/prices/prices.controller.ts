@@ -7,10 +7,9 @@ import {
   ParseIntPipe,
   Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { OHLCV } from '@yana-stocks/shared-types';
-import { PricesService } from './prices.service';
-import type { QuoteEntry } from './prices.service';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { OHLCV } from '@yana-stocks/shared-types';
+import { PricesService, QuoteEntry } from './prices.service';
 
 @ApiTags('prices')
 @Controller('prices')
@@ -19,6 +18,7 @@ export class PricesController {
 
   @Get(':symbol/history')
   @ApiOperation({ summary: 'Get OHLCV bar history for a symbol' })
+  @ApiOkResponse({ type: [OHLCV] })
   getHistory(
     @Param('symbol') symbol: string,
     @Query('limit', new DefaultValuePipe(100), ParseIntPipe) limit: number,
@@ -31,6 +31,7 @@ export class PricesController {
 
   @Get(':symbol/quote')
   @ApiOperation({ summary: 'Get latest quote for a symbol via Yahoo Finance (on-demand)' })
+  @ApiOkResponse({ type: QuoteEntry })
   async getQuote(@Param('symbol') symbol: string): Promise<QuoteEntry> {
     const quote = await this.pricesService.getQuote(symbol);
     if (!quote) throw new NotFoundException(`No quote available for ${symbol}`);

@@ -8,10 +8,10 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { OHLCV } from '@yana-stocks/shared-types';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { OHLCV } from '@yana-stocks/shared-types';
 import { UserFromTokenGuard } from '../common/current-user.decorator';
-import type {
+import {
   AggregateStockResponse,
   AssetsPage,
   FactorTile,
@@ -30,6 +30,7 @@ export class StocksController {
   @Get('stocks/:symbol')
   @UseGuards(UserFromTokenGuard)
   @ApiOperation({ summary: 'Get aggregated price, sentiment, and prediction for a symbol' })
+  @ApiOkResponse({ type: AggregateStockResponse })
   getStock(@Param('symbol') symbol: string): Promise<AggregateStockResponse> {
     return this.stocksService.getStock(symbol.toUpperCase());
   }
@@ -37,6 +38,7 @@ export class StocksController {
   @Get('stocks/:symbol/history')
   @UseGuards(UserFromTokenGuard)
   @ApiOperation({ summary: 'Get OHLCV history for a symbol' })
+  @ApiOkResponse({ type: [OHLCV] })
   getHistory(
     @Param('symbol') symbol: string,
     @Query('limit', new DefaultValuePipe(100), ParseIntPipe) limit: number,
@@ -47,6 +49,7 @@ export class StocksController {
 
   @Get('market/movers')
   @ApiOperation({ summary: 'Get top market movers' })
+  @ApiOkResponse({ type: MarketMovers })
   getMovers(
     @Query('top', new DefaultValuePipe(5), ParseIntPipe) top: number,
   ): Promise<MarketMovers> {
@@ -57,6 +60,7 @@ export class StocksController {
   @ApiOperation({
     summary: 'Get market overview: index quotes, sector performance, and market news',
   })
+  @ApiOkResponse({ type: MarketOverview })
   getOverview(): Promise<MarketOverview> {
     return this.stocksService.getOverview();
   }
@@ -65,6 +69,7 @@ export class StocksController {
   @ApiOperation({
     summary: 'Get weekly sector rotation time-series for heatmap (S&P 500)',
   })
+  @ApiOkResponse({ type: SectorRotationData })
   getSectorRotation(
     @Query('index', new DefaultValuePipe('sp500')) index: string,
   ): Promise<SectorRotationData> {
@@ -77,6 +82,7 @@ export class StocksController {
     summary:
       'Get factor ETF performance tiles (Momentum / Value / Growth / Dividend / Low Vol / Quality)',
   })
+  @ApiOkResponse({ type: [FactorTile] })
   getFactorPerformance(): Promise<FactorTile[]> {
     return this.stocksService.getFactorPerformance();
   }
@@ -85,6 +91,7 @@ export class StocksController {
   @ApiOperation({
     summary: 'Screen US stocks by market cap, volume, dividend yield, sector, and price change',
   })
+  @ApiOkResponse({ type: [ScreenerResult] })
   getScreener(
     @Query('marketCapMin', new DefaultValuePipe(0), ParseIntPipe) marketCapMin: number,
     @Query('marketCapMax', new DefaultValuePipe(0), ParseIntPipe) marketCapMax: number,
@@ -109,6 +116,7 @@ export class StocksController {
   @ApiOperation({
     summary: 'Browse tradable assets by market (us equities or etfs) with search and pagination',
   })
+  @ApiOkResponse({ type: AssetsPage })
   getAssets(
     @Query('search') search = '',
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,

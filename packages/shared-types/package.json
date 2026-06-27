@@ -17,6 +17,9 @@
     "format:check": "prettier --check \"src/**/*.ts\"",
     "lint": "eslint src/"
   },
+  "dependencies": {
+    "@nestjs/swagger": "^11.4.4"
+  },
   "devDependencies": {
     "@yana-stocks/eslint-config": "workspace:*",
     "@yana-stocks/typescript-config": "workspace:*",

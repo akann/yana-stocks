@@ -1,5 +1,5 @@
 {
-  "extends": "@yana-stocks/typescript-config/base.json",
+  "extends": "@yana-stocks/typescript-config/nestjs.json",
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src"

@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "build": "tsc",
+    "build": "nest build",
     "dev": "nest start --watch",
     "start": "node dist/main.js",
     "test": "jest",

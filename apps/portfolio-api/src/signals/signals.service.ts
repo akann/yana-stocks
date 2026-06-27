@@ -1,11 +1,23 @@
 import { Injectable } from '@nestjs/common';
-import type { PredictionSignal, SentimentSignal } from '@yana-stocks/shared-types';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PredictionSignal, SentimentSignal } from '@yana-stocks/shared-types';
 import { RedisService } from '../redis/redis.service';
 
-export interface SignalsResponse {
-  symbol: string;
-  sentiment: SentimentSignal | null;
-  prediction: PredictionSignal | null;
+export class SignalsResponse {
+  @ApiProperty({ example: 'AAPL' })
+  symbol!: string;
+  @ApiPropertyOptional({
+    type: () => SentimentSignal,
+    nullable: true,
+    description: 'Latest FinBERT sentiment signal',
+  })
+  sentiment!: SentimentSignal | null;
+  @ApiPropertyOptional({
+    type: () => PredictionSignal,
+    nullable: true,
+    description: 'Latest ml-predictor price prediction',
+  })
+  prediction!: PredictionSignal | null;
 }
 
 @Injectable()
