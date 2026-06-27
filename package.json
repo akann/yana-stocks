@@ -20,7 +20,7 @@
     "prepare": "husky",
     "audit": "pnpm audit --audit-level=high",
     "scan": "gitleaks detect --redact",
-    "knip": "knip --no-config-hints --no-tag-hints"
+    "scan:code": "knip --no-config-hints --no-tag-hints"
   },
   "devDependencies": {
     "@yana-stocks/prettier-config": "workspace:*",

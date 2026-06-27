@@ -120,7 +120,7 @@ pnpm --filter price-processor dev
 | `pnpm format:check` | Check formatting without writing                                           |
 | `pnpm audit`        | `pnpm audit --audit-level=high` — fail on high/critical CVEs               |
 | `pnpm scan`         | `gitleaks detect --redact` — scan full git history for secrets             |
-| `pnpm knip`         | Dead code and unused dependency scan (Knip)                                |
+| `pnpm scan:code`    | Dead code and unused dependency scan (Knip)                                |
 | `pnpm seed`         | Seed dev user (`dev@example.com`) into PostgreSQL auth tables (idempotent) |
 | `pnpm docker:up`    | Start local infrastructure                                                 |
 | `pnpm docker:down`  | Stop local infrastructure                                                  |

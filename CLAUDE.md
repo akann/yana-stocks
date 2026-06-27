@@ -607,7 +607,7 @@ Root convenience scripts:
 | `pnpm lint`         | `turbo lint` — lints all packages                              |
 | `pnpm audit`        | `pnpm audit --audit-level=high` — fail on high/critical CVEs   |
 | `pnpm scan`         | `gitleaks detect --redact` — scan full git history for secrets |
-| `pnpm knip`         | Knip dead-code-scan + unused dependency scan (`--no-hints`)    |
+| `pnpm scan:code`    | Knip dead-code-scan + unused dependency scan (`--no-hints`)    |
 
 ### Security scanning
 
@@ -624,7 +624,7 @@ history in CI (`secret-scan` job, always runs). Suppression in `.gitleaksignore`
 ### Dead code detection (Knip)
 
 Knip scans for unused files, exports, and dependencies across all workspaces.
-Config in `knip.json` at repo root. Run with `pnpm knip`.
+Config in `knip.json` at repo root. Run with `pnpm scan:code`.
 
 Key config decisions:
 

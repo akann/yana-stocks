@@ -543,7 +543,7 @@ jobs:
         run: pnpm install --frozen-lockfile || (pnpm approve-builds --all && pnpm install --frozen-lockfile)
 
       - name: Check for dead code
-        run: pnpm knip
+        run: pnpm scan:code
 
   # ─────────────────────────────────────────────────────────────────
   # 7. Dependency audit (high + critical CVEs block the build)
