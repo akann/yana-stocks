@@ -901,17 +901,31 @@ describe('StocksService', () => {
       );
     });
 
-    it('returns empty dates and empty changes arrays when FMP request fails', async () => {
+    it('falls back to single-column Polygon snapshot when FMP request fails', async () => {
       redis.get.mockResolvedValue(null);
       (configService.get as jest.Mock).mockReturnValue('FMP_KEY');
+      // FMP call fails; subsequent Polygon snapshot calls also fail (no network in tests)
       httpService.get.mockReturnValue(throwError(() => new Error('FMP down')));
 
       const result = await service.getSectorRotation('sp500');
 
-      // dates is empty; sector rows are still present but each has no data points
-      expect(result.dates).toHaveLength(0);
+      // Falls back to today's single-date snapshot; all changes are 0 because Polygon also fails
+      expect(result.dates).toHaveLength(1);
       expect(result.rows).toHaveLength(11);
-      expect(result.rows.every((r) => r.changes.length === 0)).toBe(true);
+      expect(result.rows.every((r) => r.changes.length === 1)).toBe(true);
+      expect(result.rows.every((r) => r.changes[0] === 0)).toBe(true);
+    });
+
+    it('falls back to single-column Polygon snapshot when FMP returns empty array', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('FMP_KEY');
+      httpService.get.mockReturnValue(of({ data: [] } as AxiosResponse));
+
+      const result = await service.getSectorRotation('sp500');
+
+      expect(result.dates).toHaveLength(1);
+      expect(result.rows).toHaveLength(11);
+      expect(result.rows.every((r) => r.changes.length === 1)).toBe(true);
     });
   });
 

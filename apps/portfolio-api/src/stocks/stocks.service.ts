@@ -522,9 +522,51 @@ export class StocksService {
       changes: entries.map((e) => Number(e[field] ?? 0)),
     }));
 
-    const result: SectorRotationData = { dates, rows };
-    await this.redis.set(CACHE_KEY, JSON.stringify(result), 3600);
-    return result;
+    if (entries.length > 0) {
+      const result: SectorRotationData = { dates, rows };
+      await this.redis.set(CACHE_KEY, JSON.stringify(result), 3600);
+      return result;
+    }
+
+    // FMP historical data unavailable — fall back to today's Polygon sector ETF snapshots
+    const polygonApiKey = this.config.get<string>('massiveApiKey') ?? '';
+    if (!polygonApiKey) return { dates: [], rows: [] };
+
+    const SECTOR_ETFS = [
+      { etf: 'XLK', sector: 'Technology' },
+      { etf: 'XLF', sector: 'Financials' },
+      { etf: 'XLV', sector: 'Health Care' },
+      { etf: 'XLY', sector: 'Consumer Disc.' },
+      { etf: 'XLI', sector: 'Industrials' },
+      { etf: 'XLC', sector: 'Comm. Services' },
+      { etf: 'XLP', sector: 'Consumer Staples' },
+      { etf: 'XLE', sector: 'Energy' },
+      { etf: 'XLRE', sector: 'Real Estate' },
+      { etf: 'XLB', sector: 'Materials' },
+      { etf: 'XLU', sector: 'Utilities' },
+    ];
+
+    const snapshots = await Promise.allSettled(
+      SECTOR_ETFS.map(({ etf }) =>
+        firstValueFrom(
+          this.httpService.get<{ ticker?: { todaysChangePerc?: number } }>(
+            `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${etf}`,
+            { params: { apiKey: polygonApiKey }, timeout: 5000 },
+          ),
+        ),
+      ),
+    );
+
+    const today = new Date().toISOString().slice(0, 10);
+    const fallbackRows: SectorRotationRow[] = SECTOR_ETFS.map(({ sector }, i) => {
+      const r = snapshots[i];
+      const change = r?.status === 'fulfilled' ? (r.value.data?.ticker?.todaysChangePerc ?? 0) : 0;
+      return { sector, changes: [change] };
+    });
+
+    const fallback: SectorRotationData = { dates: [today], rows: fallbackRows };
+    await this.redis.set(CACHE_KEY, JSON.stringify(fallback), 300);
+    return fallback;
   }
 
   async getFactorPerformance(): Promise<FactorTile[]> {
