@@ -500,7 +500,39 @@ jobs:
           retention-days: 3
 
   # ─────────────────────────────────────────────────────────────────
-  # 5. Python quality (ruff + mypy — no pytest to avoid model downloads)
+  # 5. Dependency audit (high + critical CVEs block the build)
+  # ─────────────────────────────────────────────────────────────────
+  audit:
+    runs-on: runners-yana-stocks
+    needs: changes
+    if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        run: echo "dir=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.dir }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile || (pnpm approve-builds --all && pnpm install --frozen-lockfile)
+
+      - name: Audit dependencies
+        run: pnpm audit --audit-level=high
+
+  # ─────────────────────────────────────────────────────────────────
+  # 7. Python quality (ruff + mypy — no pytest to avoid model downloads)
   #    Runs in parallel with integration-test (independent of TS services)
   # ─────────────────────────────────────────────────────────────────
   python-quality:
@@ -536,11 +568,11 @@ jobs:
         run: uv run mypy src/
 
   # ─────────────────────────────────────────────────────────────────
-  # 6. Build and push Docker images  (main branch only)
+  # 8. Build and push Docker images  (main branch only)
   # ─────────────────────────────────────────────────────────────────
   docker:
     runs-on: runners-yana-stocks
-    needs: [changes, ts-quality, integration-test, e2e, python-quality]
+    needs: [changes, ts-quality, integration-test, e2e, python-quality, audit]
     if: |
       always() &&
       github.ref == 'refs/heads/main' &&
@@ -548,7 +580,8 @@ jobs:
       (needs.ts-quality.result        == 'success' || needs.ts-quality.result        == 'skipped') &&
       (needs.integration-test.result  == 'success' || needs.integration-test.result  == 'skipped') &&
       (needs.e2e.result               == 'success' || needs.e2e.result               == 'skipped') &&
-      (needs.python-quality.result    == 'success' || needs.python-quality.result    == 'skipped')
+      (needs.python-quality.result    == 'success' || needs.python-quality.result    == 'skipped') &&
+      (needs.audit.result             == 'success' || needs.audit.result             == 'skipped')
     strategy:
       fail-fast: false
       max-parallel: 3
@@ -627,7 +660,7 @@ jobs:
           cache-to: type=registry,ref=${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}:buildcache,mode=max
 
   # ─────────────────────────────────────────────────────────────────
-  # 7. GitOps: update image tags in k8s-apps → ArgoCD auto-syncs
+  # 9. GitOps: update image tags in k8s-apps → ArgoCD auto-syncs
   # ─────────────────────────────────────────────────────────────────
   gitops:
     runs-on: runners-yana-stocks
