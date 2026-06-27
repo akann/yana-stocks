@@ -77,6 +77,16 @@ interface FmpHistoricalSectorEntry {
   technology?: number;
 }
 
+interface TwelveDataBar {
+  datetime: string;
+  close: string;
+}
+
+interface TwelveDataSeriesResponse {
+  values?: TwelveDataBar[];
+  status?: string;
+}
+
 import { RedisService } from '../redis/redis.service';
 import { MOCK_ASSETS, MOCK_ETF_ASSETS, MOCK_GLOBAL_ASSETS, MOCK_UK_ASSETS } from './mock-assets';
 import type {
@@ -485,8 +495,7 @@ export class StocksService {
     const cached = await this.redis.get(CACHE_KEY);
     if (cached) return JSON.parse(cached) as SectorRotationData;
 
-    // FTSE 100 sector time-series not yet available via FMP — return empty
-    if (index === 'ftse100') return { dates: [], rows: [] };
+    if (index === 'ftse100') return this.getFtse100SectorRotation(CACHE_KEY);
 
     const apiKey = this.config.get<string>('fmpApiKey') ?? '';
     if (!apiKey) return { dates: [], rows: [] };
@@ -567,6 +576,98 @@ export class StocksService {
     const fallback: SectorRotationData = { dates: [today], rows: fallbackRows };
     await this.redis.set(CACHE_KEY, JSON.stringify(fallback), 300);
     return fallback;
+  }
+
+  private async getFtse100SectorRotation(cacheKey: string): Promise<SectorRotationData> {
+    const tdApiKey = this.config.get<string>('twelveDataApiKey') ?? '';
+    if (!tdApiKey) return { dates: [], rows: [] };
+
+    // Twelve Data symbols for LSE stocks (exchange=LSE param disambiguates from US markets).
+    // BT Group trades as BT.A on LSE — the bare "BT" ticker resolves to a different instrument.
+    const FTSE_SECTOR_BASKETS: { sector: string; tdSymbols: string[] }[] = [
+      { sector: 'Technology', tdSymbols: ['SAGE', 'EXPN', 'HLMA'] },
+      { sector: 'Financials', tdSymbols: ['HSBA', 'LLOY', 'BARC'] },
+      { sector: 'Health Care', tdSymbols: ['AZN', 'GSK', 'HLN'] },
+      { sector: 'Consumer Disc.', tdSymbols: ['JD', 'MKS', 'CPG'] },
+      { sector: 'Industrials', tdSymbols: ['BA', 'RR', 'WEIR'] },
+      { sector: 'Comm. Services', tdSymbols: ['BT.A', 'VOD'] },
+      { sector: 'Consumer Staples', tdSymbols: ['DGE', 'TSCO', 'BATS'] },
+      { sector: 'Energy', tdSymbols: ['BP', 'SHEL'] },
+      { sector: 'Real Estate', tdSymbols: ['SGRO', 'BLND', 'LAND'] },
+      { sector: 'Materials', tdSymbols: ['RIO', 'GLEN', 'AAL'] },
+      { sector: 'Utilities', tdSymbols: ['NG', 'SSE', 'SVT'] },
+    ];
+
+    // Flatten to (sector, symbol) pairs — 31 total — and fetch all in parallel.
+    // outputsize=13 gives 13 daily bars from which we derive 12 daily % changes.
+    const NUM_DATES = 12;
+    const allStocks = FTSE_SECTOR_BASKETS.flatMap(({ sector, tdSymbols }) =>
+      tdSymbols.map((tdSymbol) => ({ sector, tdSymbol })),
+    );
+
+    const results = await Promise.allSettled(
+      allStocks.map(({ tdSymbol }) =>
+        firstValueFrom(
+          this.httpService.get<TwelveDataSeriesResponse>('https://api.twelvedata.com/time_series', {
+            params: {
+              symbol: tdSymbol,
+              exchange: 'LSE',
+              interval: '1day',
+              outputsize: NUM_DATES + 1,
+              apikey: tdApiKey,
+            },
+            timeout: 10_000,
+          }),
+        ),
+      ),
+    );
+
+    // Aggregate into: sector → date → [daily % changes across stocks in sector]
+    const sectorDateMap = new Map<string, Map<string, number[]>>();
+
+    for (const [i, result] of results.entries()) {
+      if (result.status !== 'fulfilled') continue;
+      const { sector } = allStocks[i]!;
+      const values = result.value.data?.values ?? [];
+      if (values.length < 2) continue;
+
+      if (!sectorDateMap.has(sector)) sectorDateMap.set(sector, new Map());
+      const dateMap = sectorDateMap.get(sector)!;
+
+      // Twelve Data returns values newest-first; bar[j] vs bar[j+1] gives daily change
+      for (let j = 0; j < values.length - 1; j++) {
+        const close = parseFloat(values[j]!.close);
+        const prevClose = parseFloat(values[j + 1]!.close);
+        if (!prevClose) continue;
+        const change = ((close - prevClose) / prevClose) * 100;
+        const date = values[j]!.datetime.slice(0, 10);
+        if (!dateMap.has(date)) dateMap.set(date, []);
+        dateMap.get(date)!.push(change);
+      }
+    }
+
+    // Collect all dates, sort chronologically, take the most recent NUM_DATES
+    const allDates = new Set<string>();
+    for (const dateMap of sectorDateMap.values()) {
+      for (const date of dateMap.keys()) allDates.add(date);
+    }
+    const sortedDates = [...allDates].sort().slice(-NUM_DATES);
+    if (sortedDates.length === 0) return { dates: [], rows: [] };
+
+    const rows: SectorRotationRow[] = FTSE_SECTOR_BASKETS.map(({ sector }) => {
+      const dateMap = sectorDateMap.get(sector) ?? new Map<string, number[]>();
+      const changes = sortedDates.map((date) => {
+        const dayChanges = dateMap.get(date) ?? [];
+        return dayChanges.length > 0
+          ? dayChanges.reduce((a, b) => a + b, 0) / dayChanges.length
+          : 0;
+      });
+      return { sector, changes };
+    });
+
+    const result: SectorRotationData = { dates: sortedDates, rows };
+    await this.redis.set(cacheKey, JSON.stringify(result), 3600);
+    return result;
   }
 
   async getFactorPerformance(): Promise<FactorTile[]> {

@@ -822,14 +822,100 @@ describe('StocksService', () => {
       expect(result.rows[0]?.sector).toBe('Technology');
     });
 
-    it('returns empty data immediately for ftse100', async () => {
-      redis.get.mockResolvedValue(null);
+    describe('ftse100 via Twelve Data', () => {
+      // 31 LSE stocks across 11 sectors (3+3+3+3+3+2+3+2+3+3+3)
+      const TOTAL_FTSE_STOCKS = 31;
 
-      const result = await service.getSectorRotation('ftse100');
+      const makeTdSeries = (dates: string[], closes: number[]) => ({
+        values: dates.map((datetime, i) => ({ datetime, close: String(closes[i]) })),
+        status: 'ok',
+      });
 
-      expect(httpService.get).not.toHaveBeenCalled();
-      expect(result.dates).toHaveLength(0);
-      expect(result.rows).toHaveLength(0);
+      it('returns empty data when TWELVE_DATA_API_KEY is not configured', async () => {
+        redis.get.mockResolvedValue(null);
+        (configService.get as jest.Mock).mockReturnValue('');
+
+        const result = await service.getSectorRotation('ftse100');
+
+        expect(httpService.get).not.toHaveBeenCalled();
+        expect(result.dates).toHaveLength(0);
+        expect(result.rows).toHaveLength(0);
+      });
+
+      it('fetches time_series from Twelve Data for all FTSE sector stocks', async () => {
+        redis.get.mockResolvedValue(null);
+        (configService.get as jest.Mock).mockReturnValue('TD_KEY');
+        const series = makeTdSeries(['2026-06-27', '2026-06-26'], [110, 100]);
+        httpService.get.mockReturnValue(of({ data: series } as AxiosResponse));
+
+        const result = await service.getSectorRotation('ftse100');
+
+        expect(httpService.get).toHaveBeenCalledTimes(TOTAL_FTSE_STOCKS);
+        expect(httpService.get).toHaveBeenCalledWith(
+          'https://api.twelvedata.com/time_series',
+          expect.objectContaining({
+            params: expect.objectContaining({ exchange: 'LSE', interval: '1day' }),
+          }),
+        );
+        expect(result.rows).toHaveLength(11);
+        expect(result.dates).toEqual(['2026-06-27']);
+      });
+
+      it('computes daily % change averaged across stocks in each sector', async () => {
+        redis.get.mockResolvedValue(null);
+        (configService.get as jest.Mock).mockReturnValue('TD_KEY');
+        // close=110 vs prevClose=100 → +10% for every stock
+        const series = makeTdSeries(['2026-06-27', '2026-06-26'], [110, 100]);
+        httpService.get.mockReturnValue(of({ data: series } as AxiosResponse));
+
+        const result = await service.getSectorRotation('ftse100');
+
+        expect(result.rows[0]!.changes[0]).toBeCloseTo(10, 5);
+        expect(result.rows.every((r) => Math.abs(r.changes[0]! - 10) < 0.001)).toBe(true);
+      });
+
+      it('aggregates multiple dates and keeps the 12 most recent', async () => {
+        redis.get.mockResolvedValue(null);
+        (configService.get as jest.Mock).mockReturnValue('TD_KEY');
+        // 13 bars → 12 daily changes
+        const dates = Array.from(
+          { length: 13 },
+          (_, i) => `2026-06-${String(14 + i).padStart(2, '0')}`,
+        );
+        const closes = Array.from({ length: 13 }, (_, i) => 100 + i);
+        const series = makeTdSeries(dates, closes);
+        httpService.get.mockReturnValue(of({ data: series } as AxiosResponse));
+
+        const result = await service.getSectorRotation('ftse100');
+
+        expect(result.dates).toHaveLength(12);
+        expect(result.dates[0]).toBe('2026-06-14');
+        expect(result.dates[11]).toBe('2026-06-25');
+      });
+
+      it('returns empty when all Twelve Data calls fail', async () => {
+        redis.get.mockResolvedValue(null);
+        (configService.get as jest.Mock).mockReturnValue('TD_KEY');
+        httpService.get.mockReturnValue(throwError(() => new Error('network error')));
+
+        const result = await service.getSectorRotation('ftse100');
+
+        expect(result.dates).toHaveLength(0);
+        expect(result.rows).toHaveLength(0);
+      });
+
+      it('uses cache for subsequent ftse100 calls', async () => {
+        const cached: import('./price-cache.types').SectorRotationData = {
+          dates: ['2026-06-27'],
+          rows: [{ sector: 'Technology', changes: [1.5] }],
+        };
+        redis.get.mockResolvedValue(JSON.stringify(cached));
+
+        const result = await service.getSectorRotation('ftse100');
+
+        expect(httpService.get).not.toHaveBeenCalled();
+        expect(result.dates).toEqual(['2026-06-27']);
+      });
     });
 
     it('returns empty data when no FMP API key is configured', async () => {

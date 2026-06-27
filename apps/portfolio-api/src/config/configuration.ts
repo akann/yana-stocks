@@ -14,4 +14,5 @@ export default () => ({
   mongodbUri: process.env['MONGODB_URI'] ?? 'mongodb://localhost:27017/yana_stocks',
   massiveApiKey: process.env['MASSIVE_API_KEY'] ?? '',
   fmpApiKey: process.env['FMP_API_KEY'] ?? '',
+  twelveDataApiKey: process.env['TWELVE_DATA_API_KEY'] ?? '',
 });
