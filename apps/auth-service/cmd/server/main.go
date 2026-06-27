@@ -16,23 +16,35 @@ import (
 	kafkapub "github.com/akann/yana-stocks/auth-service/internal/kafka"
 	"github.com/akann/yana-stocks/auth-service/internal/middleware"
 	"github.com/akann/yana-stocks/auth-service/internal/service"
+	"github.com/akann/yana-stocks/auth-service/internal/tracing"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 func main() {
 	_ = godotenv.Load()
 
 	cfg := config.Load()
+	ctx := context.Background()
+
+	// Tracing
+	shutdownTracing := tracing.Setup(ctx)
+	defer func() {
+		tracingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdownTracing(tracingCtx); err != nil {
+			log.Printf("OTEL shutdown error: %v", err)
+		}
+	}()
 
 	// Database
 	if err := db.RunMigrations(cfg.DatabaseURL); err != nil {
 		log.Fatalf("migration failed: %v", err)
 	}
 
-	ctx := context.Background()
 	pool, err := db.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("db connect failed: %v", err)
@@ -96,7 +108,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
-		Handler:      r,
+		Handler:      otelhttp.NewHandler(r, "auth-service"),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
