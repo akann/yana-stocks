@@ -1,0 +1,5 @@
+# Suppress false positives from historical commits.
+# These are dev-only dummy credentials, not real secrets.
+
+# DEV_USER_PASSWORD in seed-dev.ts — hardcoded local dev seed credential
+0b6cc811bed94787a789ae49da67f3072025fffe:apps/portfolio-api/src/scripts/seed-dev.ts:generic-api-key:39

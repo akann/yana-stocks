@@ -36,7 +36,7 @@ const DATABASE_URL =
 const TTL = 86_400; // 24 hours — survives overnight dev sessions
 
 const DEV_USER_EMAIL = 'dev@example.com';
-const DEV_USER_PASSWORD = 'dF1o3WlFqCxctJ5U12';
+const DEV_USER_PASSWORD = 'dF1o3WlFqCxctJ5U12'; // gitleaks:allow
 
 const BARS_PER_DAY = 390; // 6.5 trading hours × 60 min
 const TRADING_DAYS = 252; // ~1 year of daily bars
