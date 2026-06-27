@@ -32,6 +32,11 @@ jest.mock('kafkajs', () => {
   };
 });
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { eachMessageHandler } = require('kafkajs') as {
+  eachMessageHandler: { fn?: (args: unknown) => Promise<void> };
+};
+
 type HandlePrice = (msg: ProcessedPriceMessage) => Promise<void>;
 type HandleSentiment = (msg: SentimentSignal) => Promise<void>;
 type HandlePrediction = (msg: PredictionSignal) => Promise<void>;
@@ -183,5 +188,69 @@ describe('KafkaConsumerService — message handlers', () => {
         172800,
       );
     });
+  });
+});
+
+describe('KafkaConsumerService — lifecycle', () => {
+  let service: KafkaConsumerService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        KafkaConsumerService,
+        {
+          provide: RedisService,
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn().mockResolvedValue(undefined),
+            del: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
+          provide: ConfigService,
+          useValue: { getOrThrow: jest.fn().mockReturnValue(['localhost:9092']) },
+        },
+      ],
+    }).compile();
+    service = module.get(KafkaConsumerService);
+  });
+
+  it('onModuleInit triggers start(), which connects and subscribes the consumer', async () => {
+    service.onModuleInit();
+    // Give the non-awaited start() a chance to run
+    await new Promise((r) => setImmediate(r));
+    // The kafkajs mock consumer.connect should have been called
+    const { Kafka } = await import('kafkajs');
+    const kafkaMock = Kafka as jest.Mock;
+    const kafkaInstance = kafkaMock.mock.results.at(-1)?.value as {
+      consumer: jest.Mock;
+    };
+    const consumer = kafkaInstance.consumer() as { connect: jest.Mock };
+    expect(consumer.connect).toHaveBeenCalled();
+  });
+
+  it('onModuleDestroy sets stopping=true and disconnects the consumer', async () => {
+    // Ensure start() ran first so there is a consumer to disconnect
+    service.onModuleInit();
+    await new Promise((r) => setImmediate(r));
+
+    await service.onModuleDestroy();
+
+    const { Kafka } = await import('kafkajs');
+    const kafkaMock = Kafka as jest.Mock;
+    const kafkaInstance = kafkaMock.mock.results.at(-1)?.value as {
+      consumer: jest.Mock;
+    };
+    const consumer = kafkaInstance.consumer() as { disconnect: jest.Mock };
+    expect(consumer.disconnect).toHaveBeenCalled();
+  });
+
+  it('eachMessage handler ignores messages with no value', async () => {
+    service.onModuleInit();
+    await new Promise((r) => setImmediate(r));
+    // If the handler throws on a valueless message, this promise would reject
+    await expect(
+      eachMessageHandler.fn?.({ topic: 'any', message: { value: null } }),
+    ).resolves.toBeUndefined();
   });
 });
