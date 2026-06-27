@@ -28,8 +28,10 @@ overrides:
   multer: ^2.2.0
   postcss: ^8.5.10
 
-# GHSA-h67p-54hq-rp68 targets js-yaml v4 <=4.1.1; @istanbuljs/load-nyc-config
-# pulls in js-yaml v3 (^3.13.1) — different major, different API. False positive.
+# GHSA-h67p-54hq-rp68: js-yaml v3 DoS via merge key aliases (moderate).
+# @istanbuljs/load-nyc-config@1.1.0 (latest) requires js-yaml@^3.x — no v4 migration
+# from upstream. Cannot override to v4 (breaking API change). Dev-only dep (jest
+# coverage); not reachable in production. Accepted at --audit-level=high threshold.
 auditConfig:
   ignoreCves:
     - GHSA-h67p-54hq-rp68
