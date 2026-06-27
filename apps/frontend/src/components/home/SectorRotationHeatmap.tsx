@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Treemap, ResponsiveContainer, Tooltip } from 'recharts';
 import { api } from '@/lib/api';
@@ -74,6 +74,8 @@ function fmtDate(iso: string): string {
 
 // ─── Treemap pieces ───────────────────────────────────────────────────────────
 
+const CELL_GRAD_ID = 'cg-overlay';
+
 interface TreemapItem {
   name: string;
   value: number;
@@ -100,22 +102,20 @@ function abbrev(name: string): string {
   return ABBREV[name] ?? name;
 }
 
-function CustomContent(props: ContentProps): React.JSX.Element | null {
+const CustomContent = React.memo(function CustomContent(
+  props: ContentProps,
+): React.JSX.Element | null {
   const { x = 0, y = 0, width = 0, height = 0, name = '', pct = 0 } = props;
   if (width < 28 || height < 22) return null;
 
   const base = cellColor(pct);
-  // Unique gradient ID per sector (safe — no spaces/special chars after replace)
-  const gradId = `cg-${name.replace(/[^a-z]/gi, '')}`;
   const rx = 8;
   const pctStr = `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`;
   const label = abbrev(name);
 
-  // Layout thresholds
   const showBoth = width > 64 && height > 44;
   const showPctOnly = !showBoth && width > 36 && height > 28;
 
-  // Font sizes scale with cell size, clamped
   const nameFontSize = Math.max(9, Math.min(11, width / 7));
   const pctFontSize = Math.max(10, Math.min(14, width / 5.5));
 
@@ -124,14 +124,6 @@ function CustomContent(props: ContentProps): React.JSX.Element | null {
 
   return (
     <g>
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity={0.18} />
-          <stop offset="100%" stopColor="#000000" stopOpacity={0.12} />
-        </linearGradient>
-      </defs>
-
-      {/* Base colour */}
       <rect
         x={x}
         y={y}
@@ -142,12 +134,10 @@ function CustomContent(props: ContentProps): React.JSX.Element | null {
         stroke="#f8fafc"
         strokeWidth={3}
       />
-      {/* Gradient overlay for depth */}
-      <rect x={x} y={y} width={width} height={height} fill={`url(#${gradId})`} rx={rx} />
+      <rect x={x} y={y} width={width} height={height} fill={`url(#${CELL_GRAD_ID})`} rx={rx} />
 
       {showBoth && (
         <>
-          {/* Sector name — smaller, above centre */}
           <text
             x={cx}
             y={cy - pctFontSize * 0.6}
@@ -160,7 +150,6 @@ function CustomContent(props: ContentProps): React.JSX.Element | null {
           >
             {label}
           </text>
-          {/* % change — larger, hero number */}
           <text
             x={cx}
             y={cy + pctFontSize * 0.85}
@@ -190,7 +179,7 @@ function CustomContent(props: ContentProps): React.JSX.Element | null {
       )}
     </g>
   );
-}
+});
 
 interface TooltipProps {
   active?: boolean;
@@ -224,24 +213,24 @@ function TreemapView({
 }): React.JSX.Element {
   const weights = activeIndex === 'ftse100' ? FTSE_WEIGHTS : SP500_WEIGHTS;
 
-  // Prefer the last column of rotation data (today); fall back to overview sectors
-  const pctMap = new Map<string, number>();
-  if (rotationData?.rows.length && rotationData.dates.length) {
-    const lastIdx = rotationData.dates.length - 1;
-    for (const row of rotationData.rows) {
-      pctMap.set(normSector(row.sector), row.changes[lastIdx] ?? 0);
+  const treeData = useMemo<TreemapItem[]>(() => {
+    const pctMap = new Map<string, number>();
+    if (rotationData?.rows.length && rotationData.dates.length) {
+      const lastIdx = rotationData.dates.length - 1;
+      for (const row of rotationData.rows) {
+        pctMap.set(normSector(row.sector), row.changes[lastIdx] ?? 0);
+      }
+    } else if (activeIndex === 'sp500' && overviewData?.sectors.length) {
+      for (const s of overviewData.sectors) {
+        pctMap.set(s.sector, s.changesPercentage);
+      }
     }
-  } else if (activeIndex === 'sp500' && overviewData?.sectors.length) {
-    for (const s of overviewData.sectors) {
-      pctMap.set(s.sector, s.changesPercentage);
-    }
-  }
+    return Object.entries(weights)
+      .map(([name, value]) => ({ name, value, pct: pctMap.get(name) ?? 0 }))
+      .sort((a, b) => b.value - a.value);
+  }, [activeIndex, rotationData, overviewData, weights]);
 
-  const treeData: TreemapItem[] = Object.entries(weights)
-    .map(([name, value]) => ({ name, value, pct: pctMap.get(name) ?? 0 }))
-    .sort((a, b) => b.value - a.value);
-
-  if (!pctMap.size) {
+  if (!treeData.some((d) => d.pct !== 0)) {
     return (
       <div className="h-64 flex items-center justify-center text-sm text-gray-400">No data</div>
     );
@@ -250,6 +239,13 @@ function TreemapView({
   return (
     <ResponsiveContainer width="100%" height={256}>
       <Treemap data={treeData} dataKey="value" content={<CustomContent />}>
+        {/* Gradient defined once inside the Recharts SVG, shared by all cells */}
+        <defs>
+          <linearGradient id={CELL_GRAD_ID} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity={0.18} />
+            <stop offset="100%" stopColor="#000000" stopOpacity={0.12} />
+          </linearGradient>
+        </defs>
         <Tooltip content={<SectorTooltip />} />
       </Treemap>
     </ResponsiveContainer>
