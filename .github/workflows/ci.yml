@@ -128,7 +128,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   # 2. Secret scanning (Gitleaks — full history)
   # ─────────────────────────────────────────────────────────────────
-  secret-scan:
+  gitleaks-secret-scan:
     runs-on: runners-yana-stocks
     steps:
       - uses: actions/checkout@v4
@@ -141,9 +141,9 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────
   # 2b. Trivy filesystem scan — dep CVEs (npm/Go/Python) + IaC config
-  #     Runs parallel to secret-scan; blocks on CRITICAL or HIGH
+  #     Runs parallel to gitleaks-secret-scan; blocks on CRITICAL or HIGH
   # ─────────────────────────────────────────────────────────────────
-  trivy-scan:
+  trivy-image-scan:
     runs-on: runners-yana-stocks
     steps:
       - uses: actions/checkout@v4
@@ -164,7 +164,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   ts-quality:
     runs-on: runners-yana-stocks
-    needs: [changes, secret-scan, trivy-scan]
+    needs: [changes, gitleaks-secret-scan, trivy-image-scan]
     if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -226,7 +226,7 @@ jobs:
   # 4. Integration tests (Postgres + MongoDB + Redis as service containers)
   #    Kafka is mocked in all three suites — no broker needed in CI.
   # ─────────────────────────────────────────────────────────────────
-  integration-test:
+  integration-tests:
     runs-on: runners-yana-stocks
     needs: [changes, ts-quality]
     if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
@@ -341,9 +341,9 @@ jobs:
   # 5. E2E tests — full local stack (Postgres + MongoDB + Redis + all services)
   #    Kafka is not available from this runner; producer/consumer start non-blocking.
   # ─────────────────────────────────────────────────────────────────
-  e2e:
+  e2e-tests:
     runs-on: runners-yana-stocks
-    needs: [changes, ts-quality, integration-test]
+    needs: [changes, ts-quality, integration-tests]
     if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
     services:
       postgres:
@@ -556,9 +556,9 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   # 6. Dead code / unused deps (Knip)
   # ─────────────────────────────────────────────────────────────────
-  code-scan:
+  knip-code-scan:
     runs-on: runners-yana-stocks
-    needs: [changes, secret-scan, trivy-scan]
+    needs: [changes, gitleaks-secret-scan, trivy-image-scan]
     if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -591,7 +591,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   pnpm-audit:
     runs-on: runners-yana-stocks
-    needs: [changes, secret-scan, trivy-scan]
+    needs: [changes, gitleaks-secret-scan, trivy-image-scan]
     if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -607,11 +607,11 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────
   # 9. Python quality (ruff + mypy — no pytest to avoid model downloads)
-  #    Runs in parallel with integration-test (independent of TS services)
+  #    Runs in parallel with integration-tests (independent of TS services)
   # ─────────────────────────────────────────────────────────────────
   python-quality:
     runs-on: runners-yana-stocks
-    needs: [changes, secret-scan, trivy-scan]
+    needs: [changes, gitleaks-secret-scan, trivy-image-scan]
     if: needs.changes.outputs.python == 'true' || github.event.inputs.build_all == 'true'
     strategy:
       fail-fast: false
@@ -646,19 +646,19 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   docker:
     runs-on: runners-yana-stocks
-    needs: [changes, secret-scan, trivy-scan, ts-quality, integration-test, e2e, python-quality, pnpm-audit, code-scan]
+    needs: [changes, gitleaks-secret-scan, trivy-image-scan, ts-quality, integration-tests, e2e-tests, python-quality, pnpm-audit, knip-code-scan]
     if: |
       always() &&
       github.ref == 'refs/heads/main' &&
       needs.changes.outputs.has_changes == 'true' &&
-      needs.secret-scan.result          == 'success' &&
-      needs.trivy-scan.result           == 'success' &&
+      needs.gitleaks-secret-scan.result          == 'success' &&
+      needs.trivy-image-scan.result           == 'success' &&
       (needs.ts-quality.result        == 'success' || needs.ts-quality.result        == 'skipped') &&
-      (needs.integration-test.result  == 'success' || needs.integration-test.result  == 'skipped') &&
-      (needs.e2e.result               == 'success' || needs.e2e.result               == 'skipped') &&
+      (needs.integration-tests.result  == 'success' || needs.integration-tests.result  == 'skipped') &&
+      (needs.e2e-tests.result               == 'success' || needs.e2e-tests.result               == 'skipped') &&
       (needs.python-quality.result    == 'success' || needs.python-quality.result    == 'skipped') &&
       (needs.pnpm-audit.result             == 'success' || needs.pnpm-audit.result             == 'skipped') &&
-      (needs.code-scan.result    == 'success' || needs.code-scan.result    == 'skipped')
+      (needs.knip-code-scan.result    == 'success' || needs.knip-code-scan.result    == 'skipped')
     strategy:
       fail-fast: false
       max-parallel: 3
