@@ -1,1 +1,3 @@
 pnpm turbo lint --filter='[origin/main]'
+pnpm audit --audit-level=high
+pnpm scan:code
