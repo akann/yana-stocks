@@ -1,8 +1,8 @@
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserFromTokenGuard } from '../common/current-user.decorator';
 import { AnalystService } from './analyst.service';
-import type { AnalystRating } from './analyst.types';
+import { AnalystRating } from './analyst.types';
 
 @ApiTags('analyst')
 @UseGuards(UserFromTokenGuard)
@@ -12,6 +12,7 @@ export class AnalystController {
 
   @Get(':symbol/analyst')
   @ApiOperation({ summary: 'Get analyst ratings and price target for a symbol' })
+  @ApiOkResponse({ type: AnalystRating })
   getRatings(@Param('symbol') symbol: string): Promise<AnalystRating> {
     return this.analystService.getRatings(symbol.toUpperCase());
   }

@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Put, UseGuards, ValidationPipe } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Profile } from './schemas/profile.schema';
+import { PublicProfileResponseDto } from './dto/public-profile.response.dto';
 import { UpdateProfileDto } from '@yana-stocks/shared-dto';
 import { AuthUser, CurrentUser, UserFromTokenGuard } from '../common/current-user.decorator';
 import { ProfileService } from './profile.service';
@@ -31,7 +32,7 @@ export class ProfileController {
 
   @Get(':userId')
   @ApiOperation({ summary: 'Get public profile (displayName + avatar only)' })
-  @ApiOkResponse({ type: Profile })
+  @ApiOkResponse({ type: PublicProfileResponseDto })
   getPublicProfile(@Param('userId') userId: string) {
     return this.profileService.getPublicProfile(userId);
   }

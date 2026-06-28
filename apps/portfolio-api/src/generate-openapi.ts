@@ -14,6 +14,8 @@ import { SignalsService } from './signals/signals.service';
 import { NewsController } from './news/news.controller';
 import { NewsService } from './news/news.service';
 import { PredictProxyController } from './predict/predict-proxy.controller';
+import { AnalystController } from './analyst/analyst.controller';
+import { AnalystService } from './analyst/analyst.service';
 import { RedisService } from './redis/redis.service';
 
 const mockConfig = { get: () => '', getOrThrow: () => '' };
@@ -26,6 +28,7 @@ const mockConfig = { get: () => '', getOrThrow: () => '' };
     SignalsController,
     NewsController,
     PredictProxyController,
+    AnalystController,
   ],
   providers: [
     { provide: ConfigService, useValue: mockConfig },
@@ -33,6 +36,7 @@ const mockConfig = { get: () => '', getOrThrow: () => '' };
     { provide: StocksService, useValue: {} },
     { provide: SignalsService, useValue: {} },
     { provide: NewsService, useValue: {} },
+    { provide: AnalystService, useValue: {} },
     { provide: RedisService, useValue: {} },
   ],
 })

@@ -5,6 +5,7 @@ import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nes
 import { LoginDto, RefreshDto, RegisterDto } from '@yana-stocks/shared-dto';
 import type { Response } from 'express';
 import { firstValueFrom } from 'rxjs';
+import { MeResponseDto, MessageResponseDto, TokenResponseDto } from './dto/auth-response.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -43,7 +44,11 @@ export class AuthProxyController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register a new user account' })
   @ApiBody({ type: RegisterDto })
-  @ApiResponse({ status: 201, description: 'Registration successful' })
+  @ApiResponse({
+    status: 201,
+    type: MessageResponseDto,
+    description: 'Registration successful — verification email sent',
+  })
   @ApiResponse({ status: 409, description: 'Email already in use' })
   async register(@Body() body: unknown, @Res() res: Response): Promise<void> {
     const { status, data } = await this.forward('POST', '/api/auth/register', body);
@@ -54,7 +59,11 @@ export class AuthProxyController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login and receive JWT tokens' })
   @ApiBody({ type: LoginDto })
-  @ApiResponse({ status: 200, description: 'Returns accessToken and refreshToken' })
+  @ApiResponse({
+    status: 200,
+    type: TokenResponseDto,
+    description: 'Returns accessToken (15 min) and refreshToken (7 days)',
+  })
   @ApiResponse({ status: 401, description: 'Invalid credentials or unverified email' })
   async login(@Body() body: unknown, @Res() res: Response): Promise<void> {
     const { status, data } = await this.forward('POST', '/api/auth/login', body);
@@ -65,7 +74,11 @@ export class AuthProxyController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Rotate refresh token and get new access token' })
   @ApiBody({ type: RefreshDto })
-  @ApiResponse({ status: 200, description: 'Returns new accessToken and refreshToken' })
+  @ApiResponse({
+    status: 200,
+    type: TokenResponseDto,
+    description: 'New accessToken and rotated refreshToken',
+  })
   @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
   async refresh(@Body() body: unknown, @Res() res: Response): Promise<void> {
     const { status, data } = await this.forward('POST', '/api/auth/refresh', body);
@@ -76,7 +89,7 @@ export class AuthProxyController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Revoke refresh token' })
   @ApiBody({ type: RefreshDto })
-  @ApiResponse({ status: 200, description: 'Logged out successfully' })
+  @ApiResponse({ status: 200, type: MessageResponseDto, description: 'Logged out successfully' })
   async logout(
     @Body() body: unknown,
     @Headers('authorization') auth: string | undefined,
@@ -89,7 +102,11 @@ export class AuthProxyController {
   @Get('me')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user identity from JWT' })
-  @ApiResponse({ status: 200, description: 'Returns userId and email decoded from token' })
+  @ApiResponse({
+    status: 200,
+    type: MeResponseDto,
+    description: 'Decoded JWT claims (sub, email, iss, iat, exp)',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid token' })
   async me(
     @Headers('authorization') auth: string | undefined,

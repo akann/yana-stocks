@@ -193,6 +193,10 @@ jobs:
           fi
 
       - name: Lint, type-check, test
+        env:
+          TURBO_API: http://turbo-cache.yana-stocks.svc.cluster.local:3000
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: yana-stocks
         run: |
           pnpm turbo run lint type-check test \
             --filter='${{ steps.turbo-filter.outputs.filter }}' \
@@ -271,6 +275,12 @@ jobs:
           key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: pnpm-${{ runner.os }}-
 
+      - uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-ts-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-ts-${{ runner.os }}-
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile || (pnpm approve-builds --all && pnpm install --frozen-lockfile)
 
@@ -294,6 +304,10 @@ jobs:
             > apps/portfolio-api/.env.test
 
       - name: Run integration tests
+        env:
+          TURBO_API: http://turbo-cache.yana-stocks.svc.cluster.local:3000
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: yana-stocks
         run: pnpm turbo run test:int --concurrency=3
 
   # ─────────────────────────────────────────────────────────────────
@@ -406,6 +420,10 @@ jobs:
             > apps/frontend/.env.local
 
       - name: Build all apps
+        env:
+          TURBO_API: http://turbo-cache.yana-stocks.svc.cluster.local:3000
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: yana-stocks
         run: pnpm turbo run build
 
       - name: Write service .env files
@@ -547,6 +565,7 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────
   # 7. Dependency audit (high + critical CVEs block the build)
+  # pnpm audit reads pnpm-lock.yaml directly — no node_modules needed.
   # ─────────────────────────────────────────────────────────────────
   audit:
     runs-on: runners-yana-stocks
@@ -555,24 +574,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
       - uses: pnpm/action-setup@v4
-
-      - name: Get pnpm store path
-        id: pnpm-store
-        run: echo "dir=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-store.outputs.dir }}
-          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: pnpm-${{ runner.os }}-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile || (pnpm approve-builds --all && pnpm install --frozen-lockfile)
 
       - name: Audit dependencies
         run: pnpm audit --audit-level=high
@@ -646,6 +648,11 @@ jobs:
           echo "=== /var/run contents ===" && ls -la /var/run/ 2>/dev/null || true
 
           install_docker_cli() {
+            # Skip if already installed (self-hosted runner persists between runs)
+            if command -v docker &>/dev/null; then
+              echo "docker CLI already installed: $(docker --version)"
+              return 0
+            fi
             sudo install -m 0755 -d /etc/apt/keyrings
             sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
               -o /etc/apt/keyrings/docker.asc 2>/dev/null
@@ -724,12 +731,22 @@ jobs:
           token: ${{ secrets.GH_PAT }}
           path: k8s-apps
 
+      - name: Cache yq
+        id: yq-cache
+        uses: actions/cache@v4
+        with:
+          path: $HOME/.local/bin/yq
+          key: yq-v4.45.1-linux-amd64
+
       - name: Install yq
+        if: steps.yq-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p $HOME/.local/bin
           curl -fsSL -o $HOME/.local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64
           chmod +x $HOME/.local/bin/yq
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Add yq to PATH
+        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Update deployment image tags
         env:
