@@ -20,7 +20,8 @@
     "prepare": "husky",
     "audit": "pnpm audit --audit-level=high",
     "scan": "gitleaks detect --redact",
-    "scan:code": "knip --no-config-hints --no-tag-hints"
+    "scan:code": "knip --no-config-hints --no-tag-hints",
+    "scan:trivy": "trivy fs . --severity CRITICAL,HIGH --ignore-unfixed --skip-dirs node_modules,.turbo,.next,dist,coverage"
   },
   "devDependencies": {
     "@yana-stocks/prettier-config": "workspace:*",
