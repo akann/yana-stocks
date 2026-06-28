@@ -164,7 +164,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   ts-quality:
     runs-on: runners-yana-stocks
-    needs: changes
+    needs: [changes, secret-scan, trivy-scan]
     if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -558,7 +558,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   code-scan:
     runs-on: runners-yana-stocks
-    needs: changes
+    needs: [changes, secret-scan, trivy-scan]
     if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -591,7 +591,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   audit:
     runs-on: runners-yana-stocks
-    needs: changes
+    needs: [changes, secret-scan, trivy-scan]
     if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -611,7 +611,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   python-quality:
     runs-on: runners-yana-stocks
-    needs: changes
+    needs: [changes, secret-scan, trivy-scan]
     if: needs.changes.outputs.python == 'true' || github.event.inputs.build_all == 'true'
     strategy:
       fail-fast: false
