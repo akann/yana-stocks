@@ -209,7 +209,7 @@ jobs:
   integration-test:
     runs-on: runners-yana-stocks
     needs: [changes, ts-quality]
-    if: needs.changes.outputs.ts == 'true'
+    if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
     services:
       postgres:
         image: harbor.yanatech.co.uk/library/postgres:16-alpine
@@ -324,7 +324,7 @@ jobs:
   e2e:
     runs-on: runners-yana-stocks
     needs: [changes, ts-quality, integration-test]
-    if: needs.changes.outputs.ts == 'true'
+    if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
     services:
       postgres:
         image: harbor.yanatech.co.uk/library/postgres:16-alpine
