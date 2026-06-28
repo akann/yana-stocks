@@ -497,6 +497,16 @@ services:
 - **ml-predictor Rollout shows cosmetic OutOfSync** in ArgoCD after SSA
   field-manager migration. `argocd app diff` returns empty — no real diff. This
   is a known false-positive; the Rollout is Healthy.
+- **Argo Rollouts controller stuck canary (expired pause not advancing):** The
+  `argo-rollouts` controller pods have a high restart count (~2/day) due to a
+  memory issue. After a restart the controller sometimes fails to re-evaluate an
+  in-progress canary whose timed pause has already expired, leaving the rollout
+  permanently `Paused` even though the analysis passed. Diagnosis:
+  `kubectl get rollout ml-predictor -n yana-stocks -o jsonpath='{.status.phase} {.status.currentStepIndex} {.status.message}'`
+  — if phase is `Paused` and the pause startTime is >5m ago, restart the
+  controller:
+  `kubectl delete pod -n argo-rollouts -l app.kubernetes.io/name=argo-rollouts`
+  The rollout auto-advances within ~15s.
 
 ## CI/CD
 
@@ -655,6 +665,12 @@ Key config decisions:
   jest plugin issue); `jest.setup.ts` added to `entry` explicitly.
 - Workspace-level `ignoreDependencies` used for deps that Knip can't trace (e.g.
   `@nestjs/schematics` for NestJS CLI, `typescript-eslint` peer dep).
+- **`generate-openapi.ts` must be in `ignore`** for every NestJS service
+  workspace. These files are invoked from the api-docs Dockerfile
+  (`node dist/generate-openapi.js`) but are not imported anywhere in the
+  TypeScript source tree, so Knip flags them as unused files. Currently ignored
+  in: `portfolio-api`, `portfolio-service`, `profile-service`,
+  `price-processor`.
 
 ## Code Style
 
