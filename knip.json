@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreBinaries": ["go", "gofmt", "gitleaks"],
+  "ignoreBinaries": ["go", "gofmt", "gitleaks", "trivy"],
   "ignoreDependencies": ["typescript-eslint", "jest-environment-jsdom"],
   "workspaces": {
     ".": {},

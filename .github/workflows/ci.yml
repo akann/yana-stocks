@@ -589,7 +589,7 @@ jobs:
   # 7. Dependency audit (high + critical CVEs block the build)
   # pnpm audit reads pnpm-lock.yaml directly — no node_modules needed.
   # ─────────────────────────────────────────────────────────────────
-  audit:
+  pnpm-audit:
     runs-on: runners-yana-stocks
     needs: [changes, secret-scan, trivy-scan]
     if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
@@ -646,7 +646,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   docker:
     runs-on: runners-yana-stocks
-    needs: [changes, secret-scan, trivy-scan, ts-quality, integration-test, e2e, python-quality, audit, code-scan]
+    needs: [changes, secret-scan, trivy-scan, ts-quality, integration-test, e2e, python-quality, pnpm-audit, code-scan]
     if: |
       always() &&
       github.ref == 'refs/heads/main' &&
@@ -657,7 +657,7 @@ jobs:
       (needs.integration-test.result  == 'success' || needs.integration-test.result  == 'skipped') &&
       (needs.e2e.result               == 'success' || needs.e2e.result               == 'skipped') &&
       (needs.python-quality.result    == 'success' || needs.python-quality.result    == 'skipped') &&
-      (needs.audit.result             == 'success' || needs.audit.result             == 'skipped') &&
+      (needs.pnpm-audit.result             == 'success' || needs.pnpm-audit.result             == 'skipped') &&
       (needs.code-scan.result    == 'success' || needs.code-scan.result    == 'skipped')
     strategy:
       fail-fast: false
