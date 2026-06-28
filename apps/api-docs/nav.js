@@ -1,4 +1,8 @@
 (function () {
+  var p = location.pathname;
+  if (p.length > 1 && p.charAt(p.length - 1) === '/') p = p.slice(0, -1);
+  if (p === '' || p === '/') return;
+
   var links = [
     { href: '/', label: 'YanaStocks Docs', cls: 'home' },
     { sep: true },
@@ -12,8 +16,6 @@
   function buildNav() {
     var nav = document.createElement('nav');
     nav.id = 'yn';
-    var p = location.pathname;
-    if (p.length > 1 && p.charAt(p.length - 1) === '/') p = p.slice(0, -1);
     links.forEach(function (l) {
       if (l.sep) {
         var d = document.createElement('div');
