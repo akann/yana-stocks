@@ -492,15 +492,18 @@ jobs:
               sleep 2
             done
             echo "ERROR: $name not ready after 60s" >&2
-            cat logs/${name}.log 2>/dev/null || true
+            cat "logs/${name}.log" 2>/dev/null || true
             return 1
           }
-          wait_for http://localhost:3001/health auth-service      &
-          wait_for http://localhost:3003/health portfolio-service  &
-          wait_for http://localhost:3004/health portfolio-api      &
-          wait_for http://localhost:3007/health profile-service    &
-          wait_for http://localhost:3000        frontend           &
-          wait
+          pids=()
+          wait_for http://localhost:3001/health auth-service      & pids+=($!)
+          wait_for http://localhost:3003/health portfolio-service  & pids+=($!)
+          wait_for http://localhost:3004/health portfolio-api      & pids+=($!)
+          wait_for http://localhost:3007/health profile-service    & pids+=($!)
+          wait_for http://localhost:3000        frontend           & pids+=($!)
+          rc=0
+          for pid in "${pids[@]}"; do wait "$pid" || rc=$?; done
+          exit $rc
 
       - name: Seed test data
         run: pnpm seed
