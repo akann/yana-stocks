@@ -140,6 +140,26 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ─────────────────────────────────────────────────────────────────
+  # 2b. Trivy filesystem scan — dep CVEs (npm/Go/Python) + IaC config
+  #     Runs parallel to secret-scan; blocks on CRITICAL or HIGH
+  # ─────────────────────────────────────────────────────────────────
+  trivy-scan:
+    runs-on: runners-yana-stocks
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan filesystem for vulnerabilities and misconfigurations
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: table
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          skip-dirs: node_modules,.turbo,.next,dist,coverage
+
+  # ─────────────────────────────────────────────────────────────────
   # 3. TypeScript + Go quality (lint + type-check + test)
   # ─────────────────────────────────────────────────────────────────
   ts-quality:
@@ -626,18 +646,19 @@ jobs:
   # ─────────────────────────────────────────────────────────────────
   docker:
     runs-on: runners-yana-stocks
-    needs: [changes, secret-scan, ts-quality, integration-test, e2e, python-quality, audit, dead-code-scan]
+    needs: [changes, secret-scan, trivy-scan, ts-quality, integration-test, e2e, python-quality, audit, dead-code-scan]
     if: |
       always() &&
       github.ref == 'refs/heads/main' &&
       needs.changes.outputs.has_changes == 'true' &&
       needs.secret-scan.result          == 'success' &&
+      needs.trivy-scan.result           == 'success' &&
       (needs.ts-quality.result        == 'success' || needs.ts-quality.result        == 'skipped') &&
       (needs.integration-test.result  == 'success' || needs.integration-test.result  == 'skipped') &&
       (needs.e2e.result               == 'success' || needs.e2e.result               == 'skipped') &&
       (needs.python-quality.result    == 'success' || needs.python-quality.result    == 'skipped') &&
       (needs.audit.result             == 'success' || needs.audit.result             == 'skipped') &&
-      (needs.dead-code-scan.result         == 'success' || needs.dead-code-scan.result         == 'skipped')
+      (needs.dead-code-scan.result    == 'success' || needs.dead-code-scan.result    == 'skipped')
     strategy:
       fail-fast: false
       max-parallel: 3
@@ -731,6 +752,16 @@ jobs:
           provenance: false
           cache-from: type=registry,ref=${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}:buildcache
           cache-to: type=registry,ref=${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}:buildcache,mode=max
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          severity: CRITICAL
+          ignore-unfixed: true
 
   # ─────────────────────────────────────────────────────────────────
   # 11. GitOps: update image tags in k8s-apps → ArgoCD auto-syncs
