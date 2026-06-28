@@ -61,15 +61,6 @@ const PRICE_CACHE_TTL = 5;
 const QUOTE_CACHE_TTL = 900;
 const HISTORY_FETCH_TTL = 900;
 
-export interface QuoteEntry {
-  price: number;
-  prevPrice: number;
-  change: number;
-  changePercent: number;
-  volume: number;
-  timestamp: string;
-}
-
 @Injectable()
 export class PricesService {
   private readonly logger = new Logger(PricesService.name);
