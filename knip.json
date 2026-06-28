@@ -22,7 +22,8 @@
       "ignore": ["src/generate-openapi.ts"]
     },
     "apps/price-processor": {
-      "entry": ["src/main.ts"]
+      "entry": ["src/main.ts"],
+      "ignore": ["src/generate-openapi.ts"]
     },
     "apps/profile-service": {
       "entry": ["src/main.ts"],
