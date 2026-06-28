@@ -73,4 +73,6 @@ COPY --from=docs-builder /app/profile-service.html /usr/share/nginx/html/
 COPY --from=docs-builder /app/price-processor.html /usr/share/nginx/html/
 COPY --from=docs-builder /app/auth-service.html /usr/share/nginx/html/
 COPY apps/api-docs/index.html /usr/share/nginx/html/
+COPY apps/api-docs/nav.css /usr/share/nginx/html/
+COPY apps/api-docs/nav.js /usr/share/nginx/html/
 COPY apps/api-docs/nginx.conf /etc/nginx/conf.d/default.conf
