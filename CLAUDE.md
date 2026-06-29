@@ -104,6 +104,8 @@ yana-stocks/
 - **Kafka producer:** `stocks.prices.processed`
 - **MongoDB:** OHLCV price history
 - **Redis:** Latest price cache (TTL 5s)
+- **Pattern:** KEDA ScaledObject (scale 0→3 on `stocks.prices.raw` lag,
+  threshold 100)
 
 ### 3. sentiment-analyzer (Python)
 
@@ -169,6 +171,8 @@ yana-stocks/
   preferences)
 - **Kafka consumer:** `users.registered` — creates initial profile on new
   registration
+- **Pattern:** KEDA ScaledObject (scale 1→3 on `users.registered` lag, threshold
+  100; min 1 — profile must exist immediately post-registration)
 - **Dev port:** 3007; prod port: 3000
 - **Endpoints:**
   - `GET /api/profile/me` — current user's profile (requires JWT)
@@ -179,8 +183,12 @@ yana-stocks/
 
 - **Purpose:** Portfolio and watchlist management, trade history
 - **MongoDB:** Portfolios, watchlists, trades
-- **Kafka consumer:** `stocks.prices.processed` (for portfolio valuation)
+- **Kafka consumer:** `stocks.prices.processed` (for portfolio valuation),
+  `users.registered`
 - **Kafka producer:** `stocks.portfolio.events`
+- **Pattern:** KEDA ScaledObject (scale 1→3, triggers on
+  `stocks.prices.processed` + `users.registered` lag; min 1 — serves HTTP
+  traffic)
 - **Endpoints:**
   - `GET/POST /portfolios`
   - `GET/PUT/DELETE /portfolios/:id`
@@ -192,6 +200,9 @@ yana-stocks/
 
 - **Purpose:** REST aggregator — combines prices, signals, predictions
 - **Redis:** Cache aggregated responses (TTL 10s)
+- **Pattern:** KEDA ScaledObject (scale 1→3, triggers on
+  `stocks.prices.processed` + `stocks.signals.sentiment` +
+  `stocks.signals.prediction` lag; min 1 — serves HTTP traffic)
 - **Endpoints:**
   - `GET /stocks/:symbol` — price + sentiment + prediction (JWT required)
   - `GET /stocks/:symbol/history` — OHLCV history (JWT required)
