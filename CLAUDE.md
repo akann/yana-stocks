@@ -618,6 +618,33 @@ with a warning if missing — CI always runs the full scan regardless.
 False positives are suppressed via `.gitleaksignore` (fingerprint-based) and
 inline `// gitleaks:allow` comments on known dev-seed credentials.
 
+### Pre-push hook
+
+A pre-push hook runs on every `git push`. Unlike the pre-commit hook (which runs
+on every commit), this runs only when pushing — catching slower checks before CI
+sees them.
+
+```bash
+# .husky/pre-push
+pnpm turbo lint --filter='[origin/main]'   # 1. ESLint — only changed packages since last push
+pnpm audit --audit-level=high              # 2. CVE scan — fail on high/critical
+pnpm scan:code                             # 3. Knip dead-code + unused dep scan
+```
+
+**Why pre-push and not pre-commit:**
+
+- `turbo lint` is fast on unchanged code (turbo cache), but ESLint can still add
+  1-2s per commit on active files — too slow to run on every commit
+- `pnpm audit` is a network call; unsuitable for every commit
+- Knip scans the full monorepo; unsuitable for every commit
+
+**Why pre-commit doesn't catch ESLint failures:** The pre-commit hook runs
+`turbo type-check` (tsc), not `turbo lint` (ESLint). TypeScript accepts
+class+interface declaration merging; ESLint's
+`@typescript-eslint/no-unsafe-declaration-merging` rejects it. Both checks are
+needed: type-check is fast enough for every commit; lint is reserved for
+pre-push.
+
 ### Format + lint tasks (turbo.json)
 
 - `lint` — runs with `"cache": false` (never skipped due to stale cache).
