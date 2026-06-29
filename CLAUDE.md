@@ -104,8 +104,9 @@ yana-stocks/
 - **Kafka producer:** `stocks.prices.processed`
 - **MongoDB:** OHLCV price history
 - **Redis:** Latest price cache (TTL 5s)
-- **Pattern:** KEDA ScaledObject (scale 0→3 on `stocks.prices.raw` lag,
-  threshold 100)
+- **Pattern:** KEDA ScaledObject (scale 1→3 on `stocks.prices.raw` lag,
+  threshold 100; min 1 — serves HTTP history/quote requests outside trading
+  hours)
 
 ### 3. sentiment-analyzer (Python)
 
@@ -1080,6 +1081,7 @@ runtime with missing `.so` errors.
 | MACD signal scan only emitted current-bar crossover | `detectSignals()` compared only the last 2 `signalLine` entries; all historical crossovers were missed                                                                                     | Loop in `signals.ts` changed to `for (let i = 1; i < n; i++)` — scans all bars; MACD arrows now appear throughout chart history |
 | `chart.subscribeClick is not a function` in Jest    | `src/__mocks__/lightweight-charts.js` `mockChart` was missing `subscribeClick` and `unsubscribeClick` methods; `StockChart.tsx:256` calls `chart.subscribeClick()` for news headline popup | Added `subscribeClick: jest.fn()` and `unsubscribeClick: jest.fn()` to `mockChart` in the mock file                             |
 | S&P 500 treemap flashes "No data" before overview   | `isLoading` gated only on `rotLoading`; when rotation resolved empty, `TreemapView` rendered with an empty `pctMap` for one cycle before `overviewData` arrived                            | Widened `isLoading` to include `overviewLoading` in the narrow case: S&P 500 + today view + rotation empty + overview in flight |
+| `GET /api/stocks/:symbol/history` returns 500       | `price-processor` KEDA ScaledObject had `minReplicaCount: 0`; scales to 0 outside trading hours; Cilium returns `EPERM` when `portfolio-api` connects to a Service with no endpoints       | Set `minReplicaCount: 1` in `k8s-apps/apps/yana-stocks/price-processor/keda-scaledobject.yaml`                                  |
 
 ## Feature Implementation Progress
 
