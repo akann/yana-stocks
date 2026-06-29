@@ -10,6 +10,7 @@ COPY packages/typescript-config/package.json ./packages/typescript-config/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
 COPY packages/prettier-config/package.json ./packages/prettier-config/
 COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/shared-dto/package.json ./packages/shared-dto/
 COPY packages/kafka-client/package.json ./packages/kafka-client/
 COPY apps/price-processor/package.json ./apps/price-processor/
 
@@ -19,6 +20,7 @@ COPY packages ./packages
 COPY apps/price-processor ./apps/price-processor
 
 RUN pnpm --filter "@yana-stocks/shared-types" build && \
+    pnpm --filter "@yana-stocks/shared-dto" build && \
     pnpm --filter "@yana-stocks/kafka-client" build && \
     pnpm --filter "@yana-stocks/price-processor" build
 
@@ -36,12 +38,14 @@ COPY packages/typescript-config/package.json ./packages/typescript-config/
 COPY packages/eslint-config/package.json ./packages/eslint-config/
 COPY packages/prettier-config/package.json ./packages/prettier-config/
 COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/shared-dto/package.json ./packages/shared-dto/
 COPY packages/kafka-client/package.json ./packages/kafka-client/
 COPY apps/price-processor/package.json ./apps/price-processor/
 
 RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 
 COPY --from=builder /app/packages/shared-types/dist ./packages/shared-types/dist
+COPY --from=builder /app/packages/shared-dto/dist ./packages/shared-dto/dist
 COPY --from=builder /app/packages/kafka-client/dist ./packages/kafka-client/dist
 COPY --from=builder /app/apps/price-processor/dist ./apps/price-processor/dist
 
