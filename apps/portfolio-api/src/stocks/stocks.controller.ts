@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { OHLCV } from '@yana-stocks/shared-types';
+import { NotFoundDto, UnauthorizedDto } from '@yana-stocks/shared-dto';
 import { UserFromTokenGuard } from '../common/current-user.decorator';
 import {
   AggregateStockResponse,
@@ -32,8 +33,12 @@ export class StocksController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get aggregated price, sentiment, and prediction for a symbol' })
   @ApiOkResponse({ type: AggregateStockResponse })
-  @ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })
-  @ApiResponse({ status: 404, description: 'No data available for this symbol' })
+  @ApiResponse({
+    status: 401,
+    type: UnauthorizedDto,
+    description: 'Missing or invalid bearer token',
+  })
+  @ApiResponse({ status: 404, type: NotFoundDto, description: 'No data available for this symbol' })
   getStock(@Param('symbol') symbol: string): Promise<AggregateStockResponse> {
     return this.stocksService.getStock(symbol.toUpperCase());
   }
@@ -43,7 +48,11 @@ export class StocksController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get OHLCV history for a symbol' })
   @ApiOkResponse({ type: [OHLCV] })
-  @ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })
+  @ApiResponse({
+    status: 401,
+    type: UnauthorizedDto,
+    description: 'Missing or invalid bearer token',
+  })
   getHistory(
     @Param('symbol') symbol: string,
     @Query('limit', new DefaultValuePipe(100), ParseIntPipe) limit: number,

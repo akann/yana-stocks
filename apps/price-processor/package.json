@@ -26,6 +26,7 @@
     "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
     "@opentelemetry/sdk-node": "^0.219.0",
     "@yana-stocks/kafka-client": "workspace:*",
+    "@yana-stocks/shared-dto": "workspace:*",
     "@yana-stocks/shared-types": "workspace:*",
     "axios": "^1.9.0",
     "ioredis": "^5.11.1",

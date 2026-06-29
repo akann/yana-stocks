@@ -1,5 +1,6 @@
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { UnauthorizedDto } from '@yana-stocks/shared-dto';
 import { UserFromTokenGuard } from '../common/current-user.decorator';
 import { SignalsResponse, SignalsService } from './signals.service';
 
@@ -13,7 +14,11 @@ export class SignalsController {
   @Get(':symbol')
   @ApiOperation({ summary: 'Get latest sentiment and prediction signals for a symbol' })
   @ApiOkResponse({ type: SignalsResponse })
-  @ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })
+  @ApiResponse({
+    status: 401,
+    type: UnauthorizedDto,
+    description: 'Missing or invalid bearer token',
+  })
   getSignals(@Param('symbol') symbol: string): Promise<SignalsResponse> {
     return this.signalsService.getSignals(symbol.toUpperCase());
   }

@@ -1,5 +1,6 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { UnauthorizedDto } from '@yana-stocks/shared-dto';
 import { UserFromTokenGuard } from '../common/current-user.decorator';
 import { NewsArticle, NewsService } from './news.service';
 
@@ -13,7 +14,11 @@ export class NewsController {
   @Get(':symbol')
   @ApiOperation({ summary: 'Get recent news articles with sentiment for a symbol' })
   @ApiOkResponse({ type: [NewsArticle] })
-  @ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })
+  @ApiResponse({
+    status: 401,
+    type: UnauthorizedDto,
+    description: 'Missing or invalid bearer token',
+  })
   getNews(@Param('symbol') symbol: string, @Query('limit') limit?: string): Promise<NewsArticle[]> {
     const parsedLimit = limit ? Math.min(parseInt(limit, 10), 50) : 10;
     return this.newsService.getNews(symbol.toUpperCase(), parsedLimit);

@@ -16,6 +16,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { OHLCV } from '@yana-stocks/shared-types';
+import { NotFoundDto } from '@yana-stocks/shared-dto';
 import { PricesService, QuoteEntry } from './prices.service';
 
 @ApiTags('prices')
@@ -61,7 +62,11 @@ export class PricesController {
   @ApiOperation({ summary: 'Get latest quote for a symbol (on-demand)' })
   @ApiParam({ name: 'symbol', example: 'AAPL', description: 'Stock ticker symbol' })
   @ApiOkResponse({ type: QuoteEntry })
-  @ApiResponse({ status: 404, description: 'No quote available for this symbol' })
+  @ApiResponse({
+    status: 404,
+    type: NotFoundDto,
+    description: 'No quote available for this symbol',
+  })
   async getQuote(@Param('symbol') symbol: string): Promise<QuoteEntry> {
     const quote = await this.pricesService.getQuote(symbol);
     if (!quote) throw new NotFoundException(`No quote available for ${symbol}`);

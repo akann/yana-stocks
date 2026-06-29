@@ -2,7 +2,13 @@ import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Post, Res } from 
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { LoginDto, RefreshDto, RegisterDto } from '@yana-stocks/shared-dto';
+import {
+  ConflictDto,
+  LoginDto,
+  RefreshDto,
+  RegisterDto,
+  UnauthorizedDto,
+} from '@yana-stocks/shared-dto';
 import type { Response } from 'express';
 import { firstValueFrom } from 'rxjs';
 import { MeResponseDto, MessageResponseDto, TokenResponseDto } from './dto/auth-response.dto';
@@ -49,7 +55,7 @@ export class AuthProxyController {
     type: MessageResponseDto,
     description: 'Registration successful — verification email sent',
   })
-  @ApiResponse({ status: 409, description: 'Email already in use' })
+  @ApiResponse({ status: 409, type: ConflictDto, description: 'Email already in use' })
   async register(@Body() body: unknown, @Res() res: Response): Promise<void> {
     const { status, data } = await this.forward('POST', '/api/auth/register', body);
     res.status(status).json(data);
@@ -64,7 +70,11 @@ export class AuthProxyController {
     type: TokenResponseDto,
     description: 'Returns accessToken (15 min) and refreshToken (7 days)',
   })
-  @ApiResponse({ status: 401, description: 'Invalid credentials or unverified email' })
+  @ApiResponse({
+    status: 401,
+    type: UnauthorizedDto,
+    description: 'Invalid credentials or unverified email',
+  })
   async login(@Body() body: unknown, @Res() res: Response): Promise<void> {
     const { status, data } = await this.forward('POST', '/api/auth/login', body);
     res.status(status).json(data);
@@ -79,7 +89,11 @@ export class AuthProxyController {
     type: TokenResponseDto,
     description: 'New accessToken and rotated refreshToken',
   })
-  @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
+  @ApiResponse({
+    status: 401,
+    type: UnauthorizedDto,
+    description: 'Invalid or expired refresh token',
+  })
   async refresh(@Body() body: unknown, @Res() res: Response): Promise<void> {
     const { status, data } = await this.forward('POST', '/api/auth/refresh', body);
     res.status(status).json(data);
@@ -107,7 +121,7 @@ export class AuthProxyController {
     type: MeResponseDto,
     description: 'Decoded JWT claims (sub, email, iss, iat, exp)',
   })
-  @ApiResponse({ status: 401, description: 'Missing or invalid token' })
+  @ApiResponse({ status: 401, type: UnauthorizedDto, description: 'Missing or invalid token' })
   async me(
     @Headers('authorization') auth: string | undefined,
     @Res() res: Response,

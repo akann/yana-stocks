@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Put, UseGuards, ValidationPipe } from '@n
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Profile } from './schemas/profile.schema';
 import { PublicProfileResponseDto } from './dto/public-profile.response.dto';
-import { UpdateProfileDto } from '@yana-stocks/shared-dto';
+import { NotFoundDto, UnauthorizedDto, UpdateProfileDto } from '@yana-stocks/shared-dto';
 import { AuthUser, CurrentUser, UserFromTokenGuard } from '../common/current-user.decorator';
 import { ProfileService } from './profile.service';
 
@@ -16,7 +16,11 @@ export class ProfileController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiOkResponse({ type: Profile })
-  @ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })
+  @ApiResponse({
+    status: 401,
+    type: UnauthorizedDto,
+    description: 'Missing or invalid bearer token',
+  })
   getMyProfile(@CurrentUser() user: AuthUser) {
     return this.profileService.getMyProfile(user.id);
   }
@@ -26,7 +30,11 @@ export class ProfileController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update current user profile' })
   @ApiOkResponse({ type: Profile })
-  @ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })
+  @ApiResponse({
+    status: 401,
+    type: UnauthorizedDto,
+    description: 'Missing or invalid bearer token',
+  })
   updateMyProfile(
     @CurrentUser() user: AuthUser,
     @Body(new ValidationPipe({ whitelist: true })) dto: UpdateProfileDto,
@@ -37,7 +45,7 @@ export class ProfileController {
   @Get(':userId')
   @ApiOperation({ summary: 'Get public profile (displayName + avatar only)' })
   @ApiOkResponse({ type: PublicProfileResponseDto })
-  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: 404, type: NotFoundDto, description: 'User not found' })
   getPublicProfile(@Param('userId') userId: string) {
     return this.profileService.getPublicProfile(userId);
   }
