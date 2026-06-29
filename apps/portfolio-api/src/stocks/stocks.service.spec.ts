@@ -481,6 +481,42 @@ describe('StocksService', () => {
       expect(redis.set).toHaveBeenCalledWith('papi:assets:us', expect.any(String), 86400);
     });
 
+    it('follows next_url cursor to fetch all pages from Massive', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('MY_MASSIVE_KEY');
+
+      const page1 = [
+        { ticker: 'AAPL', name: 'Apple Inc.', primary_exchange: 'NASDAQ', active: true },
+      ];
+      const page2 = [
+        {
+          ticker: 'STOR',
+          name: 'Store Capital Corporation',
+          primary_exchange: 'NYSE',
+          active: true,
+        },
+      ];
+      const nextUrl =
+        'https://api.polygon.io/v3/reference/tickers?cursor=abc123&apiKey=MY_MASSIVE_KEY';
+
+      httpService.get
+        .mockReturnValueOnce(of({ data: { results: page1, next_url: nextUrl } } as AxiosResponse))
+        .mockReturnValueOnce(of({ data: { results: page2 } } as AxiosResponse));
+
+      const result = await service.getAssets('', 1, 10, 'us');
+
+      expect(httpService.get).toHaveBeenCalledTimes(2);
+      expect(httpService.get).toHaveBeenNthCalledWith(
+        1,
+        'https://api.polygon.io/v3/reference/tickers',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        expect.objectContaining({ params: expect.objectContaining({ type: 'CS' }) }),
+      );
+      expect(httpService.get).toHaveBeenNthCalledWith(2, nextUrl, { params: {} });
+      expect(result.data).toHaveLength(2);
+      expect(result.data.map((a) => a.symbol)).toEqual(['AAPL', 'STOR']);
+    });
+
     it('calls Massive with type=ETF when market=etf', async () => {
       redis.get.mockResolvedValue(null);
       (configService.get as jest.Mock).mockReturnValue('MY_MASSIVE_KEY');

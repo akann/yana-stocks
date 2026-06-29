@@ -60,6 +60,7 @@ interface PolygonTickerResult {
 
 interface PolygonTickersResponse {
   results?: PolygonTickerResult[];
+  next_url?: string;
 }
 
 interface FmpHistoricalSectorEntry {
@@ -856,14 +857,29 @@ export class StocksService {
     }
 
     try {
-      const resp = await firstValueFrom(
-        this.httpService.get<PolygonTickersResponse>(
-          'https://api.polygon.io/v3/reference/tickers',
-          { params: { type, market: 'stocks', active: true, limit: 1000, apiKey } },
-        ),
-      );
+      const collected: PolygonTickerResult[] = [];
+      let url: string | null = 'https://api.polygon.io/v3/reference/tickers';
+      let params: Record<string, unknown> | null = {
+        type,
+        market: 'stocks',
+        active: true,
+        limit: 1000,
+        apiKey,
+      };
 
-      return (resp.data.results ?? [])
+      while (url) {
+        const pageUrl: string = url;
+        const resp = await firstValueFrom(
+          this.httpService.get<PolygonTickersResponse>(pageUrl, { params: params ?? {} }),
+        );
+        collected.push(...(resp.data.results ?? []));
+
+        // next_url already contains the apiKey in the query string
+        url = resp.data.next_url ?? null;
+        params = null;
+      }
+
+      return collected
         .filter(
           (t): t is PolygonTickerResult & { ticker: string; name: string } =>
             typeof t.ticker === 'string' &&
