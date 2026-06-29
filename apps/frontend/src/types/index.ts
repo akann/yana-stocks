@@ -99,6 +99,7 @@ export interface MoverEntry {
 export interface MarketMovers {
   gainers: MoverEntry[];
   losers: MoverEntry[];
+  lastUpdated?: string;
 }
 
 export interface IndexQuote {

@@ -327,6 +327,7 @@ export class StocksService {
     const movers: MarketMovers = {
       gainers: entries.slice(0, top),
       losers: entries.slice(-top).reverse(),
+      lastUpdated: new Date().toISOString(),
     };
 
     await this.redis.set(cacheKey, JSON.stringify(movers), 10);
@@ -807,7 +808,7 @@ export class StocksService {
     const apiKey = this.config.get<string>('fmpApiKey') ?? '';
     if (!apiKey) {
       this.logger.warn('FMP_API_KEY not set — cannot build FMP movers fallback');
-      return { gainers: [], losers: [] };
+      return { gainers: [], losers: [], lastUpdated: new Date().toISOString() };
     }
     try {
       const results = await Promise.allSettled(
@@ -838,12 +839,13 @@ export class StocksService {
       const movers: MarketMovers = {
         gainers: entries.slice(0, top),
         losers: entries.slice(-top).reverse(),
+        lastUpdated: new Date().toISOString(),
       };
       await this.redis.set('papi:movers', JSON.stringify(movers), 60);
       return movers;
     } catch (err) {
       this.logger.error(`FMP movers fallback failed: ${String(err)}`);
-      return { gainers: [], losers: [] };
+      return { gainers: [], losers: [], lastUpdated: new Date().toISOString() };
     }
   }
 

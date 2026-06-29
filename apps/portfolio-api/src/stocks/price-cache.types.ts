@@ -34,6 +34,8 @@ export class MarketMovers {
   gainers!: MoverEntry[];
   @ApiProperty({ type: [MoverEntry] })
   losers!: MoverEntry[];
+  @ApiProperty({ example: '2024-01-15T16:00:00.000Z' })
+  lastUpdated!: string;
 }
 
 export class StockResponse {
