@@ -41,12 +41,12 @@ export function HomePageView(): React.JSX.Element {
 
       <FactorTiles />
 
+      <MoversCard />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SectorRotationHeatmap />
         <MarketNews />
       </div>
-
-      <MoversCard />
 
       <div>
         <div className="flex border-b border-gray-200 mb-0">
