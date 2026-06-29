@@ -539,6 +539,23 @@ CI job pipeline (`.github/workflows/ci.yml`):
 `docker` only runs when all non-skipped quality gates succeed — `secret-scan`
 must be `success`; all others may be `success` or `skipped`.
 
+### Turborepo remote cache
+
+CI jobs pass `TURBO_API`, `TURBO_TOKEN`, and `TURBO_TEAM` so Turborepo stores
+task outputs in a self-hosted remote cache backed by MinIO:
+
+| Setting      | Value                                                                |
+| ------------ | -------------------------------------------------------------------- |
+| Cache server | `http://turbo-cache.yana-stocks.svc.cluster.local:3000`              |
+| Image        | `ducktors/turborepo-remote-cache:latest`                             |
+| MinIO bucket | `turborepocache`                                                     |
+| Secret       | `turbo-cache-secret` in `yana-stocks` namespace (ESO from Infisical) |
+
+**Bucket name gotcha:** The `ducktors/turborepo-remote-cache` image ignores the
+`S3_BUCKET` env var and falls back to its hardcoded default `turborepocache`.
+The MinIO bucket must be named `turborepocache` — do not rename it to match the
+env var.
+
 ## Local Dev Quick-Start
 
 Requires Go ≥ 1.22 installed (Mac: `brew install go`).
