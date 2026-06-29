@@ -854,6 +854,7 @@ describe('StocksService', () => {
         expect(httpService.get).toHaveBeenCalledWith(
           'https://api.twelvedata.com/time_series',
           expect.objectContaining({
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             params: expect.objectContaining({ exchange: 'LSE', interval: '1day' }),
           }),
         );

@@ -74,7 +74,7 @@ describe('NewsController (integration)', () => {
     app = moduleRef.createNestApplication();
     await app.init();
     server = app.getHttpServer() as Server;
-    newsGetSpy = newsServiceMock.getNews as jest.Mock;
+    newsGetSpy = newsServiceMock.getNews;
   });
 
   afterEach(() => {

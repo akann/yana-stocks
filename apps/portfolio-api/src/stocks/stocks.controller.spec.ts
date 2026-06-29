@@ -22,7 +22,7 @@ describe('StocksController', () => {
     }).compile();
     controller = module.get(StocksController);
     jest.clearAllMocks();
-    Object.values(mockService).forEach((m) => (m as jest.Mock).mockResolvedValue(undefined));
+    Object.values(mockService).forEach((m) => m.mockResolvedValue(undefined));
   });
 
   // ── getStock ──────────────────────────────────────────────────────────────
