@@ -7,7 +7,14 @@ import {
   ParseIntPipe,
   Query,
 } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { OHLCV } from '@yana-stocks/shared-types';
 import { PricesService, QuoteEntry } from './prices.service';
 
@@ -54,6 +61,7 @@ export class PricesController {
   @ApiOperation({ summary: 'Get latest quote for a symbol (on-demand)' })
   @ApiParam({ name: 'symbol', example: 'AAPL', description: 'Stock ticker symbol' })
   @ApiOkResponse({ type: QuoteEntry })
+  @ApiResponse({ status: 404, description: 'No quote available for this symbol' })
   async getQuote(@Param('symbol') symbol: string): Promise<QuoteEntry> {
     const quote = await this.pricesService.getQuote(symbol);
     if (!quote) throw new NotFoundException(`No quote available for ${symbol}`);

@@ -8,7 +8,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { OHLCV } from '@yana-stocks/shared-types';
 import { UserFromTokenGuard } from '../common/current-user.decorator';
 import {
@@ -29,16 +29,21 @@ export class StocksController {
 
   @Get('stocks/:symbol')
   @UseGuards(UserFromTokenGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get aggregated price, sentiment, and prediction for a symbol' })
   @ApiOkResponse({ type: AggregateStockResponse })
+  @ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })
+  @ApiResponse({ status: 404, description: 'No data available for this symbol' })
   getStock(@Param('symbol') symbol: string): Promise<AggregateStockResponse> {
     return this.stocksService.getStock(symbol.toUpperCase());
   }
 
   @Get('stocks/:symbol/history')
   @UseGuards(UserFromTokenGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get OHLCV history for a symbol' })
   @ApiOkResponse({ type: [OHLCV] })
+  @ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })
   getHistory(
     @Param('symbol') symbol: string,
     @Query('limit', new DefaultValuePipe(100), ParseIntPipe) limit: number,

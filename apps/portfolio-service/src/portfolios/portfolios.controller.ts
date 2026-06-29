@@ -10,7 +10,14 @@ import {
   UseGuards,
   ValidationPipe,
 } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiNoContentResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { AddStockDto, CreatePortfolioDto } from '@yana-stocks/shared-dto';
 import { AuthUser, CurrentUser, UserFromTokenGuard } from '../common/current-user.decorator';
 import { UpdatePortfolioDto } from './dto/update-portfolio.dto';
@@ -19,6 +26,7 @@ import { PortfoliosService } from './portfolios.service';
 
 @ApiTags('portfolios')
 @UseGuards(UserFromTokenGuard)
+@ApiBearerAuth()
 @Controller('portfolios')
 export class PortfoliosController {
   constructor(private readonly portfoliosService: PortfoliosService) {}
@@ -26,6 +34,7 @@ export class PortfoliosController {
   @Get()
   @ApiOperation({ summary: 'List portfolios for the authenticated user' })
   @ApiOkResponse({ type: [Portfolio] })
+  @ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })
   findAll(): Promise<Portfolio[]> {
     return this.portfoliosService.findAll();
   }
@@ -33,6 +42,8 @@ export class PortfoliosController {
   @Get(':id')
   @ApiOperation({ summary: 'Get a portfolio by ID' })
   @ApiOkResponse({ type: Portfolio })
+  @ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })
+  @ApiResponse({ status: 404, description: 'Portfolio not found' })
   findOne(@Param('id') id: string): Promise<Portfolio> {
     return this.portfoliosService.findOne(id);
   }
@@ -40,6 +51,7 @@ export class PortfoliosController {
   @Post()
   @ApiOperation({ summary: 'Create a portfolio' })
   @ApiOkResponse({ type: Portfolio })
+  @ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })
   create(
     @Body(ValidationPipe) dto: CreatePortfolioDto,
     @CurrentUser() user: AuthUser,
@@ -50,6 +62,8 @@ export class PortfoliosController {
   @Put(':id')
   @ApiOperation({ summary: 'Rename a portfolio' })
   @ApiOkResponse({ type: Portfolio })
+  @ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })
+  @ApiResponse({ status: 404, description: 'Portfolio not found' })
   update(
     @Param('id') id: string,
     @Body(ValidationPipe) dto: UpdatePortfolioDto,
@@ -60,6 +74,9 @@ export class PortfoliosController {
   @Delete(':id')
   @HttpCode(204)
   @ApiOperation({ summary: 'Delete a portfolio' })
+  @ApiNoContentResponse({ description: 'Portfolio deleted' })
+  @ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })
+  @ApiResponse({ status: 404, description: 'Portfolio not found' })
   remove(@Param('id') id: string): Promise<void> {
     return this.portfoliosService.remove(id);
   }
@@ -67,6 +84,8 @@ export class PortfoliosController {
   @Post(':id/stocks')
   @ApiOperation({ summary: 'Add a stock to a portfolio (records a buy trade)' })
   @ApiOkResponse({ type: Portfolio })
+  @ApiResponse({ status: 401, description: 'Missing or invalid bearer token' })
+  @ApiResponse({ status: 404, description: 'Portfolio not found' })
   addStock(
     @Param('id') id: string,
     @Body(ValidationPipe) dto: AddStockDto,
