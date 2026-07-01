@@ -21,6 +21,7 @@ async function generate(): Promise<void> {
     .setVersion('1.0')
     .addBearerAuth()
     .addServer('https://api-gateway.yanatech.co.uk', 'Production (via Kong)')
+    .addServer('http://localhost:3007', 'Local development')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

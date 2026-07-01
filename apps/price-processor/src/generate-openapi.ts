@@ -20,6 +20,7 @@ async function generate(): Promise<void> {
     .setDescription('OHLCV bar storage and price cache service')
     .setVersion('1.0')
     .addServer('https://api-gateway.yanatech.co.uk', 'Production (via Kong)')
+    .addServer('http://localhost:3002', 'Local development')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
