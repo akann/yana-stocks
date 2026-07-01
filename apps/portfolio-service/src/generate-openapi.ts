@@ -28,6 +28,7 @@ async function generate(): Promise<void> {
     .setDescription('Portfolio, watchlist, and trade management')
     .setVersion('1.0')
     .addBearerAuth()
+    .addServer('https://api-gateway.yanatech.co.uk', 'Production (via Kong)')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

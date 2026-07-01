@@ -20,6 +20,7 @@ async function bootstrap(): Promise<void> {
     .setDescription('Aggregated stock prices, signals, and market data')
     .setVersion('1.0')
     .addBearerAuth()
+    .addServer('https://api-gateway.yanatech.co.uk', 'Production (via Kong)')
     .build();
   SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, swaggerConfig));
 
