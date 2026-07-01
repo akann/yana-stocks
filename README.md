@@ -152,7 +152,7 @@ auth-service (Go) owns all authentication. profile-service (NestJS) owns display
 data.
 
 ```
-POST /api/auth/register  →  auth-service: create user, send verification email (SMTP2GO)
+POST /api/auth/register  →  auth-service: create user, send verification email (via shared-services' email-api)
                              publishes users.registered Kafka event → profile-service creates profile
 POST /api/auth/verify    →  auth-service: activate account
 POST /api/auth/login     →  auth-service: returns accessToken (HS256 JWT 15min, iss:'yana-stocks')
