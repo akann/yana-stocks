@@ -2,7 +2,6 @@ package config
 
 import (
 	"os"
-	"strconv"
 	"time"
 )
 
@@ -21,16 +20,11 @@ type Config struct {
 
 	FrontendURL string
 
-	SMTPHost     string
-	SMTPPort     int
-	SMTPUsername string
-	SMTPPassword string
-	SMTPFrom     string
+	EmailAPIURL string
+	EmailAPIKey string
 }
 
 func Load() *Config {
-	smtpPort, _ := strconv.Atoi(getEnv("SMTP_PORT", "2525"))
-
 	jwtExpiry, _ := time.ParseDuration(getEnv("JWT_EXPIRES_IN", "15m"))
 	refreshExpiry, _ := time.ParseDuration(getEnv("JWT_REFRESH_EXPIRES_IN", "168h"))
 
@@ -43,11 +37,8 @@ func Load() *Config {
 		JWTRefreshExpiresIn: refreshExpiry,
 		KafkaBrokers:        getEnv("KAFKA_BROKERS", "localhost:19092"),
 		FrontendURL:         getEnv("FRONTEND_URL", "http://localhost:3000"),
-		SMTPHost:            getEnv("SMTP_HOST", "mail-eu.smtp2go.com"),
-		SMTPPort:            smtpPort,
-		SMTPUsername:        getEnv("SMTP_USERNAME", ""),
-		SMTPPassword:        getEnv("SMTP_PASSWORD", ""),
-		SMTPFrom:            getEnv("SMTP_FROM", "info@yanatech.co.uk"),
+		EmailAPIURL:         getEnv("EMAIL_API_URL", "https://api-gateway.yanatech.co.uk/api/email/send"),
+		EmailAPIKey:         getEnv("EMAIL_API_KEY", ""),
 	}
 }
 

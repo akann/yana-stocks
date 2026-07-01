@@ -50,7 +50,8 @@ yana-stocks/
 - JWT: HS256, `iss: 'yana-stocks'`, 15min access token
 - Refresh tokens: opaque, Redis, 7d TTL, rotated on use
 - Kafka: Sarama — publishes `users.registered` event on registration
-- Email: SMTP2GO (STARTTLS port 2525)
+- Email: POSTs to `shared-services`' `email-api` (Kong, key-auth) — no longer
+  talks to SMTP2GO directly
 
 ### NestJS Services
 
@@ -304,7 +305,7 @@ yana-stocks/
 
 ```shell
 POST /api/auth/register
-  → auth-service creates user (passwordHash via bcrypt), sends verification email (SMTP2GO)
+  → auth-service creates user (passwordHash via bcrypt), sends verification email (via shared-services' email-api)
   → publishes users.registered event to Kafka → profile-service creates initial profile
   → returns { message }
 
@@ -445,7 +446,7 @@ apps/yana-stocks/
 │   └── ingress-api.yaml           # /api/stocks|market|signals|portfolio|news|predict
 ├── auth-service/
 │   ├── cnpg-cluster.yaml          # auth-service-pg CNPG cluster in yana-stocks namespace
-│   ├── external-secret.yaml       # JWT_SECRET, REDIS_URL, DATABASE_URL, SMTP_*, FRONTEND_URL
+│   ├── external-secret.yaml       # JWT_SECRET, REDIS_URL, DATABASE_URL, EMAIL_API_URL, EMAIL_API_KEY, FRONTEND_URL
 │   ├── deployment.yaml            # migrations run at startup (golang-migrate)
 │   ├── service.yaml
 │   └── kafka-topic.yaml           # users.registered KafkaTopic
@@ -752,11 +753,8 @@ REDIS_URL=redis://localhost:6379
 JWT_SECRET=...
 KAFKA_BROKERS=localhost:19092
 FRONTEND_URL=http://localhost:3000        # base for /verify?token= links in emails
-SMTP_HOST=mail-eu.smtp2go.com
-SMTP_PORT=2525                            # SMTP2GO STARTTLS (egress allowed in netpol)
-SMTP_USERNAME=yanatech.co.uk
-SMTP_PASSWORD=...
-SMTP_FROM=info@yanatech.co.uk
+EMAIL_API_URL=https://api-gateway.yanatech.co.uk/api/email/send
+EMAIL_API_KEY=...
 PORT=3004                                 # dev only; prod uses 3000
 ```
 
@@ -873,7 +871,7 @@ Following CLAUDE.md, scaffold apps/auth-service as a Go service with:
 - Kafka producer: publishes users.registered event on successful registration
 - Endpoints: POST /api/auth/register, POST /api/auth/verify, POST /api/auth/login,
              POST /api/auth/refresh, POST /api/auth/logout, GET /api/auth/me
-- Email verification via SMTP2GO (port 2525)
+- Email verification via shared-services' email-api (POST https://api-gateway.yanatech.co.uk/api/email/send)
 - Dockerfile (multi-stage Go build)
 - .env.example
 - package.json with "dev": "go run ./cmd/server" so turbo dev works

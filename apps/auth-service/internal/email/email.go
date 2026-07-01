@@ -1,21 +1,64 @@
 package email
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
-
-	"gopkg.in/gomail.v2"
+	"net/http"
+	"time"
 )
 
 type Sender struct {
-	host     string
-	port     int
-	username string
-	password string
-	from     string
+	apiURL string
+	apiKey string
+	client *http.Client
 }
 
-func NewSender(host string, port int, username, password, from string) *Sender {
-	return &Sender{host: host, port: port, username: username, password: password, from: from}
+func NewSender(apiURL, apiKey string) *Sender {
+	return &Sender{
+		apiURL: apiURL,
+		apiKey: apiKey,
+		client: &http.Client{Timeout: 10 * time.Second},
+	}
+}
+
+type sendEmailRequest struct {
+	To       []string          `json:"to"`
+	Subject  string            `json:"subject"`
+	HTML     string            `json:"html"`
+	Metadata map[string]string `json:"metadata,omitempty"`
+}
+
+func (s *Sender) send(to, subject, html string) error {
+	payload := sendEmailRequest{
+		To:       []string{to},
+		Subject:  subject,
+		HTML:     html,
+		Metadata: map[string]string{"sourceService": "auth-service"},
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal email request: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, s.apiURL, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("build email request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("apikey", s.apiKey)
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("send email request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("email-api returned status %d", resp.StatusCode)
+	}
+	return nil
 }
 
 func (s *Sender) SendPasswordReset(to, frontendURL, token string) error {
@@ -25,14 +68,7 @@ func (s *Sender) SendPasswordReset(to, frontendURL, token string) error {
 <p>Or copy this link: %s</p>
 <p>This link expires in 1 hour. If you didn't request this, you can ignore this email.</p>`, link, link)
 
-	m := gomail.NewMessage()
-	m.SetHeader("From", s.from)
-	m.SetHeader("To", to)
-	m.SetHeader("Subject", "Reset your yana-stocks password")
-	m.SetBody("text/html", body)
-
-	d := gomail.NewDialer(s.host, s.port, s.username, s.password)
-	return d.DialAndSend(m)
+	return s.send(to, "Reset your yana-stocks password", body)
 }
 
 func (s *Sender) SendVerification(to, frontendURL, token string) error {
@@ -41,12 +77,5 @@ func (s *Sender) SendVerification(to, frontendURL, token string) error {
 <p><a href="%s">Verify your email address</a></p>
 <p>Or copy this link: %s</p>`, link, link)
 
-	m := gomail.NewMessage()
-	m.SetHeader("From", s.from)
-	m.SetHeader("To", to)
-	m.SetHeader("Subject", "Verify your yana-stocks account")
-	m.SetBody("text/html", body)
-
-	d := gomail.NewDialer(s.host, s.port, s.username, s.password)
-	return d.DialAndSend(m)
+	return s.send(to, "Verify your yana-stocks account", body)
 }

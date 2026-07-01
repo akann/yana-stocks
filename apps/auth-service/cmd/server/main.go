@@ -70,7 +70,7 @@ func main() {
 	defer rdb.Close()
 
 	// Email
-	emailer := email.NewSender(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUsername, cfg.SMTPPassword, cfg.SMTPFrom)
+	emailer := email.NewSender(cfg.EmailAPIURL, cfg.EmailAPIKey)
 
 	// Kafka
 	publisher := kafkapub.NewPublisher(cfg.KafkaBrokers)
