@@ -79,6 +79,34 @@ describe('PortfoliosService', () => {
       expect(result[0]?.name).toBe('My Portfolio');
       expect(portfolioRepo.findAll).toHaveBeenCalled();
     });
+
+    it('values holdings at latestPrice when available', async () => {
+      portfolioRepo.findAll.mockResolvedValue([
+        {
+          ...mockPortfolioDoc,
+          stocks: [{ symbol: 'AAPL', shares: 10, avgCostBasis: 150, latestPrice: 200 }],
+        },
+      ]);
+
+      const result = await service.findAll();
+
+      expect(result[0]?.stocks[0]?.currentValue).toBe(2000);
+      expect(result[0]?.totalValue).toBe(2000);
+    });
+
+    it('falls back to cost basis when no price has streamed yet', async () => {
+      portfolioRepo.findAll.mockResolvedValue([
+        {
+          ...mockPortfolioDoc,
+          stocks: [{ symbol: 'AAPL', shares: 10, avgCostBasis: 150 }],
+        },
+      ]);
+
+      const result = await service.findAll();
+
+      expect(result[0]?.stocks[0]?.currentValue).toBe(1500);
+      expect(result[0]?.totalValue).toBe(1500);
+    });
   });
 
   describe('create', () => {
@@ -171,6 +199,41 @@ describe('PortfoliosService', () => {
       // (10*100 + 10*120) / 20 = 110
       expect(existing.shares).toBe(20);
       expect(existing.avgCostBasis).toBe(110);
+    });
+
+    it('seeds latestPrice with the trade price on a new holding', async () => {
+      const stocks: Array<{
+        symbol: string;
+        shares: number;
+        avgCostBasis: number;
+        latestPrice?: number;
+      }> = [];
+      portfolioRepo.findByIdForMutation.mockResolvedValue({
+        ...mockPortfolioDoc,
+        stocks,
+        save: jest.fn().mockResolvedValue({
+          toObject: () => ({ ...mockPortfolioDoc, stocks }),
+        }),
+      } as unknown as Awaited<ReturnType<PortfolioRepository['findByIdForMutation']>>);
+
+      await service.addStock('portfolio-1', { symbol: 'MSFT', shares: 5, price: 400 }, mockUser);
+
+      expect(stocks[0]?.latestPrice).toBe(400);
+    });
+
+    it('does not overwrite a streamed latestPrice on an existing holding', async () => {
+      const existing = { symbol: 'AAPL', shares: 10, avgCostBasis: 100, latestPrice: 180 };
+      portfolioRepo.findByIdForMutation.mockResolvedValue({
+        ...mockPortfolioDoc,
+        stocks: [existing],
+        save: jest.fn().mockResolvedValue({
+          toObject: () => ({ ...mockPortfolioDoc, stocks: [existing] }),
+        }),
+      } as unknown as Awaited<ReturnType<PortfolioRepository['findByIdForMutation']>>);
+
+      await service.addStock('portfolio-1', { symbol: 'AAPL', shares: 10, price: 120 }, mockUser);
+
+      expect(existing.latestPrice).toBe(180);
     });
 
     it('throws NotFoundException when portfolio belongs to another user', async () => {

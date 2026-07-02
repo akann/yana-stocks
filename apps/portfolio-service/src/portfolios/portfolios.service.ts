@@ -67,8 +67,15 @@ export class PortfoliosService {
       existing.avgCostBasis =
         (existing.shares * existing.avgCostBasis + dto.shares * dto.price) / newShares;
       existing.shares = newShares;
+      // Seed only when no live price has streamed yet — streamed ticks stay authoritative
+      existing.latestPrice ??= dto.price;
     } else {
-      doc.stocks.push({ symbol: dto.symbol, shares: dto.shares, avgCostBasis: dto.price });
+      doc.stocks.push({
+        symbol: dto.symbol,
+        shares: dto.shares,
+        avgCostBasis: dto.price,
+        latestPrice: dto.price,
+      });
     }
 
     const saved = await doc.save();
@@ -101,7 +108,9 @@ export class PortfoliosService {
       symbol: s.symbol,
       shares: s.shares,
       avgCostBasis: s.avgCostBasis,
-      currentValue: s.latestPrice != null ? s.shares * s.latestPrice : undefined,
+      // Cost-basis fallback keeps valuations non-zero when no price has streamed
+      // yet (market closed, pipeline down) — same rule the portfolio page applies
+      currentValue: s.shares * (s.latestPrice ?? s.avgCostBasis),
     }));
     const totalValue = stocks.reduce((acc, s) => acc + (s.currentValue ?? 0), 0);
     return {
