@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures/base.fixture';
 import {
   setupAuthSession,
   mockWatchlistsEndpoint,
+  mockAssets,
   fulfill,
   type WatchlistData,
 } from '../fixtures/api-mocks';
@@ -116,6 +117,28 @@ test.describe('Watchlist page — authenticated, with existing watchlist', () =>
     await gotoWatchlistPage(page);
     await expect(page.getByText('$180.00')).toBeVisible();
     await expect(page.getByText('$420.00')).toBeVisible();
+  });
+
+  test('add-symbol input autocompletes and submits the selected symbol', async ({ page }) => {
+    await mockAssets(page);
+    const posted = new Promise<string>((resolve) => {
+      void page.route(/\/api\/portfolio\/watchlists\/wl-1\/symbols$/, (route) => {
+        const body = JSON.parse(route.request().postData() ?? '{}') as { symbol?: string };
+        resolve(body.symbol ?? '');
+        return fulfill(route, { ...existing, symbols: [...existing.symbols, 'NVDA'] }, 201);
+      });
+    });
+
+    await gotoWatchlistPage(page);
+    await page.getByRole('button', { name: '+ Add Symbol' }).click();
+    await page.getByPlaceholder('Symbol (e.g. AAPL)').fill('NVD');
+
+    // Debounced /market/assets query populates the dropdown
+    await page.getByRole('button', { name: 'NVDA NVIDIA Corporation' }).click();
+    await expect(page.getByPlaceholder('Symbol (e.g. AAPL)')).toHaveValue('NVDA');
+
+    await page.getByRole('button', { name: 'Add', exact: true }).click();
+    expect(await posted).toBe('NVDA');
   });
 
   test('clicking a symbol navigates to its stock page', async ({ page }) => {
