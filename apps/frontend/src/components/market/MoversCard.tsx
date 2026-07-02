@@ -74,7 +74,7 @@ export function MoversCard(): React.JSX.Element {
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">
+          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider pb-2.5 mb-1 border-b border-gray-200/60">
             Top Gainers
           </h3>
           <div className="divide-y divide-gray-200/60">
@@ -87,7 +87,7 @@ export function MoversCard(): React.JSX.Element {
           </div>
         </div>
         <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
-          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">
+          <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider pb-2.5 mb-1 border-b border-gray-200/60">
             Top Losers
           </h3>
           <div className="divide-y divide-gray-200/60">
