@@ -17,14 +17,20 @@ function MoverRow({ entry, rank }: { entry: MoverEntry; rank: number }): React.J
         <span className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors truncate">
           {entry.symbol}
         </span>
-        <div className="text-right ml-auto shrink-0">
-          <div className="text-sm font-medium text-gray-900">${entry.price.toFixed(2)}</div>
-          <div
-            className={clsx('text-xs font-medium', positive ? 'text-green-600' : 'text-red-600')}
+        <div className="ml-auto shrink-0 flex items-baseline gap-2">
+          <span className="text-sm font-medium text-gray-900 tabular-nums">
+            ${entry.price.toFixed(2)}
+          </span>
+          {/* Fixed width keeps the percent column (and thus the prices) aligned across rows */}
+          <span
+            className={clsx(
+              'text-xs font-medium tabular-nums w-14 text-right',
+              positive ? 'text-green-600' : 'text-red-600',
+            )}
           >
             {positive ? '+' : ''}
             {entry.changePercent.toFixed(2)}%
-          </div>
+          </span>
         </div>
       </Link>
       <div className="ml-1 shrink-0">
