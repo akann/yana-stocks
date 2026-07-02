@@ -77,7 +77,7 @@ export function MoversCard(): React.JSX.Element {
           <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">
             Top Gainers
           </h3>
-          <div className="space-y-1">
+          <div className="divide-y divide-gray-200/60">
             {(data?.gainers ?? []).map((entry, i) => (
               <MoverRow key={entry.symbol} entry={entry} rank={i + 1} />
             ))}
@@ -90,7 +90,7 @@ export function MoversCard(): React.JSX.Element {
           <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wider mb-3">
             Top Losers
           </h3>
-          <div className="space-y-1">
+          <div className="divide-y divide-gray-200/60">
             {(data?.losers ?? []).map((entry, i) => (
               <MoverRow key={entry.symbol} entry={entry} rank={i + 1} />
             ))}
