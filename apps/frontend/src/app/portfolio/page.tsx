@@ -156,28 +156,33 @@ export default function PortfolioPage(): React.JSX.Element {
 
       {/* ── Summary card ── */}
       {summary && (
-        <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-5">
-          <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-4">
+        <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4 sm:p-5">
+          <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3 sm:mb-4">
             Overall Summary
           </h2>
-          <div className="grid grid-cols-3 gap-6">
-            <div>
-              <div className="text-xs text-gray-600 uppercase tracking-wider mb-1">
+          {/* Stacked on phones — three currency values don't fit side by side at 390px */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-6">
+            <div className="flex items-baseline justify-between sm:block">
+              <div className="text-xs text-gray-600 uppercase tracking-wider sm:mb-1">
                 Market Value
               </div>
-              <div className="text-xl font-bold text-gray-900">${fmt(summary.totalValue)}</div>
+              <div className="text-lg sm:text-xl font-bold text-gray-900">
+                ${fmt(summary.totalValue)}
+              </div>
             </div>
-            <div>
-              <div className="text-xs text-gray-600 uppercase tracking-wider mb-1">Invested</div>
-              <div className="text-xl font-bold text-gray-900">${fmt(summary.totalCost)}</div>
+            <div className="flex items-baseline justify-between sm:block">
+              <div className="text-xs text-gray-600 uppercase tracking-wider sm:mb-1">Invested</div>
+              <div className="text-lg sm:text-xl font-bold text-gray-900">
+                ${fmt(summary.totalCost)}
+              </div>
             </div>
-            <div>
-              <div className="text-xs text-gray-600 uppercase tracking-wider mb-1">
+            <div className="flex items-baseline justify-between sm:block">
+              <div className="text-xs text-gray-600 uppercase tracking-wider sm:mb-1">
                 Unrealized P&amp;L
               </div>
-              <div className={`text-xl font-bold ${pnlColor}`}>
+              <div className={`text-lg sm:text-xl font-bold ${pnlColor}`}>
                 {summary.pnl >= 0 ? '+' : ''}${fmt(Math.abs(summary.pnl))}
-                <span className="text-sm font-medium ml-2">
+                <span className="text-xs sm:text-sm font-medium ml-1.5 sm:ml-2">
                   ({summary.pnl >= 0 ? '+' : ''}
                   {summary.totalCost > 0 ? fmt((summary.pnl / summary.totalCost) * 100) : '0.00'}
                   %)

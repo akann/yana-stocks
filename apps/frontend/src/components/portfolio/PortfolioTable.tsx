@@ -65,11 +65,12 @@ export function PortfolioTable({
   return (
     <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl overflow-hidden">
       {/* ── Card header ── */}
-      <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between gap-4">
-        <div className="flex items-baseline gap-3 min-w-0">
+      <div className="px-4 sm:px-5 py-3.5 sm:py-4 border-b border-gray-200 flex items-center justify-between gap-4">
+        {/* Name and totals stack on phones so long values don't collide with the name */}
+        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3 min-w-0">
           <h3 className="font-semibold text-gray-900 truncate">{portfolio.name}</h3>
           {enriched.length > 0 && (
-            <span className="text-sm text-gray-600 shrink-0">
+            <span className="text-xs sm:text-sm text-gray-600 shrink-0">
               ${fmtUsd(totalMktValue)}
               <span
                 className={clsx(
@@ -128,20 +129,22 @@ export function PortfolioTable({
       {enriched.length > 0 ? (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-[13px] sm:text-sm">
               <thead>
                 <tr className="text-xs text-gray-600 uppercase tracking-wider border-b border-gray-200">
-                  <th className="text-left px-5 py-2.5 font-medium">Symbol</th>
-                  <th className="text-right px-4 py-2.5 font-medium">Shares</th>
-                  <th className="text-right px-4 py-2.5 font-medium hidden sm:table-cell">
+                  <th className="text-left px-4 sm:px-5 py-2.5 font-medium">Symbol</th>
+                  <th className="text-right px-2.5 sm:px-4 py-2.5 font-medium">Shares</th>
+                  <th className="text-right px-2.5 sm:px-4 py-2.5 font-medium hidden sm:table-cell">
                     Avg Cost
                   </th>
-                  <th className="text-right px-4 py-2.5 font-medium">Live Price</th>
-                  <th className="text-right px-4 py-2.5 font-medium hidden md:table-cell">Day %</th>
-                  <th className="text-right px-4 py-2.5 font-medium hidden lg:table-cell">
+                  <th className="text-right px-2.5 sm:px-4 py-2.5 font-medium">Live Price</th>
+                  <th className="text-right px-2.5 sm:px-4 py-2.5 font-medium hidden md:table-cell">
+                    Day %
+                  </th>
+                  <th className="text-right px-2.5 sm:px-4 py-2.5 font-medium hidden lg:table-cell">
                     Mkt Value
                   </th>
-                  <th className="text-right px-5 py-2.5 font-medium">P&amp;L</th>
+                  <th className="text-right px-4 sm:px-5 py-2.5 font-medium">P&amp;L</th>
                 </tr>
               </thead>
               <tbody>
@@ -151,23 +154,23 @@ export function PortfolioTable({
                     onClick={() => router.push(`/stocks/${h.symbol}`)}
                     className="border-b border-gray-200 last:border-0 hover:bg-gray-100/60 cursor-pointer transition-colors"
                   >
-                    <td className="px-5 py-3.5 font-semibold text-blue-600 font-mono">
+                    <td className="px-4 sm:px-5 py-3 sm:py-3.5 font-semibold text-blue-600 font-mono">
                       {h.symbol}
                     </td>
-                    <td className="px-4 py-3.5 text-right text-gray-600 tabular-nums">
+                    <td className="px-2.5 sm:px-4 py-3 sm:py-3.5 text-right text-gray-600 tabular-nums">
                       {h.shares}
                     </td>
-                    <td className="px-4 py-3.5 text-right text-gray-600 tabular-nums hidden sm:table-cell">
+                    <td className="px-2.5 sm:px-4 py-3 sm:py-3.5 text-right text-gray-600 tabular-nums hidden sm:table-cell">
                       ${fmtUsd(h.avgCostBasis)}
                     </td>
-                    <td className="px-4 py-3.5 text-right tabular-nums">
+                    <td className="px-2.5 sm:px-4 py-3 sm:py-3.5 text-right tabular-nums">
                       {h.livePrice != null ? (
                         <span className="text-gray-900 font-medium">${fmtUsd(h.livePrice)}</span>
                       ) : (
                         <span className="text-gray-600">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3.5 text-right tabular-nums hidden md:table-cell">
+                    <td className="px-2.5 sm:px-4 py-3 sm:py-3.5 text-right tabular-nums hidden md:table-cell">
                       {h.changePercent != null ? (
                         <span
                           className={clsx(
@@ -182,10 +185,10 @@ export function PortfolioTable({
                         <span className="text-gray-600 text-xs">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3.5 text-right text-gray-600 tabular-nums hidden lg:table-cell">
+                    <td className="px-2.5 sm:px-4 py-3 sm:py-3.5 text-right text-gray-600 tabular-nums hidden lg:table-cell">
                       ${fmtUsd(h.mktValue)}
                     </td>
-                    <td className="px-5 py-3.5 text-right tabular-nums">
+                    <td className="px-4 sm:px-5 py-3 sm:py-3.5 text-right tabular-nums">
                       <PnlCell pnl={h.pnl} pnlPct={h.pnlPct} />
                     </td>
                   </tr>
@@ -194,16 +197,16 @@ export function PortfolioTable({
               {/* Totals row */}
               <tfoot>
                 <tr className="border-t border-gray-200 bg-gray-100/30 text-xs text-gray-600">
-                  <td className="px-5 py-2.5 font-medium text-gray-600" colSpan={2}>
+                  <td className="px-4 sm:px-5 py-2.5 font-medium text-gray-600" colSpan={2}>
                     Total ({enriched.length} holding{enriched.length !== 1 ? 's' : ''})
                   </td>
                   <td className="hidden sm:table-cell" />
                   <td className="hidden md:table-cell" />
-                  <td className="px-4 py-2.5 text-right text-gray-600 font-medium hidden lg:table-cell">
+                  <td className="px-2.5 sm:px-4 py-2.5 text-right text-gray-600 font-medium hidden lg:table-cell">
                     ${fmtUsd(totalMktValue)}
                   </td>
                   <td />
-                  <td className="px-5 py-2.5 text-right">
+                  <td className="px-4 sm:px-5 py-2.5 text-right">
                     <PnlCell pnl={totalPnl} pnlPct={totalPnlPct} />
                   </td>
                 </tr>
