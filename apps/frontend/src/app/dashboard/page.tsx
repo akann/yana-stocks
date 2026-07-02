@@ -36,15 +36,19 @@ export default function DashboardPage(): React.JSX.Element {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
           <p className="text-sm text-gray-600">Total Portfolio Value</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">${totalValue.toFixed(2)}</p>
+          <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
+            ${totalValue.toFixed(2)}
+          </p>
         </div>
         <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
           <p className="text-sm text-gray-600">Portfolios</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{portfolios?.length ?? 0}</p>
+          <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">
+            {portfolios?.length ?? 0}
+          </p>
         </div>
         <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
           <p className="text-sm text-gray-600">Holdings</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{totalHoldings}</p>
+          <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{totalHoldings}</p>
         </div>
       </div>
 

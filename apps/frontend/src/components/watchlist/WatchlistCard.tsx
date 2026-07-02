@@ -58,7 +58,7 @@ export function WatchlistCard({
     // overflow must stay visible so the add-symbol autocomplete dropdown can escape the card
     <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl">
       {/* ── Header ── */}
-      <div className="px-5 py-3.5 border-b border-gray-200 flex items-center justify-between gap-4">
+      <div className="px-4 sm:px-5 py-3.5 border-b border-gray-200 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <h3 className="font-semibold text-gray-900 truncate">{watchlist.name}</h3>
           <span className="text-xs text-gray-600 shrink-0">
@@ -107,17 +107,19 @@ export function WatchlistCard({
       {/* ── Symbol table ── */}
       {watchlist.symbols.length > 0 ? (
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-[13px] sm:text-sm">
             <thead>
               <tr className="text-xs text-gray-600 uppercase tracking-wider border-b border-gray-200">
-                <th className="text-left px-5 py-2.5 font-medium">Symbol</th>
-                <th className="text-right px-4 py-2.5 font-medium">Price</th>
-                <th className="text-right px-4 py-2.5 font-medium">Change</th>
-                <th className="text-right px-4 py-2.5 font-medium hidden sm:table-cell">Day %</th>
-                <th className="text-left px-4 py-2.5 font-medium hidden md:table-cell">
+                <th className="text-left px-4 sm:px-5 py-2.5 font-medium">Symbol</th>
+                <th className="text-right px-2.5 sm:px-4 py-2.5 font-medium">Price</th>
+                <th className="text-right px-2.5 sm:px-4 py-2.5 font-medium">Change</th>
+                <th className="text-right px-2.5 sm:px-4 py-2.5 font-medium hidden sm:table-cell">
+                  Day %
+                </th>
+                <th className="text-left px-2.5 sm:px-4 py-2.5 font-medium hidden md:table-cell">
                   Sentiment
                 </th>
-                <th className="px-5 py-2.5" />
+                <th className="px-4 sm:px-5 py-2.5" />
               </tr>
             </thead>
             <tbody>
@@ -132,13 +134,13 @@ export function WatchlistCard({
                     className="border-b border-gray-200 last:border-0 hover:bg-gray-100/50 transition-colors"
                   >
                     <td
-                      className="px-5 py-3.5 font-semibold text-blue-600 font-mono cursor-pointer"
+                      className="px-4 sm:px-5 py-3 sm:py-3.5 font-semibold text-blue-600 font-mono cursor-pointer"
                       onClick={() => router.push(`/stocks/${sym}`)}
                     >
                       {sym}
                     </td>
 
-                    <td className="px-4 py-3.5 text-right tabular-nums">
+                    <td className="px-2.5 sm:px-4 py-3 sm:py-3.5 text-right tabular-nums">
                       {agg?.price != null ? (
                         <span className="text-gray-900 font-medium">${agg.price.toFixed(2)}</span>
                       ) : (
@@ -146,17 +148,17 @@ export function WatchlistCard({
                       )}
                     </td>
 
-                    <td className="px-4 py-3.5 text-right tabular-nums">
+                    <td className="px-2.5 sm:px-4 py-3 sm:py-3.5 text-right tabular-nums">
                       {agg?.change != null ? (
-                        <span className={dayPos ? 'text-green-600' : 'text-red-600'}>
-                          {dayPos ? '+' : ''}${agg.change.toFixed(2)}
+                        <span className={agg.change >= 0 ? 'text-green-600' : 'text-red-600'}>
+                          {agg.change >= 0 ? '+' : '−'}${Math.abs(agg.change).toFixed(2)}
                         </span>
                       ) : (
                         <span className="text-gray-600">—</span>
                       )}
                     </td>
 
-                    <td className="px-4 py-3.5 text-right tabular-nums hidden sm:table-cell">
+                    <td className="px-2.5 sm:px-4 py-3 sm:py-3.5 text-right tabular-nums hidden sm:table-cell">
                       {agg?.changePercent != null ? (
                         <span
                           className={clsx(
@@ -172,7 +174,7 @@ export function WatchlistCard({
                       )}
                     </td>
 
-                    <td className="px-4 py-3.5 hidden md:table-cell">
+                    <td className="px-2.5 sm:px-4 py-3 sm:py-3.5 hidden md:table-cell">
                       {agg?.sentiment?.label ? (
                         <SentimentBadge label={agg.sentiment.label} />
                       ) : (
@@ -180,7 +182,7 @@ export function WatchlistCard({
                       )}
                     </td>
 
-                    <td className="px-5 py-3.5 text-right">
+                    <td className="px-4 sm:px-5 py-3 sm:py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <AddToWatchlistButton symbol={sym} excludeWatchlistId={watchlist.id} />
                         <button
@@ -222,7 +224,7 @@ export function WatchlistCard({
       )}
 
       {/* ── Add symbol footer ── */}
-      <div className="px-5 py-3 border-t border-gray-200">
+      <div className="px-4 sm:px-5 py-3 border-t border-gray-200">
         {showAdd ? (
           <form onSubmit={handleAddSubmit} className="flex gap-2">
             <SymbolAutocompleteInput
