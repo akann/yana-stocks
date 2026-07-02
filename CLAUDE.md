@@ -1112,6 +1112,11 @@ step. All 15 steps are complete.
   `market=all`
 - Sticky navbar (`sticky top-0 z-50`)
 - MarketNews fixed 350px height with internal scroll
+- Market closed indicator (`lib/market-hours.ts`) — client-side weekday/hours
+  check (no holiday calendar) per region (US: NYSE 9:30-16:00 ET; UK: LSE
+  8:00-16:30 London, symbols ending `.L` or `^FTSE`; DE: Xetra 9:00-17:30
+  Berlin, `^GDAXI`). Stock page swaps the animated "Live" badge for a gray
+  "Market Closed" badge; `IndicesBar` shows a per-card "Closed" pill
 
 **Step 5 gap completions (shipped post-step):**
 

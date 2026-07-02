@@ -3,6 +3,7 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { isMarketOpen } from '@/lib/market-hours';
 import type { MarketOverview } from '@/types';
 
 function fmt(n: number, decimals = 2): string {
@@ -38,9 +39,17 @@ export function IndicesBar(): React.JSX.Element {
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {data.indices.map((idx) => {
         const positive = idx.changesPercentage >= 0;
+        const closed = !isMarketOpen(idx.symbol);
         return (
           <div key={idx.symbol} className="bg-white rounded-xl border border-gray-200 p-4">
-            <p className="text-xs text-gray-500 font-medium truncate">{idx.name}</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-gray-500 font-medium truncate">{idx.name}</p>
+              {closed && (
+                <span className="shrink-0 text-[10px] font-medium text-gray-500 bg-gray-100 rounded-full px-1.5 py-0.5">
+                  Closed
+                </span>
+              )}
+            </div>
             <p className="text-lg font-bold text-gray-900 mt-0.5">{fmt(idx.price)}</p>
             <p
               className={`text-xs font-semibold mt-0.5 ${positive ? 'text-green-600' : 'text-red-600'}`}

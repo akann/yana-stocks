@@ -9,6 +9,7 @@ import { NewsPanel } from '@/components/news/NewsPanel';
 import { StockChart } from '@/components/charts/StockChart';
 import { SignalsPanel } from '@/components/signals/SignalsPanel';
 import { AddToWatchlistButton } from '@/components/watchlist/AddToWatchlistButton';
+import { isMarketOpen } from '@/lib/market-hours';
 import type { OHLCVBar, StockAggregate } from '@/types';
 
 function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
@@ -94,6 +95,8 @@ export default function StockPage(): React.JSX.Element | null {
   // but defend against the edge case during SSR hydration
   if (!upperSymbol) return null;
 
+  const marketOpen = isMarketOpen(upperSymbol);
+
   const price = stock?.price ?? null;
   const change = stock?.change ?? null;
   const changePercent = stock?.changePercent ?? null;
@@ -109,14 +112,20 @@ export default function StockPage(): React.JSX.Element | null {
           <div className="space-y-1">
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-gray-900">{upperSymbol}</h1>
-              {/* Animated live indicator */}
-              <span className="flex items-center gap-1.5 text-xs font-medium text-green-600">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" />
+              {marketOpen ? (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-green-600">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" />
+                  </span>
+                  Live
                 </span>
-                Live
-              </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+                  <span className="inline-flex h-2 w-2 rounded-full bg-gray-400" />
+                  Market Closed
+                </span>
+              )}
               <AddToWatchlistButton symbol={upperSymbol} />
             </div>
 
