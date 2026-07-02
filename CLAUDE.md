@@ -1111,6 +1111,11 @@ step. All 15 steps are complete.
 
 - Navbar symbol autocomplete (`SymbolSearch`) — debounced, keyboard nav,
   `market=all`
+- Add-symbol autocomplete (`SymbolAutocompleteInput`) — same debounced
+  `/market/assets` search as the navbar, but fills the input instead of
+  navigating; used by the watchlist add-symbol form and the portfolio Add Stock
+  modal. `WatchlistCard` must not use `overflow-hidden` or the dropdown gets
+  clipped.
 - Sticky navbar (`sticky top-0 z-50`)
 - MarketNews fixed 350px height with internal scroll
 - Market closed indicator (`lib/market-hours.ts`) — client-side weekday/hours

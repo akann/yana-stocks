@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { SymbolAutocompleteInput } from '@/components/SymbolAutocompleteInput';
 
 interface Props {
   portfolioId: string;
@@ -47,12 +48,13 @@ export function AddStockModal({ portfolioId, onClose }: Props): React.JSX.Elemen
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm text-gray-600 mb-1">Symbol</label>
-            <input
-              type="text"
+            <SymbolAutocompleteInput
+              autoFocus
               value={symbol}
-              onChange={(e) => setSymbol(e.target.value)}
+              onChange={(v) => setSymbol(v.toUpperCase())}
               placeholder="AAPL"
-              className="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 uppercase"
+              maxLength={10}
+              inputClassName="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 uppercase"
             />
           </div>
           <div>

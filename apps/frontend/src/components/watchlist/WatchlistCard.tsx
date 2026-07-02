@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { AddToWatchlistButton } from './AddToWatchlistButton';
+import { SymbolAutocompleteInput } from '@/components/SymbolAutocompleteInput';
 import type { StockAggregate, Watchlist } from '@/types';
 
 interface Props {
@@ -54,7 +55,8 @@ export function WatchlistCard({
   }
 
   return (
-    <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl overflow-hidden">
+    // overflow must stay visible so the add-symbol autocomplete dropdown can escape the card
+    <div className="bg-[#f2f5f7] border border-gray-200 rounded-xl">
       {/* ── Header ── */}
       <div className="px-5 py-3.5 border-b border-gray-200 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
@@ -223,14 +225,14 @@ export function WatchlistCard({
       <div className="px-5 py-3 border-t border-gray-200">
         {showAdd ? (
           <form onSubmit={handleAddSubmit} className="flex gap-2">
-            <input
+            <SymbolAutocompleteInput
               autoFocus
-              type="text"
               value={addInput}
-              onChange={(e) => setAddInput(e.target.value.toUpperCase())}
+              onChange={(v) => setAddInput(v.toUpperCase())}
               placeholder="Symbol (e.g. AAPL)"
               maxLength={10}
-              className="flex-1 bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:border-blue-500 uppercase"
+              className="flex-1"
+              inputClassName="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 placeholder-gray-400 text-sm focus:outline-none focus:border-blue-500 uppercase"
             />
             <button
               type="button"
