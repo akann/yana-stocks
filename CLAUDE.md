@@ -1117,6 +1117,10 @@ step. All 15 steps are complete.
   modal. `WatchlistCard` must not use `overflow-hidden` or the dropdown gets
   clipped.
 - Sticky navbar (`sticky top-0 z-50`)
+- Mobile navbar — hamburger below `md` opens a collapsible panel with a
+  full-width `SymbolSearch` and stacked nav links; panel closes via `onNavigate`
+  callbacks (not a pathname effect — the React compiler lint rule rejects
+  setState-in-effect)
 - MarketNews fixed 350px height with internal scroll
 - Market closed indicator (`lib/market-hours.ts`) — client-side weekday/hours
   check (no holiday calendar) per region (US: NYSE 9:30-16:00 ET; UK: LSE

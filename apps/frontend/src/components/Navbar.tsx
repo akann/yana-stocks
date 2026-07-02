@@ -6,13 +6,24 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { SymbolSearch } from './SymbolSearch';
 
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+function NavLink({
+  href,
+  children,
+  className = 'px-3 py-1',
+  onNavigate,
+}: {
+  href: string;
+  children: React.ReactNode;
+  className?: string;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   const active = pathname === href || (href !== '/' && pathname.startsWith(href));
   return (
     <Link
       href={href}
-      className={`px-3 py-1 text-sm font-medium rounded transition-colors ${
+      onClick={onNavigate}
+      className={`${className} text-sm font-medium rounded transition-colors ${
         active ? 'bg-blue-600 text-white' : 'text-gray-300 hover:text-white hover:bg-white/10'
       }`}
     >
@@ -21,9 +32,35 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
   );
 }
 
+function NavLinks({ mobile = false, onNavigate }: { mobile?: boolean; onNavigate?: () => void }) {
+  const { isAuthenticated } = useAuth();
+  const linkClass = mobile ? 'block px-3 py-2' : undefined;
+  return (
+    <>
+      <NavLink href="/" className={linkClass} onNavigate={onNavigate}>
+        Market
+      </NavLink>
+      {isAuthenticated && (
+        <>
+          <NavLink href="/dashboard" className={linkClass} onNavigate={onNavigate}>
+            Dashboard
+          </NavLink>
+          <NavLink href="/portfolio" className={linkClass} onNavigate={onNavigate}>
+            Portfolio
+          </NavLink>
+          <NavLink href="/watchlist" className={linkClass} onNavigate={onNavigate}>
+            Watchlist
+          </NavLink>
+        </>
+      )}
+    </>
+  );
+}
+
 export function Navbar(): React.JSX.Element {
   const { isAuthenticated, logout, profile } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,21 +76,49 @@ export function Navbar(): React.JSX.Element {
   return (
     <nav className="sticky top-0 z-50 bg-[#1B2A4A] border-b border-[#0D1A30]">
       <div className="max-w-7xl mx-auto px-4 h-11 flex items-center justify-between">
-        {/* Brand + nav links */}
+        {/* Hamburger + brand + nav links */}
         <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setMobileOpen((o) => !o)}
+            aria-expanded={mobileOpen}
+            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+            className="md:hidden p-1.5 -ml-1.5 mr-1 text-gray-300 hover:text-white transition-colors"
+          >
+            {mobileOpen ? (
+              <svg
+                className="w-5 h-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              >
+                <line x1="6" y1="6" x2="18" y2="18" />
+                <line x1="18" y1="6" x2="6" y2="18" />
+              </svg>
+            ) : (
+              <svg
+                className="w-5 h-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              >
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            )}
+          </button>
+
           <Link href="/" className="text-white font-bold text-base tracking-tight mr-4 shrink-0">
             yana<span className="text-blue-400">stocks</span>
           </Link>
 
           <div className="hidden md:flex items-center gap-0.5">
-            <NavLink href="/">Market</NavLink>
-            {isAuthenticated && (
-              <>
-                <NavLink href="/dashboard">Dashboard</NavLink>
-                <NavLink href="/portfolio">Portfolio</NavLink>
-                <NavLink href="/watchlist">Watchlist</NavLink>
-              </>
-            )}
+            <NavLinks />
           </div>
         </div>
 
@@ -123,6 +188,16 @@ export function Navbar(): React.JSX.Element {
           )}
         </div>
       </div>
+
+      {/* Mobile panel — search + stacked nav links */}
+      {mobileOpen && (
+        <div className="md:hidden border-t border-[#0D1A30] px-4 py-3 space-y-3">
+          <SymbolSearch className="block w-full" onNavigate={() => setMobileOpen(false)} />
+          <div className="flex flex-col gap-1">
+            <NavLinks mobile onNavigate={() => setMobileOpen(false)} />
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

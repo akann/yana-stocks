@@ -6,7 +6,17 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import type { AssetsPage } from '@/types';
 
-export function SymbolSearch(): React.JSX.Element {
+interface Props {
+  /** Wrapper visibility/sizing — defaults to the desktop navbar variant */
+  className?: string;
+  /** Called after navigating to a symbol — lets the mobile menu close itself */
+  onNavigate?: () => void;
+}
+
+export function SymbolSearch({
+  className = 'hidden md:block w-52',
+  onNavigate,
+}: Props): React.JSX.Element {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -49,6 +59,7 @@ export function SymbolSearch(): React.JSX.Element {
     setOpen(false);
     setActiveIndex(-1);
     router.push(`/stocks/${symbol}`);
+    onNavigate?.();
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -76,7 +87,7 @@ export function SymbolSearch(): React.JSX.Element {
   const showDropdown = open && results.length > 0;
 
   return (
-    <div ref={containerRef} className="relative hidden md:block w-52">
+    <div ref={containerRef} className={`relative ${className}`}>
       <input
         ref={inputRef}
         type="text"
