@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
+import { APP_FILTER } from '@nestjs/core';
+import { SentryModule, SentryGlobalFilter } from '@sentry/nestjs/setup';
 import configuration from './config/configuration';
 import { AuthProxyController } from './auth/auth-proxy.controller';
+import { DebugSentryController } from './debug-sentry.controller';
 import { HealthController } from './health.controller';
 import { PortfolioProxyController } from './portfolio/portfolio-proxy.controller';
 import { PredictProxyController } from './predict/predict-proxy.controller';
@@ -16,6 +19,7 @@ import { StocksModule } from './stocks/stocks.module';
 
 @Module({
   imports: [
+    SentryModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
     HttpModule.register({ timeout: 10_000 }),
     RedisModule,
@@ -31,6 +35,13 @@ import { StocksModule } from './stocks/stocks.module';
     HealthController,
     PortfolioProxyController,
     PredictProxyController,
+    DebugSentryController,
+  ],
+  providers: [
+    {
+      provide: APP_FILTER,
+      useClass: SentryGlobalFilter,
+    },
   ],
 })
 export class AppModule {}

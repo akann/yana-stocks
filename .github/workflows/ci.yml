@@ -222,6 +222,20 @@ jobs:
             --concurrency=4 \
             --output-logs=new-only
 
+      # Sentry-instrumented NestJS services (see apps/profile-service/src/tracing.ts
+      # for the OTel-coexistence approach these all share) — built and uploaded
+      # here rather than via the general turbo filter, since only these four
+      # need a Sentry release/source-map step.
+      - name: Build Sentry-instrumented services and upload source maps
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          for svc in profile-service portfolio-service portfolio-api price-processor; do
+            pnpm --filter "@yana-stocks/$svc" build
+            npx @sentry/cli sourcemaps inject "apps/$svc/dist"
+            npx @sentry/cli sourcemaps upload --org yana-tech-limited --project "yana-stocks-$svc" "apps/$svc/dist"
+          done
+
   # ─────────────────────────────────────────────────────────────────
   # 4. Integration tests (Postgres + MongoDB + Redis as service containers)
   #    Kafka is mocked in all three suites — no broker needed in CI.
@@ -732,6 +746,7 @@ jobs:
               echo 'args<<EOF'
               echo 'NEXT_PUBLIC_API_URL=https://api-gateway.yanatech.co.uk/api'
               echo 'NEXT_PUBLIC_WS_URL=wss://api-gateway.yanatech.co.uk'
+              echo 'NEXT_PUBLIC_SENTRY_DSN=https://b7573581c85df1ce24ea66b2dcda43f9@o4511713892499456.ingest.de.sentry.io/4511714258780240'
               echo 'EOF'
             } >> "$GITHUB_OUTPUT"
           else
@@ -749,6 +764,8 @@ jobs:
             ${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}:${{ github.sha }}
             ${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}:latest
           build-args: ${{ steps.bargs.outputs.args }}
+          secrets: |
+            sentry_auth_token=${{ secrets.SENTRY_AUTH_TOKEN }}
           provenance: false
           cache-from: type=registry,ref=${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}:buildcache
           cache-to: type=registry,ref=${{ env.IMAGE_PREFIX }}/${{ matrix.service.name }}:buildcache,mode=max

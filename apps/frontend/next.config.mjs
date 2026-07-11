@@ -1,3 +1,5 @@
+import { withSentryConfig } from '@sentry/nextjs';
+
 /** @type {import('next').NextConfig} */
 const config = {
   output: 'standalone',
@@ -28,4 +30,10 @@ const config = {
   },
 };
 
-export default config;
+export default withSentryConfig(config, {
+  org: 'yana-tech-limited',
+  project: 'yana-stocks-frontend',
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+});

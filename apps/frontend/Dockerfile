@@ -26,9 +26,14 @@ COPY --from=deps /app/apps/frontend/node_modules ./apps/frontend/node_modules
 COPY . .
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_WS_URL
+ARG NEXT_PUBLIC_SENTRY_DSN
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
-RUN mkdir -p apps/frontend/public && pnpm --filter "@yana-stocks/frontend" build
+ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
+RUN mkdir -p apps/frontend/public
+RUN --mount=type=secret,id=sentry_auth_token \
+    SENTRY_AUTH_TOKEN=$(cat /run/secrets/sentry_auth_token 2>/dev/null || true) \
+    pnpm --filter "@yana-stocks/frontend" build
 
 FROM base AS runner
 WORKDIR /app
