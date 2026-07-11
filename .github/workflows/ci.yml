@@ -59,15 +59,19 @@ jobs:
             price-processor:
               - 'apps/price-processor/**'
               - 'packages/**'
+              - '.github/workflows/**'
             profile-service:
               - 'apps/profile-service/**'
               - 'packages/**'
+              - '.github/workflows/**'
             portfolio-service:
               - 'apps/portfolio-service/**'
               - 'packages/**'
+              - '.github/workflows/**'
             portfolio-api:
               - 'apps/portfolio-api/**'
               - 'packages/**'
+              - '.github/workflows/**'
             api-docs:
               - 'apps/api-docs/**'
               - 'apps/portfolio-api/**'
