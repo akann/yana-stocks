@@ -31,7 +31,7 @@ const config = {
 };
 
 export default withSentryConfig(config, {
-  org: 'yana-tech-limited',
+  org: 'yanatech-tech-limited',
   project: 'yana-stocks-frontend',
   authToken: process.env.SENTRY_AUTH_TOKEN,
   silent: !process.env.CI,

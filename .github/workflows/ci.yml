@@ -233,7 +233,7 @@ jobs:
           for svc in profile-service portfolio-service portfolio-api price-processor; do
             pnpm --filter "@yana-stocks/$svc" build
             npx @sentry/cli sourcemaps inject "apps/$svc/dist"
-            npx @sentry/cli sourcemaps upload --org yana-tech-limited --project "yana-stocks-$svc" "apps/$svc/dist"
+            npx @sentry/cli sourcemaps upload --org yanatech-tech-limited --project "yana-stocks-$svc" "apps/$svc/dist"
           done
 
   # ─────────────────────────────────────────────────────────────────
