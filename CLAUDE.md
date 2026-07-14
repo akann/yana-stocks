@@ -251,6 +251,29 @@ yana-stocks/
   lives in `src/components/home/HomePageView.tsx`.
 - **metadataBase:** `https://stocks.yanatech.co.uk` — all relative canonical
   URLs resolve against this.
+- **CSP is set in `src/proxy.ts`** (nonce + `'strict-dynamic'`, per-request) —
+  **not** `apps/frontend/proxy.ts`. This app uses the `src/` directory
+  convention (`src/app/`), and Next.js silently ignores a `proxy.ts` placed at
+  the project root in that layout: no error, `next build`'s route table just
+  never shows a `ƒ Proxy (Middleware)` line and no CSP header is ever sent.
+  `next.config.mjs`'s `headers()` still sets the other, non-nonce security
+  headers (X-Content-Type-Options, X-Frame-Options, Referrer-Policy,
+  Permissions-Policy). Every page is forced dynamic via a single
+  `export const dynamic = 'force-dynamic'` in `src/app/layout.tsx` (cascades to
+  all routes) since `Providers`/`Navbar`/`CookieBanner` are all client
+  components rendered in the root layout, so every route needs JS to hydrate.
+  Two allowances this app needed that `akan`/`yanatech` didn't: `img-src`
+  includes `https:` (not just `'self' data:'`) because `profile-service`'s
+  `avatar` field is a free-form user-supplied external URL with no host
+  allowlist; `connect-src` explicitly allows
+  `https://api-gateway.yanatech.co.uk` since the browser calls it cross-origin
+  directly in production (`NEXT_PUBLIC_API_URL`), same-origin only in dev via
+  `next.config.mjs` rewrites. `connect-src`'s Sentry entry is
+  `*.ingest.de.sentry.io` (EU region, matching `NEXT_PUBLIC_SENTRY_DSN`). Unlike
+  `akan`/`yanatech` (which had a CSP that silently broke hydration), this app
+  had **no CSP at all** before this fix — added proactively, not because
+  something broke. See `[[project_nextjs_csp_nonce_gotchas]]` memory for the
+  full incident history across all four apps.
 
 ### 9. api-docs (static nginx)
 

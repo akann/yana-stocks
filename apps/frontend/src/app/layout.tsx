@@ -8,6 +8,13 @@ import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
+// Every page must be dynamically rendered under the nonce-based CSP set in
+// proxy.ts — a statically prerendered page's <script> tags are baked at
+// build time, before proxy.ts ever runs, so they'd get no nonce and be
+// silently blocked in production (works fine in `pnpm dev`, where every
+// request is rendered fresh). See proxy.ts for the full explanation.
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   metadataBase: new URL('https://stocks.yanatech.co.uk'),
   title: {

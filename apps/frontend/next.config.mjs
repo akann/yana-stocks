@@ -28,6 +28,25 @@ const config = {
       { source: '/api/news/:path*', destination: `${portfolioApiUrl}/api/news/:path*` },
     ];
   },
+  async headers() {
+    // Content-Security-Policy is set in proxy.ts, not here — script-src
+    // needs a per-request nonce, which a static headers() config can't
+    // generate. See proxy.ts for the full explanation.
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default withSentryConfig(config, {
