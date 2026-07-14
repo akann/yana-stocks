@@ -14,6 +14,18 @@ export function proxy(request: NextRequest) {
     process.env.NODE_ENV === 'development'
       ? `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval'`
       : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`;
+  // Derived from NEXT_PUBLIC_API_URL rather than hardcoded, since the origin
+  // the browser actually calls differs by environment: production crosses to
+  // https://api-gateway.yanatech.co.uk, dev is same-origin (via
+  // next.config.mjs rewrites, covered by 'self'), and CI's e2e job points
+  // straight at a local service port (e.g. http://localhost:3004) with no
+  // gateway in front at all. Hardcoding the prod value here once silently
+  // CSP-blocked every auth fetch in the e2e environment — 'self' alone
+  // wouldn't have caught it since NEXT_PUBLIC_API_URL there isn't same-origin
+  // either.
+  const apiOrigin = new URL(
+    process.env.NEXT_PUBLIC_API_URL ?? 'https://api-gateway.yanatech.co.uk/api',
+  ).origin;
   const csp = [
     "default-src 'self'",
     scriptSrc,
@@ -23,12 +35,9 @@ export function proxy(request: NextRequest) {
     // needs to allow any https host, not just 'self'.
     "img-src 'self' data: https:",
     "font-src 'self' data:",
-    // api-gateway is a separate origin the browser calls directly in
-    // production (NEXT_PUBLIC_API_URL); in dev it's same-origin via
-    // next.config.mjs rewrites, so 'self' alone would work there. Sentry's
-    // ingest host is region-specific — this project's DSN
+    // Sentry's ingest host is region-specific — this project's DSN
     // (NEXT_PUBLIC_SENTRY_DSN) is on the EU region, *.ingest.de.sentry.io.
-    "connect-src 'self' https://api-gateway.yanatech.co.uk https://*.ingest.de.sentry.io",
+    `connect-src 'self' ${apiOrigin} https://*.ingest.de.sentry.io`,
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",

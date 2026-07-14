@@ -265,15 +265,22 @@ yana-stocks/
   Two allowances this app needed that `akan`/`yanatech` didn't: `img-src`
   includes `https:` (not just `'self' data:'`) because `profile-service`'s
   `avatar` field is a free-form user-supplied external URL with no host
-  allowlist; `connect-src` explicitly allows
-  `https://api-gateway.yanatech.co.uk` since the browser calls it cross-origin
-  directly in production (`NEXT_PUBLIC_API_URL`), same-origin only in dev via
-  `next.config.mjs` rewrites. `connect-src`'s Sentry entry is
-  `*.ingest.de.sentry.io` (EU region, matching `NEXT_PUBLIC_SENTRY_DSN`). Unlike
-  `akan`/`yanatech` (which had a CSP that silently broke hydration), this app
-  had **no CSP at all** before this fix — added proactively, not because
-  something broke. See `[[project_nextjs_csp_nonce_gotchas]]` memory for the
-  full incident history across all four apps.
+  allowlist; `connect-src`'s API origin is **computed from `NEXT_PUBLIC_API_URL`
+  at request time**
+  (`new URL(process.env.NEXT_PUBLIC_API_URL ?? '<prod default>').origin`), **not
+  hardcoded** — production crosses to `https://api-gateway.yanatech.co.uk`, but
+  the `e2e-tests` CI job builds the frontend with
+  `NEXT_PUBLIC_API_URL=http://localhost:3004/api` (no Kong/api-gateway in CI,
+  points straight at `auth-service`), and a hardcoded prod-only value silently
+  CSP-blocked every auth fetch there on first attempt — every login e2e test
+  failed (`toBeVisible`/`waitForURL` timeouts, same symptom as a real hydration
+  break, but the actual cause was `connect-src` not `script-src`).
+  `connect-src`'s Sentry entry is `*.ingest.de.sentry.io` (EU region, matching
+  `NEXT_PUBLIC_SENTRY_DSN`). Unlike `akan`/`yanatech` (which had a CSP that
+  silently broke hydration), this app had **no CSP at all** before this fix —
+  added proactively, not because something broke. See
+  `[[project_nextjs_csp_nonce_gotchas]]` memory for the full incident history
+  across all four apps, including this `connect-src` regression.
 
 ### 9. api-docs (static nginx)
 
