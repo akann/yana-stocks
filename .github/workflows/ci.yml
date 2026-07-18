@@ -854,18 +854,4 @@ jobs:
             git add apps/yana-stocks/
             git commit -m "ci(yana-stocks): update images → $(echo "$SHA" | cut -c1-7)"
             git push
-
-            # No ArgoCD webhook is configured — argocd.yanatech.co.uk has no
-            # public DNS record, so GitHub can never reach it. Instead, this
-            # runner (already inside the cluster network) patches the
-            # Application's refresh annotation directly via kube-apiserver,
-            # using its own auto-mounted ServiceAccount token — scoped by
-            # infrastructure/argocd/ci-refresh-rbac.yaml in k8s-apps to
-            # get/patch on exactly the "yana-stocks" Application, nothing else.
-            curl -sf --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
-              -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
-              -H "Content-Type: application/merge-patch+json" \
-              -X PATCH \
-              "https://kubernetes.default.svc/apis/argoproj.io/v1alpha1/namespaces/argocd/applications/yana-stocks" \
-              -d "{\"metadata\":{\"annotations\":{\"argocd.argoproj.io/refresh\":\"$(date +%s)\"}}}"
           fi
