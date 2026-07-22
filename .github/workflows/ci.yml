@@ -574,7 +574,16 @@ jobs:
         id: setup-chrome
         uses: browser-actions/setup-chrome@v1
 
+      # Non-blocking: lighthouserc.json's assertions are warn-level already, so
+      # the only way this step fails the job is an lhci infra hiccup (upload
+      # auth, the self-hosted server, or Chrome itself — e.g. the
+      # CHROME_INTERSTITIAL_ERROR flakiness seen in practice) — never a real
+      # perf regression. Shares this job's already-booted stack rather than
+      # get its own job (see the earlier design discussion), but a monitoring
+      # tool's own flakiness shouldn't block e2e tests or deploy the way a
+      # genuine e2e failure should.
       - name: Run Lighthouse CI against homepage
+        continue-on-error: true
         env:
           CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
           LHCI_UPLOAD__TOKEN: ${{ secrets.LHCI_TOKEN }}
