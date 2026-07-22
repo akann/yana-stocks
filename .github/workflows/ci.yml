@@ -611,7 +611,11 @@ jobs:
       # direct apt install of real Google Chrome stable above.
       # lighthouserc.json also gained --no-sandbox --disable-dev-shm-usage
       # defensively, since this runs in a k8s pod where /dev/shm is commonly
-      # undersized for headless Chrome.
+      # undersized for headless Chrome. LHCI_TOKEN/LHCI_BASIC_AUTH_* secrets
+      # (below) were missing entirely until 2026-07-23 — the upload step
+      # failed with "Must provide token for LHCI target" on every run before
+      # that, non-blocking but silently doing nothing; confirm this comment's
+      # neighboring run actually uploaded before trusting it's still working.
       - name: Run Lighthouse CI against homepage
         continue-on-error: true
         env:
