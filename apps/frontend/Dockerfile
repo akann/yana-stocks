@@ -1,5 +1,8 @@
 FROM node:24-alpine AS base
-RUN apk upgrade --no-cache && corepack enable && corepack prepare pnpm@11.6.0 --activate
+# npm@latest picks up a patched node-tar (CVE-2026-59873, CRITICAL) — npm
+# itself isn't used to install anything here (pnpm is), but its bundled
+# tar still ships in the image and fails the Trivy image scan otherwise.
+RUN apk upgrade --no-cache && npm install -g npm@latest && corepack enable && corepack prepare pnpm@11.6.0 --activate
 
 FROM base AS deps
 WORKDIR /app
