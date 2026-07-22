@@ -56,7 +56,7 @@ describe('IndicesBar', () => {
     await waitFor(() => expect(screen.getByText('S&P 500')).toBeInTheDocument());
     // S&P 500 has changesPercentage = +0.49 → green
     const sp500Card = screen.getByText('S&P 500').closest('div')!;
-    const changeEl = sp500Card.parentElement?.querySelector('.text-green-600');
+    const changeEl = sp500Card.parentElement?.querySelector('.text-green-700');
     expect(changeEl).toBeInTheDocument();
   });
 

@@ -33,7 +33,7 @@ function fmtPct(n: number): string {
 }
 
 function pctClass(n: number): string {
-  return n >= 0 ? 'text-green-600' : 'text-red-600';
+  return n >= 0 ? 'text-green-700' : 'text-red-600';
 }
 
 export function FactorTiles(): React.JSX.Element {
@@ -91,16 +91,28 @@ export function FactorTiles(): React.JSX.Element {
                 className="flex-shrink-0 w-36 bg-white rounded-xl border border-gray-200 p-3 hover:border-blue-200 transition-colors"
               >
                 <p className="text-xs font-semibold text-gray-800 truncate">{tile.factor}</p>
-                <p className="text-xs text-gray-400 mb-2">{tile.etf}</p>
-                <p className={`text-lg font-bold leading-none ${pctClass(primary)}`}>
+                <p className="text-xs text-gray-500 mb-2">{tile.etf}</p>
+                {/* Live factor performance can tick between the SSR-embedded
+                    snapshot and client hydration — suppress the resulting
+                    (expected) mismatch on these text nodes specifically. */}
+                <p
+                  className={`text-lg font-bold leading-none ${pctClass(primary)}`}
+                  suppressHydrationWarning
+                >
                   {fmtPct(primary)}
                 </p>
                 <div className="mt-2 flex gap-2 text-xs text-gray-500">
                   <span>
-                    {sec1Label} <span className={pctClass(secondary1)}>{fmtPct(secondary1)}</span>
+                    {sec1Label}{' '}
+                    <span className={pctClass(secondary1)} suppressHydrationWarning>
+                      {fmtPct(secondary1)}
+                    </span>
                   </span>
                   <span>
-                    {sec2Label} <span className={pctClass(secondary2)}>{fmtPct(secondary2)}</span>
+                    {sec2Label}{' '}
+                    <span className={pctClass(secondary2)} suppressHydrationWarning>
+                      {fmtPct(secondary2)}
+                    </span>
                   </span>
                 </div>
               </div>

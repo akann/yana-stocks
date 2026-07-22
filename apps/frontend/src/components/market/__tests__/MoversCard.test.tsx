@@ -74,7 +74,7 @@ describe('MoversCard', () => {
     render(<MoversCard />, { wrapper });
     await waitFor(() => screen.getByText('+5.70%'));
     const positive = screen.getByText('+5.70%');
-    expect(positive).toHaveClass('text-green-600');
+    expect(positive).toHaveClass('text-green-800');
   });
 
   it('applies red text class to negative changePercent', async () => {
@@ -82,7 +82,7 @@ describe('MoversCard', () => {
     render(<MoversCard />, { wrapper });
     await waitFor(() => screen.getByText('-11.76%'));
     const negative = screen.getByText('-11.76%');
-    expect(negative).toHaveClass('text-red-600');
+    expect(negative).toHaveClass('text-red-700');
   });
 
   it('links each gainer row to /stocks/:symbol', async () => {

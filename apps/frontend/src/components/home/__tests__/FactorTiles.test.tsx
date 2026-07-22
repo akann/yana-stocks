@@ -92,7 +92,7 @@ describe('FactorTiles', () => {
     mockApiGet.mockResolvedValue({ data: MOCK_FACTORS });
     render(<FactorTiles />, { wrapper });
     await waitFor(() => expect(screen.getByText('+1.20%')).toBeInTheDocument());
-    expect(screen.getByText('+1.20%')).toHaveClass('text-green-600');
+    expect(screen.getByText('+1.20%')).toHaveClass('text-green-700');
   });
 
   it('applies red formatting for negative change', async () => {

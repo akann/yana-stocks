@@ -89,7 +89,7 @@ export function MarketBrowser({
         {isLoading && <div className="py-12 text-center text-sm text-gray-500">Loading…</div>}
 
         {isError && (
-          <div className="py-12 text-center text-sm text-red-500">Failed to load assets</div>
+          <div className="py-12 text-center text-sm text-red-600">Failed to load assets</div>
         )}
 
         {!isLoading && !isError && data && (
@@ -97,12 +97,21 @@ export function MarketBrowser({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
-                  <th className="text-left px-4 py-2 font-medium text-gray-500 w-24">Symbol</th>
-                  <th className="text-left px-4 py-2 font-medium text-gray-500">Name</th>
-                  <th className="text-left px-4 py-2 font-medium text-gray-500 hidden sm:table-cell">
+                  <th scope="col" className="text-left px-4 py-2 font-medium text-gray-500 w-24">
+                    Symbol
+                  </th>
+                  <th scope="col" className="text-left px-4 py-2 font-medium text-gray-500">
+                    Name
+                  </th>
+                  <th
+                    scope="col"
+                    className="text-left px-4 py-2 font-medium text-gray-500 hidden sm:table-cell"
+                  >
                     Exchange
                   </th>
-                  <th className="px-4 py-2 w-10" />
+                  <th scope="col" className="px-4 py-2 w-10">
+                    <span className="sr-only">Watchlist</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -127,7 +136,7 @@ export function MarketBrowser({
                         </Link>
                       </td>
                       <td className="px-4 py-2.5 text-gray-700 truncate max-w-xs">{asset.name}</td>
-                      <td className="px-4 py-2.5 text-gray-400 text-xs hidden sm:table-cell">
+                      <td className="px-4 py-2.5 text-gray-500 text-xs hidden sm:table-cell">
                         {asset.exchange}
                       </td>
                       <td className="px-4 py-2.5 text-right">
@@ -141,7 +150,7 @@ export function MarketBrowser({
 
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-gray-500">
                   {data.total}{' '}
                   {activeTab === 'etf' ? 'ETFs' : activeTab === 'uk' ? 'UK equities' : 'equities'}
                   {search ? ` matching "${search.toUpperCase()}"` : ''}

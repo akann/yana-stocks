@@ -150,6 +150,9 @@ const CustomContent = React.memo(function CustomContent(
           >
             {label}
           </text>
+          {/* Live sector data can tick between the SSR-embedded snapshot and
+              client hydration — suppress the resulting (expected) mismatch
+              on this text node specifically. */}
           <text
             x={cx}
             y={cy + pctFontSize * 0.85}
@@ -158,6 +161,7 @@ const CustomContent = React.memo(function CustomContent(
             fill="#ffffff"
             fontSize={pctFontSize}
             fontWeight={700}
+            suppressHydrationWarning
           >
             {pctStr}
           </text>
@@ -173,6 +177,7 @@ const CustomContent = React.memo(function CustomContent(
           fill="#ffffff"
           fontSize={Math.max(9, Math.min(12, width / 5))}
           fontWeight={700}
+          suppressHydrationWarning
         >
           {pctStr}
         </text>
@@ -192,7 +197,7 @@ function SectorTooltip({ active, payload }: TooltipProps): React.JSX.Element | n
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow px-3 py-2 text-sm">
       <p className="font-semibold text-gray-900">{name}</p>
-      <p className={`font-medium ${pct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+      <p className={`font-medium ${pct >= 0 ? 'text-green-700' : 'text-red-600'}`}>
         {pct >= 0 ? '+' : ''}
         {pct.toFixed(2)}%
       </p>
@@ -359,7 +364,7 @@ export function SectorRotationHeatmap(): React.JSX.Element {
                 className={`px-2.5 py-1 text-xs rounded-md font-medium transition-colors capitalize ${
                   view === v
                     ? 'bg-white text-gray-800 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
+                    : 'text-gray-600 hover:text-gray-700'
                 }`}
               >
                 {v === 'today' ? 'Today' : 'History'}

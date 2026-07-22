@@ -35,7 +35,7 @@ export function MarketNews(): React.JSX.Element {
           ))}
         </div>
       ) : !data?.news.length ? (
-        <p className="text-sm text-gray-400 py-4 text-center">No news available</p>
+        <p className="text-sm text-gray-500 py-4 text-center">No news available</p>
       ) : (
         <ul className="space-y-3 flex-1 overflow-y-auto min-h-0 pr-1">
           {data.news.map((item, i) => (
@@ -44,7 +44,10 @@ export function MarketNews(): React.JSX.Element {
                 <p className="text-sm text-gray-900 font-medium leading-snug group-hover:text-blue-600 transition-colors line-clamp-2">
                   {item.title}
                 </p>
-                <p className="text-xs text-gray-400 mt-0.5">
+                {/* timeAgo() depends on Date.now(), which advances between the
+                    SSR render and client hydration — an expected mismatch, not
+                    a bug. See https://react.dev/link/hydration-mismatch */}
+                <p className="text-xs text-gray-500 mt-0.5" suppressHydrationWarning>
                   {item.source} · {timeAgo(item.publishedAt)}
                 </p>
               </a>

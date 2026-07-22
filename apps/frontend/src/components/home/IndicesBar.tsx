@@ -45,14 +45,20 @@ export function IndicesBar(): React.JSX.Element {
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs text-gray-500 font-medium truncate">{idx.name}</p>
               {closed && (
-                <span className="shrink-0 text-[10px] font-medium text-gray-500 bg-gray-100 rounded-full px-1.5 py-0.5">
+                <span className="shrink-0 text-[10px] font-medium text-gray-600 bg-gray-100 rounded-full px-1.5 py-0.5">
                   Closed
                 </span>
               )}
             </div>
-            <p className="text-lg font-bold text-gray-900 mt-0.5">{fmt(idx.price)}</p>
+            {/* Live index prices can tick between the SSR-embedded snapshot and
+                client hydration — suppress the resulting (expected) mismatch
+                rather than let React discard and re-render the subtree. */}
+            <p className="text-lg font-bold text-gray-900 mt-0.5" suppressHydrationWarning>
+              {fmt(idx.price)}
+            </p>
             <p
-              className={`text-xs font-semibold mt-0.5 ${positive ? 'text-green-600' : 'text-red-600'}`}
+              className={`text-xs font-semibold mt-0.5 ${positive ? 'text-green-700' : 'text-red-600'}`}
+              suppressHydrationWarning
             >
               {positive ? '+' : ''}
               {fmt(idx.change)} ({positive ? '+' : ''}

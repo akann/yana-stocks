@@ -17,16 +17,22 @@ function MoverRow({ entry, rank }: { entry: MoverEntry; rank: number }): React.J
         <span className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors truncate">
           {entry.symbol}
         </span>
+        {/* Live prices can tick between the SSR-embedded snapshot and client
+            hydration — suppress the resulting (expected) mismatch on these two
+            text nodes rather than let React discard and re-render the row.
+            suppressHydrationWarning only applies one level deep, so it must
+            sit on each element whose own text can vary, not a wrapping div. */}
         <div className="ml-auto shrink-0 flex items-baseline gap-2">
-          <span className="text-sm font-medium text-gray-900 tabular-nums">
+          <span className="text-sm font-medium text-gray-900 tabular-nums" suppressHydrationWarning>
             ${entry.price.toFixed(2)}
           </span>
           {/* Fixed width keeps the percent column (and thus the prices) aligned across rows */}
           <span
             className={clsx(
               'text-xs font-medium tabular-nums w-14 text-right',
-              positive ? 'text-green-600' : 'text-red-600',
+              positive ? 'text-green-800' : 'text-red-700',
             )}
+            suppressHydrationWarning
           >
             {positive ? '+' : ''}
             {entry.changePercent.toFixed(2)}%
@@ -40,11 +46,14 @@ function MoverRow({ entry, rank }: { entry: MoverEntry; rank: number }): React.J
   );
 }
 
+// Locale is pinned explicitly (not `undefined`, i.e. runtime default) — the
+// server (Node) and client (browser) can resolve different default locales,
+// which is one of React's documented hydration-mismatch causes.
 function formatLastUpdated(iso: string | undefined): string {
   if (!iso) return '';
   const d = new Date(iso);
-  const date = d.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
-  const time = d.toLocaleTimeString(undefined, {
+  const date = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  const time = d.toLocaleTimeString('en-GB', {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
@@ -68,7 +77,7 @@ export function MoversCard(): React.JSX.Element {
   return (
     <div className="space-y-1">
       {lastUpdated && (
-        <p className="text-xs text-gray-400 text-right pr-1">
+        <p className="text-xs text-gray-500 text-right pr-1">
           <span className="font-medium text-gray-500">Updated:</span> {lastUpdated}
         </p>
       )}
