@@ -472,6 +472,22 @@ jobs:
           TURBO_TEAM: yana-stocks
         run: pnpm turbo run build --output-logs=new-only
 
+      # apps/frontend/next.config.mjs sets output:'standalone' (needed for the
+      # Dockerfile's prod image), but Next.js doesn't support running that
+      # build via `next start` — it prints "next start does not work with
+      # output: standalone" and the server throws on real requests. The
+      # Dockerfile already runs the correct entrypoint (node apps/frontend/
+      # server.js); this mirrors that same COPY + start pattern for e2e so
+      # this job exercises the same code path prod actually runs, instead of
+      # an unsupported one that happens to boot far enough to pass a health
+      # check before crashing on the first real page render.
+      - name: Assemble frontend standalone server
+        run: |
+          cp -r apps/frontend/.next/static apps/frontend/.next/standalone/apps/frontend/.next/static
+          if [ -d apps/frontend/public ]; then
+            cp -r apps/frontend/public apps/frontend/.next/standalone/public
+          fi
+
       - name: Write service .env files
         run: |
           printf '%s\n' \
@@ -526,7 +542,7 @@ jobs:
           pnpm --filter @yana-stocks/portfolio-service start > logs/portfolio-service.log 2>&1 &
           pnpm --filter @yana-stocks/portfolio-api     start > logs/portfolio-api.log     2>&1 &
           pnpm --filter @yana-stocks/profile-service   start > logs/profile-service.log   2>&1 &
-          pnpm --filter @yana-stocks/frontend          start > logs/frontend.log          2>&1 &
+          PORT=3000 HOSTNAME=0.0.0.0 node apps/frontend/.next/standalone/apps/frontend/server.js > logs/frontend.log 2>&1 &
 
       - name: Wait for all services to be ready
         run: |

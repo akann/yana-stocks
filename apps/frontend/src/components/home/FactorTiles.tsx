@@ -39,7 +39,7 @@ function pctClass(n: number): string {
 export function FactorTiles(): React.JSX.Element {
   const [tf, setTf] = useState<Timeframe>('1d');
 
-  const { data = [], isLoading } = useQuery<FactorTile[]>({
+  const { data, isLoading } = useQuery<FactorTile[]>({
     queryKey: ['factors'],
     queryFn: () => api.get<FactorTile[]>('/market/factors').then((r) => r.data),
     staleTime: 15 * 60 * 1000,
@@ -47,7 +47,13 @@ export function FactorTiles(): React.JSX.Element {
 
   const primaryKey = changeKey(tf);
 
-  const sorted = [...data].sort((a, b) => (b[primaryKey] as number) - (a[primaryKey] as number));
+  // `data` can be `null` (not just `undefined`) when the server-side SSR
+  // prefetch in src/app/page.tsx fails — fetchPublicMarketData() resolves to
+  // null rather than throwing, and a default-value destructure only covers
+  // `undefined`, not `null`.
+  const sorted = [...(data ?? [])].sort(
+    (a, b) => (b[primaryKey] as number) - (a[primaryKey] as number),
+  );
 
   return (
     <div>
