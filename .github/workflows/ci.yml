@@ -570,8 +570,25 @@ jobs:
           for pid in "${pids[@]}"; do wait "$pid" || rc=$?; done
           exit $rc
 
+      # chrome-version: stable below downloads Google Chrome's actual .deb
+      # package and unpacks it with `ar` (how .deb archives work) — `ar`
+      # (part of binutils) isn't in this runner's minimal image, so install
+      # it first. Harmless/no-op once binutils is already present.
+      - name: Ensure ar is available (needed to unpack Chrome's .deb)
+        run: |
+          command -v ar >/dev/null || {
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends binutils >/dev/null
+          }
+
       - name: Setup Chrome for Lighthouse
         id: setup-chrome
+        # Non-blocking, matching the Lighthouse step below: this failed hard
+        # once already (see git history) and took the whole e2e-tests job
+        # down with it, which is exactly the blast radius this whole section
+        # is meant to avoid — a Chrome/Chromium install hiccup here should
+        # never block e2e tests or deploy.
+        continue-on-error: true
         uses: browser-actions/setup-chrome@v1
         with:
           # "latest" (the default) pulls a raw, unvetted Chromium continuous-
