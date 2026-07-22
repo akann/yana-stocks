@@ -1,15 +1,29 @@
 'use client';
 
 import React, { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { IndicesBar } from '@/components/home/IndicesBar';
 import { SectorRotationHeatmap } from '@/components/home/SectorRotationHeatmap';
 import { MarketNews } from '@/components/home/MarketNews';
-import { StockScreener } from '@/components/home/StockScreener';
 import { MoversCard } from '@/components/market/MoversCard';
-import { MarketBrowser } from '@/components/market/MarketBrowser';
 import { FactorTiles } from '@/components/home/FactorTiles';
 import { useAuth } from '@/context/AuthContext';
 import type { AssetMarket } from '@/types';
+
+// Below-the-fold, single-tab-visible-at-a-time: code-split out of the main
+// homepage bundle so their JS (search/pagination logic, screener filters)
+// isn't parsed/executed until the user actually reaches this section.
+// (Confirmed via live testing this is NOT the source of an intermittent
+// hydration mismatch seen elsewhere on this page — reverting to static
+// imports made no difference, so this stays.)
+const MarketBrowser = dynamic(
+  () => import('@/components/market/MarketBrowser').then((m) => m.MarketBrowser),
+  { loading: () => <div className="animate-pulse bg-gray-100 rounded-xl h-96 mt-4" /> },
+);
+const StockScreener = dynamic(
+  () => import('@/components/home/StockScreener').then((m) => m.StockScreener),
+  { loading: () => <div className="animate-pulse bg-gray-100 rounded-xl h-96 mt-4" /> },
+);
 
 const BOTTOM_TABS = [
   { id: 'browser', label: 'Market Browser' },

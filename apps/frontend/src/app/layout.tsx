@@ -8,6 +8,19 @@ import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
+// Preconnect to Sentry's ingest origin (derived from the DSN, not hardcoded,
+// so it tracks the region/project automatically — see proxy.ts's CSP
+// connect-src for the same *.ingest.de.sentry.io region note).
+const sentryOrigin = (() => {
+  const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+  if (!dsn) return null;
+  try {
+    return new URL(dsn).origin;
+  } catch {
+    return null;
+  }
+})();
+
 // Every page must be dynamically rendered under the nonce-based CSP set in
 // proxy.ts — a statically prerendered page's <script> tags are baked at
 // build time, before proxy.ts ever runs, so they'd get no nonce and be
@@ -59,6 +72,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
   return (
     <html lang="en" className={inter.variable}>
       <body>
+        {sentryOrigin && <link rel="preconnect" href={sentryOrigin} crossOrigin="anonymous" />}
         <Providers>
           <CookieBanner />
           <Navbar />
