@@ -281,6 +281,113 @@ yana-stocks/
   added proactively, not because something broke. See
   `[[project_nextjs_csp_nonce_gotchas]]` memory for the full incident history
   across all four apps, including this `connect-src` regression.
+- **Real SSR + ISR-style data caching for the homepage** (2026-07-22):
+  `force-dynamic` on every route (above) only disables _static generation_ — it
+  doesn't stop server-side data fetching. `app/page.tsx` is now an async Server
+  Component that prefetches the homepage's above-the-fold **public** endpoints
+  (`market/overview`, `market/movers`, `market/factors`,
+  `market/sectors/rotation?index=sp500` — none behind `UserFromTokenGuard`)
+  server-side via `src/lib/server-api.ts`'s `fetchPublicMarketData()`, using
+  `fetch(..., { next: { revalidate } })` for Next's Data Cache (real ISR
+  semantics — shared, periodically-refreshed cache — even though the page itself
+  can't be statically generated), then hydrates a **per-request** `QueryClient`
+  (`dehydrate`/`HydrationBoundary`) so `IndicesBar`, `FactorTiles`,
+  `MoversCard`, and `SectorRotationHeatmap`'s default S&P 500 view render real
+  data in the initial HTML instead of a skeleton — verified by `curl`ing the
+  prod build with JS disabled and finding the market data already present in the
+  raw response. Never reuse the client-side `src/lib/ query-client.ts` singleton
+  for this — it's one instance for the whole Node.js server process, so
+  prefetching into it would leak one user's data into another's response.
+  `server-api.ts` resolves an absolute API origin itself (`NEXT_PUBLIC_API_URL`
+  in prod; falls back to hitting `PORTFOLIO_API_URL` directly in dev) because
+  server-side `fetch` — unlike the browser — doesn't have an implicit origin to
+  resolve `next.config.mjs`'s relative `/api/*` rewrites against.
+  `MarketBrowser`/`StockScreener` (the tabbed section below the fold, only one
+  visible at a time) are now `next/dynamic` imports to keep their JS out of the
+  homepage's main bundle. **Deliberately not done**: server-side auth redirects
+  for `/dashboard`/`/portfolio`/`/watchlist` — `AuthContext.tsx` keeps tokens
+  only in `sessionStorage`, which no Server Component or `proxy.ts` can read, so
+  this would need a real migration to httpOnly cookies first, not a rendering
+  change; still client-side `useEffect` + `router.replace('/login')`.
+- **Lighthouse CI** (2026-07-22, upgraded to a real server 2026-07-22):
+  `pnpm --filter @yana-stocks/frontend lighthouse`
+  (`apps/frontend/lighthouserc.json`, `@lhci/cli`) runs Lighthouse 3x against
+  `http://localhost:3000/` with the `desktop` preset (chosen over
+  mobile-throttled to reduce noise on the self-hosted runner's shared CPU, and
+  because this dashboard is realistically desktop-first). Wired into
+  `.github/workflows/ci.yml`'s `e2e-tests` job, right after "Wait for all
+  services to be ready" and before seeding/Playwright — measures the clean,
+  unseeded public homepage. Needs `browser-actions/setup-chrome@v1` first since
+  the self-hosted ARC runner has no browser installed (Playwright's cached
+  Chromium from the e2e steps isn't used — lhci needs a real Chrome/Chromium via
+  `CHROME_PATH`, not Playwright's managed binary). Assertions
+  (`categories:performance` ≥ 0.8, LCP ≤ 2500ms, CLS ≤ 0.1, TBT ≤ 300ms) are
+  `warn`-level, not `error` — intentionally non-blocking until there's a real
+  baseline of runs on this runner to know what's actual regression vs. CI noise;
+  tighten to `error` once that exists. Locally against a production build this
+  scored 97-100/100 performance, ~0.85-1.2s LCP, 0.000 CLS — confirms the
+  SSR/ISR change above is working, not just theoretically correct.
+  - **Real server, not filesystem/temporary-public-storage**: `upload.target` is
+    `"lhci"` pointing at a self-hosted server, `apps/lighthouse-ci` in
+    `k8s-apps` (`patrickhulce/lhci-server`, PVC+SQLite, no CNPG — see that
+    repo's CLAUDE.md), at `https://lighthouse.yanatech.co.uk/`. `filesystem`
+    (the original setup) can't post a GitHub commit status at all —
+    `runGithubStatusCheck` in `@lhci/cli`'s `upload.js` is only ever called from
+    the `lhci`/`temporary-public-storage` target branches, confirmed by reading
+    the source, not assumed — a token would've been a silent no-op under
+    `filesystem`. `temporary-public-storage` was rejected because it uploads
+    full HTML reports to a public, unauthenticated Google-hosted URL.
+  - **HTTP Basic Auth, not Authentik**: the server needs to be usable by both
+    CI's automated upload (no browser, can't do an SSO login flow) and a human
+    clicking the link Lighthouse CI posts on the commit status. `@lhci/server`
+    has basic auth built in for exactly this; Authentik's SSO flow doesn't
+    cleanly support a non-browser caller without extra per-path bypass config.
+    One shared credential (`LHCI_BASIC_AUTH_USERNAME`/ `PASSWORD` — both a
+    GitHub Actions secret _and_ the k8s-apps Infisical
+    `/lighthouse-ci/BASIC_AUTH_USERNAME`+`PASSWORD`, kept in sync manually —
+    there's no bridge between the two secret stores) works for both. **TODO,
+    revisit**: switch to a split-Ingress setup — one Ingress for `/v1/*` (LHCI's
+    API, all CI actually calls) with no auth annotations, a second for
+    everything else (`/app/*`, the UI) with the normal Authentik outpost
+    annotations (same 5-step pattern as uptime-kuma). Gets per-user SSO + audit
+    trail for the human-facing dashboard, matching this cluster's usual
+    convention, while leaving CI's API calls ungated (the build token still
+    gates what CI can write). Needs an Authentik Provider/Application created
+    first — that's a manual step in Authentik's own admin console, not
+    scriptable from here.
+  - **Secrets are passed via `LHCI_UPLOAD__*` env vars** in the CI step, not
+    committed to `lighthouserc.json`: `LHCI_UPLOAD__TOKEN` (the LHCI project
+    build token, minted once via `POST /v1/projects` against the live server —
+    not re-creatable from git, if lost create a new project),
+    `LHCI_UPLOAD__BASIC_AUTH__USERNAME`/`PASSWORD`, `LHCI_UPLOAD__GITHUB_TOKEN`
+    (the built-in `secrets.GITHUB_TOKEN`, not `GH_PAT` — this only needs to
+    write a status to this same repo). The double-underscore nesting
+    (`LHCI_UPLOAD__BASIC_AUTH__USERNAME` → `upload.basicAuth.username`) is
+    `@lhci/cli`'s own env-var convention for `autorun`'s per-command option
+    merging — verified working locally against the real server before
+    committing, not assumed. The job also needs
+    `permissions: {contents: read, statuses: write}` (job-level permissions
+    replace, not merge with, the workflow-level `contents: read`) for the
+    status-check POST to not 403.
+  - `upload.ignoreDuplicateBuildFailure: true` — LHCI server keys a build by git
+    commit SHA; a second upload attempt for the same commit (e.g. a workflow
+    re-run) 422s otherwise. Confirmed this doesn't fail the overall
+    `pnpm test:lh` exit code even without the flag (`autorun`'s
+    `failOnUploadFailure` isn't set), but it's a clean, zero-cost fix for
+    exactly this case.
+  - **Known non-issue, extensively investigated 2026-07-22**: an intermittent
+    `Minified React error #418` (hydration mismatch) shows up in
+    `errors-in-console` specifically on Lighthouse's 2nd/3rd run within one
+    `numberOfRuns: 3` invocation (1st is always clean) — never once reproduced
+    across many manual repeated navigations in a real browser. Ruled out with
+    direct evidence, not guesses: live market data ticking (curled
+    `portfolio-api` 5x over 5s, byte-identical), `next/dynamic` on
+    `MarketBrowser`/`StockScreener` (reverted to static imports, rebuilt,
+    identical failure pattern), and Next's Data Cache serving stale SSR data
+    (diffed raw SSR HTML across cold/warm requests, byte-identical). Most likely
+    a client-side timing/scheduling sensitivity specific to Lighthouse's own
+    Chrome instance across repeated runs — not pursued further given it's
+    `warn`-level, doesn't affect real users, and doesn't move the actual scores.
 
 ### 9. api-docs (static nginx)
 
@@ -616,6 +723,23 @@ pnpm --filter @yana-stocks/profile-service dev    # :3007
 pnpm --filter @yana-stocks/portfolio-service dev  # :3005
 pnpm --filter @yana-stocks/portfolio-api dev      # :3006
 pnpm --filter @yana-stocks/frontend dev           # :3000
+
+# ...or, one terminal, everything `pnpm dev` starts except frontend runs
+# `next start` instead of `next dev` (added 2026-07-22 for realistic
+# Lighthouse runs — see the Lighthouse CI note below). Requires `pnpm build`
+# (or at least `pnpm --filter @yana-stocks/frontend build`) to have already
+# been run — `pnpm start` does not build for you, and is expected to be run
+# rarely, so this is intentionally not handled automatically. `pnpm dev`'s
+# backend half is `turbo run dev --filter=!frontend`, so it auto-includes
+# every service with a `dev` script (currently also price-processor, which
+# the manual list above omits) without needing to be kept in sync by hand.
+# Uses `concurrently` so Ctrl+C stops everything cleanly, same as `pnpm dev`.
+# Caveat: `next start`'s rewrites() intentionally returns `[]` in production
+# (real prod expects Kong as the API gateway — see the frontend's "Dev proxy"
+# note above) — with no Kong running locally, only the homepage's
+# server-prefetched public data works; every other page's client-side
+# `/api/*` calls 404 until Kong (or an equivalent local shim) is in front.
+pnpm build && pnpm start   # or just `pnpm start` if already built
 
 # 4. Run tests
 pnpm --filter @yana-stocks/auth-service test      # go test ./...

@@ -82,6 +82,9 @@ web_modules/
 out
 next-env.d.ts
 
+# Lighthouse CI reports
+.lighthouseci
+
 # Nuxt.js build / generate output
 .nuxt
 dist

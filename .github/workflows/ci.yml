@@ -363,6 +363,15 @@ jobs:
     runs-on: runners-yana-stocks
     needs: [changes, ts-quality, integration-tests]
     if: needs.changes.outputs.ts == 'true' || github.event.inputs.build_all == 'true'
+    # Job-level permissions replace the workflow-level `contents: read` above
+    # for this job, not merge with it — contents:read must be repeated here.
+    # statuses:write lets the Lighthouse step post a GitHub commit status
+    # (genuinely functional now that upload.target is "lhci", not
+    # "filesystem" — see the Lighthouse CI note in CLAUDE.md for why this
+    # was a no-op the first time it was tried).
+    permissions:
+      contents: read
+      statuses: write
     services:
       postgres:
         image: harbor.yanatech.co.uk/library/postgres:16-alpine
@@ -545,6 +554,19 @@ jobs:
           for pid in "${pids[@]}"; do wait "$pid" || rc=$?; done
           exit $rc
 
+      - name: Setup Chrome for Lighthouse
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Run Lighthouse CI against homepage
+        env:
+          CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+          LHCI_UPLOAD__TOKEN: ${{ secrets.LHCI_TOKEN }}
+          LHCI_UPLOAD__BASIC_AUTH__USERNAME: ${{ secrets.LHCI_BASIC_AUTH_USERNAME }}
+          LHCI_UPLOAD__BASIC_AUTH__PASSWORD: ${{ secrets.LHCI_BASIC_AUTH_PASSWORD }}
+          LHCI_UPLOAD__GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm test:lh
+
       - name: Seed test data
         run: pnpm seed
 
@@ -562,6 +584,14 @@ jobs:
           name: playwright-report
           path: apps/e2e/playwright-report/
           retention-days: 7
+
+      - name: Upload Lighthouse report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-report
+          path: apps/frontend/.lighthouseci/
+          retention-days: 14
 
       - name: Upload service logs
         uses: actions/upload-artifact@v4
