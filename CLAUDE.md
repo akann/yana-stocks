@@ -388,6 +388,29 @@ yana-stocks/
     a client-side timing/scheduling sensitivity specific to Lighthouse's own
     Chrome instance across repeated runs — not pursued further given it's
     `warn`-level, doesn't affect real users, and doesn't move the actual scores.
+  - **`pnpm audit`/Trivy CI gates, 2026-07-22**: pushing this work surfaced two
+    pre-existing, repo-wide gates that would have blocked _any_ push to `main`
+    right now, confirmed by re-running both against the commit this work
+    branched from (before any of it existed) — not caused by this work.
+    `pnpm-workspace.yaml`'s `auditConfig` now overrides `tmp`/`shell-quote`
+    (introduced by `@lhci/cli`/`concurrently`, genuinely new, fixed),
+    `brace-expansion`/`fast-uri` (pre-existing, safe leaf-utility overrides),
+    and ignore-lists `js-yaml`(v4, via eslint)/
+    `@opentelemetry/propagator-jaeger`(shared across 5 services)/`sharp`(Next's
+    image binary) as too risky to blind-override — each with its own documented
+    reason. **Real bug found doing this**: the field is
+    `auditConfig.ignoreGhsas`, not `ignoreCves` — silently renamed upstream in a
+    pnpm major; the repo's pre-existing `ignoreCves` entry never actually
+    suppressed anything (its one CVE happened to be below the
+    `--audit-level=high` gate, so nobody noticed). **Still open**: CI's separate
+    `trivy-image-scan` job doesn't read `pnpm-workspace.yaml` at all (needs its
+    own `.trivyignore` for the same 3 ignore-listed CVEs) and separately flags
+    unrelated pre-existing CVEs in `auth-service`'s `go.sum` (grpc) and
+    `ml-predictor`'s `uv.lock` (pillow) — decision on how to handle those
+    pending, see `project_yana_stocks_ci_security_gates_2026-07-22` memory for
+    full detail. `trivy-image-scan` runs before `docker`/`gitops` in the
+    workflow graph, so this failure mode never risks an actual bad deploy —
+    worst case CI just doesn't finish.
 
 ### 9. api-docs (static nginx)
 
