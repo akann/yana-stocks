@@ -41,7 +41,13 @@ RUN --mount=type=secret,id=sentry_auth_token \
 FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+# corepack's cached pnpm dist (from `corepack prepare --activate` in the base
+# stage, inherited here) vendors its own separate tar copy — untouched by the
+# npm upgrade in base and not needed at runtime (this stage only runs
+# `node server.js`, never pnpm). Deleted here, not in base, since deps/builder
+# still need it.
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs && \
+    rm -rf /root/.cache/node/corepack
 COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/frontend/.next/static ./apps/frontend/.next/static

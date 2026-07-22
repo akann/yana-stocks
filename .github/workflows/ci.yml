@@ -573,15 +573,28 @@ jobs:
       - name: Setup Chrome for Lighthouse
         id: setup-chrome
         uses: browser-actions/setup-chrome@v1
+        with:
+          # "latest" (the default) pulls a raw, unvetted Chromium continuous-
+          # build snapshot from chromium-browser-snapshots, not a tested
+          # release — the CHROME_INTERSTITIAL_ERROR flakiness noted below was
+          # traced to this. "stable" resolves an actual Chrome for Testing
+          # stable-channel build instead.
+          chrome-version: stable
 
       # Non-blocking: lighthouserc.json's assertions are warn-level already, so
       # the only way this step fails the job is an lhci infra hiccup (upload
-      # auth, the self-hosted server, or Chrome itself — e.g. the
-      # CHROME_INTERSTITIAL_ERROR flakiness seen in practice) — never a real
-      # perf regression. Shares this job's already-booted stack rather than
-      # get its own job (see the earlier design discussion), but a monitoring
-      # tool's own flakiness shouldn't block e2e tests or deploy the way a
-      # genuine e2e failure should.
+      # auth, the self-hosted server, or Chrome itself) — never a real perf
+      # regression. Shares this job's already-booted stack rather than get its
+      # own job (see the earlier design discussion), but a monitoring tool's
+      # own flakiness shouldn't block e2e tests or deploy the way a genuine
+      # e2e failure should. First real CI run hit CHROME_INTERSTITIAL_ERROR
+      # (Chrome's own chrome-error://chromewebdata/ page) on every attempt
+      # despite curl confirming the frontend was already serving — traced to
+      # the "latest" Chromium snapshot build above being an unvetted
+      # continuous-integration artifact, not a tested release; pinned to
+      # "stable" instead. lighthouserc.json also gained --no-sandbox
+      # --disable-dev-shm-usage defensively, since this runs in a k8s pod
+      # where /dev/shm is commonly undersized for headless Chrome.
       - name: Run Lighthouse CI against homepage
         continue-on-error: true
         env:

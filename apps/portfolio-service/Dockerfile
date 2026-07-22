@@ -45,7 +45,11 @@ COPY packages/shared-dto/package.json ./packages/shared-dto/
 COPY packages/kafka-client/package.json ./packages/kafka-client/
 COPY apps/portfolio-service/package.json ./apps/portfolio-service/
 
-RUN pnpm install --frozen-lockfile --prod --ignore-scripts
+# corepack's cached pnpm dist (downloaded on first pnpm invocation above)
+# vendors its own separate tar copy — untouched by the npm upgrade above and
+# not needed at runtime (nothing after this invokes pnpm again).
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts && \
+    rm -rf /root/.cache/node/corepack
 
 COPY --from=builder /app/packages/shared-types/dist ./packages/shared-types/dist
 COPY --from=builder /app/packages/shared-dto/dist ./packages/shared-dto/dist
