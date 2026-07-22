@@ -34,11 +34,44 @@ overrides:
   # GHSA-395f-4hp3-45gv: shell-quote quadratic-complexity DoS, pulled in by
   # concurrently. Fixed upstream.
   shell-quote: ^1.8.5
+  # GHSA-3jxr-9vmj-r5cp: brace-expansion DoS via exponential-time expansion,
+  # pulled in transitively across multiple apps (e.g.
+  # @opentelemetry/auto-instrumentations-node>...>rimraf>glob>minimatch>brace-expansion).
+  # Leaf utility, low risk to override globally. Fixed upstream.
+  brace-expansion: ^2.1.2
+  # GHSA-v2hh-gcrm-f6hx / GHSA-4c8g-83qw-93j6: fast-uri host-confusion
+  # vulnerabilities (literal backslash authority delimiter; failed IDN
+  # canonicalization), pulled in via
+  # @sentry/nextjs>@sentry/webpack-plugin>webpack>schema-utils>ajv>fast-uri.
+  # >=3.1.4 covers both fixes. Leaf utility within ajv's tolerated peer range
+  # (verified via `pnpm install` + a clean frontend build). Fixed upstream.
+  fast-uri: ^3.1.4
 
 # GHSA-h67p-54hq-rp68: js-yaml v3 DoS via merge key aliases (moderate).
 # @istanbuljs/load-nyc-config@1.1.0 (latest) requires js-yaml@^3.x — no v4 migration
 # from upstream. Cannot override to v4 (breaking API change). Dev-only dep (jest
 # coverage); not reachable in production. Accepted at --audit-level=high threshold.
+#
+# GHSA-52cp-r559-cp3m: js-yaml v4 line DoS via merge-key chains, pulled in via
+# eslint>@eslint/eslintrc>js-yaml (fix >=4.3.0). Not overridden: eslint's own
+# config loader may be pinned to a specific js-yaml major, and a blanket
+# override risks breaking lint entirely. Dev-only dep; not reachable in
+# production. Accepted at --audit-level=high threshold.
+#
+# GHSA-45rx-2jwx-cxfr: @opentelemetry/propagator-jaeger DoS via unhandled
+# exception on a malformed header (fix >=2.9.0). Deep in the OpenTelemetry SDK
+# bundle shared across auth-service, portfolio-api, portfolio-service,
+# price-processor, and profile-service — an override risks peer-dependency
+# mismatches across all of them, too broad a blast radius to force here.
+# Accepted at --audit-level=high threshold.
+#
+# GHSA-f88m-g3jw-g9cj: sharp inherited libvips CVEs (fix >=0.35.0). This is
+# Next.js's own image-optimization binary — a version bump changes the
+# underlying libvips build and needs real testing that image optimization
+# still works, not a silent override. Accepted at --audit-level=high threshold.
 auditConfig:
-  ignoreCves:
+  ignoreGhsas:
     - GHSA-h67p-54hq-rp68
+    - GHSA-52cp-r559-cp3m
+    - GHSA-45rx-2jwx-cxfr
+    - GHSA-f88m-g3jw-g9cj
