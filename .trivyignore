@@ -1,0 +1,20 @@
+# Trivy has its own ignore mechanism, separate from pnpm audit's
+# `pnpm-workspace.yaml` -> `auditConfig.ignoreGhsas`. These three entries
+# mirror decisions already made and documented there — same CVEs, same
+# reasoning, kept consistent across both scanners:
+#
+# CVE-2026-59892 (GHSA-45rx-2jwx-cxfr): @opentelemetry/propagator-jaeger DoS
+# via malformed HTTP header. Deep in the OpenTelemetry SDK bundle shared
+# across auth-service/portfolio-api/portfolio-service/price-processor/
+# profile-service; not overridden due to peer-dependency risk. Fix >=2.9.0.
+CVE-2026-59892
+
+# CVE-2026-59869 (GHSA-52cp-r559-cp3m): js-yaml v4 line DoS via merge-key
+# chains, pulled in via eslint>@eslint/eslintrc>js-yaml. Not overridden:
+# eslint's config loader may be pinned to a specific js-yaml major. Dev-only
+# dep, not reachable in production. Fix >=4.3.0.
+CVE-2026-59869
+
+# GHSA-f88m-g3jw-g9cj: sharp's bundled libvips carries CVE-2026-33327/33328/
+# 35590/35591. sharp is Next.js's image-processing binary; fix >=0.35.0.
+GHSA-f88m-g3jw-g9cj
