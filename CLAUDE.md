@@ -317,16 +317,17 @@ yana-stocks/
   because this dashboard is realistically desktop-first). Wired into
   `.github/workflows/ci.yml`'s `e2e-tests` job, right after "Wait for all
   services to be ready" and before seeding/Playwright — measures the clean,
-  unseeded public homepage. Needs `browser-actions/setup-chrome@v1` first since
-  the self-hosted ARC runner has no browser installed (Playwright's cached
-  Chromium from the e2e steps isn't used — lhci needs a real Chrome/Chromium via
-  `CHROME_PATH`, not Playwright's managed binary). Assertions
-  (`categories:performance` ≥ 0.8, LCP ≤ 2500ms, CLS ≤ 0.1, TBT ≤ 300ms) are
-  `warn`-level, not `error` — intentionally non-blocking until there's a real
-  baseline of runs on this runner to know what's actual regression vs. CI noise;
-  tighten to `error` once that exists. Locally against a production build this
-  scored 97-100/100 performance, ~0.85-1.2s LCP, 0.000 CLS — confirms the
-  SSR/ISR change above is working, not just theoretically correct.
+  unseeded public homepage. Needs a real Chrome installed first since the
+  self-hosted ARC runner has none (Playwright's cached Chromium from the e2e
+  steps isn't used — lhci needs a real Chrome/Chromium via `CHROME_PATH`, not
+  Playwright's managed binary) — see the CI gotcha below for how that's
+  installed and why. Assertions (`categories:performance` ≥ 0.8, LCP ≤ 2500ms,
+  CLS ≤ 0.1, TBT ≤ 300ms) are `warn`-level, not `error` — intentionally
+  non-blocking until there's a real baseline of runs on this runner to know
+  what's actual regression vs. CI noise; tighten to `error` once that exists.
+  Locally against a production build this scored 97-100/100 performance,
+  ~0.85-1.2s LCP, 0.000 CLS — confirms the SSR/ISR change above is working, not
+  just theoretically correct.
   - **Real server, not filesystem/temporary-public-storage**: `upload.target` is
     `"lhci"` pointing at a self-hosted server, `apps/lighthouse-ci` in
     `k8s-apps` (`patrickhulce/lhci-server`, PVC+SQLite, no CNPG — see that
@@ -411,6 +412,26 @@ yana-stocks/
     full detail. `trivy-image-scan` runs before `docker`/`gitops` in the
     workflow graph, so this failure mode never risks an actual bad deploy —
     worst case CI just doesn't finish.
+  - **Lighthouse's Chrome install, real-CI debugging saga, 2026-07-22**: first
+    real run hit `CHROME_INTERSTITIAL_ERROR` on every attempt despite curl
+    confirming the frontend was already serving — traced to
+    `browser-actions/setup-chrome@v1`'s default `chrome-version: latest`
+    silently pulling a raw, unvetted Chromium continuous-build snapshot from
+    `chromium-browser-snapshots`, not a tested release. Switching to
+    `chrome-version: stable` then failed hard (`ar: command not found` — that
+    path downloads Chrome's real `.deb` and manually unpacks it), which took the
+    whole `e2e-tests` job down since that step had no `continue-on-error` —
+    fixed both by adding it and installing `binutils`. The very next run failed
+    again one layer deeper (`tar` exit code 2 on the `.deb`'s inner archive —
+    this minimal runner image was also missing proper `xz`/`zstd` support for
+    `tar` to lean on). Rather than keep chasing that action's opaque unpacking
+    dependencies one CI cycle at a time, replaced it entirely with a direct apt
+    install of real `google-chrome-stable` (same conditional-install + apt
+    keyring pattern already proven for `docker-ce-cli` a few steps earlier in
+    this same job) — apt/dpkg handles a `.deb`'s internal compression correctly
+    by definition, sidestepping the whole class of failure. `CHROME_PATH` is now
+    the fixed `/usr/bin/google-chrome-stable` instead of a `steps.<id>.outputs`
+    value.
 
 ### 9. api-docs (static nginx)
 
@@ -693,6 +714,19 @@ services:
   anonymous pull rate limits on the self-hosted runner
 - **ESLint:** Frontend uses ESLint 9 with flat config (`eslint.config.mjs`);
   `eslint-config-next@16` requires ESLint ≥9
+- **Corepack's cached pnpm dist vendors its own `tar`, separate from npm's**
+  (2026-07-22): `trivy-image-scan`/`docker`'s Trivy scan flagged CVE-2026-59873
+  (node-tar CRITICAL) on all 5 Node-based images. First fix attempt
+  (`npm install -g npm@latest` in each final stage) only patched npm's own
+  bundled tar — Trivy confirmed that copy clean but kept failing, because a
+  second, unrelated tar copy ships inside corepack's cached pnpm distribution
+  (`root/.cache/node/corepack/v1/pnpm/<ver>/dist/node_modules/tar`, populated
+  the first time pnpm actually runs, or for `frontend` by its explicit
+  `corepack prepare --activate`). None of the shipped stages invoke pnpm at
+  runtime, so each Dockerfile now deletes that cache dir right after it's
+  populated, in the shipped stage only — never in build-only stages that still
+  need it (`frontend`'s `deps`/`builder` both run pnpm on top of the same `base`
+  image, so the deletion lives in `runner` alone).
 
 CI job pipeline (`.github/workflows/ci.yml`):
 

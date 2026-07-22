@@ -570,33 +570,32 @@ jobs:
           for pid in "${pids[@]}"; do wait "$pid" || rc=$?; done
           exit $rc
 
-      # chrome-version: stable below downloads Google Chrome's actual .deb
-      # package and unpacks it with `ar` (how .deb archives work) — `ar`
-      # (part of binutils) isn't in this runner's minimal image, so install
-      # it first. Harmless/no-op once binutils is already present.
-      - name: Ensure ar is available (needed to unpack Chrome's .deb)
-        run: |
-          command -v ar >/dev/null || {
-            sudo apt-get update -qq
-            sudo apt-get install -y --no-install-recommends binutils >/dev/null
-          }
-
-      - name: Setup Chrome for Lighthouse
-        id: setup-chrome
-        # Non-blocking, matching the Lighthouse step below: this failed hard
-        # once already (see git history) and took the whole e2e-tests job
-        # down with it, which is exactly the blast radius this whole section
-        # is meant to avoid — a Chrome/Chromium install hiccup here should
-        # never block e2e tests or deploy.
+      # browser-actions/setup-chrome@v1's "stable" path manually unpacks
+      # Google Chrome's .deb with ar + tar — burned two straight CI cycles on
+      # this minimal runner image missing what that unpacking needed (ar,
+      # then tar's .xz support), each invisible until hit, with no guarantee
+      # a third missing tool doesn't surface next. Installing Chrome directly
+      # via apt sidesteps that action's unpacking logic entirely: apt/dpkg
+      # already correctly handles a .deb's internal compression, whatever it
+      # is, since that's the actual job they're built for. Same
+      # conditional-install + apt keyring pattern already proven for
+      # docker-ce-cli above ("Wait for all services to be ready").
+      - name: Install Google Chrome (for Lighthouse)
+        # Non-blocking, matching the Lighthouse step below: a Chrome-install
+        # hiccup here should never block e2e tests or deploy the way this did
+        # once already (see git history) before continue-on-error was added.
         continue-on-error: true
-        uses: browser-actions/setup-chrome@v1
-        with:
-          # "latest" (the default) pulls a raw, unvetted Chromium continuous-
-          # build snapshot from chromium-browser-snapshots, not a tested
-          # release — the CHROME_INTERSTITIAL_ERROR flakiness noted below was
-          # traced to this. "stable" resolves an actual Chrome for Testing
-          # stable-channel build instead.
-          chrome-version: stable
+        run: |
+          if command -v google-chrome-stable >/dev/null; then
+            echo "google-chrome-stable already installed: $(google-chrome-stable --version)"
+            exit 0
+          fi
+          curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | \
+            sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | \
+            sudo tee /etc/apt/sources.list.d/google-chrome.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends google-chrome-stable >/dev/null
 
       # Non-blocking: lighthouserc.json's assertions are warn-level already, so
       # the only way this step fails the job is an lhci infra hiccup (upload
@@ -607,15 +606,16 @@ jobs:
       # e2e failure should. First real CI run hit CHROME_INTERSTITIAL_ERROR
       # (Chrome's own chrome-error://chromewebdata/ page) on every attempt
       # despite curl confirming the frontend was already serving — traced to
-      # the "latest" Chromium snapshot build above being an unvetted
-      # continuous-integration artifact, not a tested release; pinned to
-      # "stable" instead. lighthouserc.json also gained --no-sandbox
-      # --disable-dev-shm-usage defensively, since this runs in a k8s pod
-      # where /dev/shm is commonly undersized for headless Chrome.
+      # browser-actions/setup-chrome's "latest" being an unvetted Chromium
+      # continuous-build snapshot, not a tested release; replaced with a
+      # direct apt install of real Google Chrome stable above.
+      # lighthouserc.json also gained --no-sandbox --disable-dev-shm-usage
+      # defensively, since this runs in a k8s pod where /dev/shm is commonly
+      # undersized for headless Chrome.
       - name: Run Lighthouse CI against homepage
         continue-on-error: true
         env:
-          CHROME_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
+          CHROME_PATH: /usr/bin/google-chrome-stable
           LHCI_UPLOAD__TOKEN: ${{ secrets.LHCI_TOKEN }}
           LHCI_UPLOAD__BASIC_AUTH__USERNAME: ${{ secrets.LHCI_BASIC_AUTH_USERNAME }}
           LHCI_UPLOAD__BASIC_AUTH__PASSWORD: ${{ secrets.LHCI_BASIC_AUTH_PASSWORD }}
