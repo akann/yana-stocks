@@ -27,25 +27,36 @@ export default async function HomePage(): Promise<React.JSX.Element> {
   // the client fetches it post-hydration. `revalidate` gives each of these
   // ISR-style shared caching via Next's Data Cache. Query keys/endpoints must
   // match the corresponding useQuery calls exactly for hydration to work.
-  await Promise.all([
-    queryClient.prefetchQuery({
-      queryKey: ['market-overview'],
-      queryFn: () => fetchPublicMarketData<MarketOverview>('/market/overview', 300),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ['movers'],
-      queryFn: () => fetchPublicMarketData<MarketMovers>('/market/movers', 10),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ['factors'],
-      queryFn: () => fetchPublicMarketData<FactorTile[]>('/market/factors', 900),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ['sector-rotation', 'sp500'],
-      queryFn: () =>
-        fetchPublicMarketData<SectorRotationData>('/market/sectors/rotation?index=sp500', 3600),
-    }),
-  ]);
+  //
+  // Skipped entirely under E2E_TEST_MODE: this fetch runs server-side inside
+  // this Server Component, before the page ever reaches the browser —
+  // Playwright's page.route() only intercepts requests the browser makes, so
+  // it can't mock this call. Every homepage e2e test that sets up route()
+  // mocks would otherwise see real backend data instead of its fixtures.
+  // Skipping it here falls back to each widget's own client-side useQuery,
+  // which page.route() can intercept normally. Set by CI's "Start backend
+  // services" step and playwright.config.ts's webServer.env for local runs.
+  if (process.env.E2E_TEST_MODE !== 'true') {
+    await Promise.all([
+      queryClient.prefetchQuery({
+        queryKey: ['market-overview'],
+        queryFn: () => fetchPublicMarketData<MarketOverview>('/market/overview', 300),
+      }),
+      queryClient.prefetchQuery({
+        queryKey: ['movers'],
+        queryFn: () => fetchPublicMarketData<MarketMovers>('/market/movers', 10),
+      }),
+      queryClient.prefetchQuery({
+        queryKey: ['factors'],
+        queryFn: () => fetchPublicMarketData<FactorTile[]>('/market/factors', 900),
+      }),
+      queryClient.prefetchQuery({
+        queryKey: ['sector-rotation', 'sp500'],
+        queryFn: () =>
+          fetchPublicMarketData<SectorRotationData>('/market/sectors/rotation?index=sp500', 3600),
+      }),
+    ]);
+  }
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>

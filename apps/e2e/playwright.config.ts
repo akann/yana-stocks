@@ -14,6 +14,11 @@ export default defineConfig({
     reuseExistingServer: true,
     timeout: 60_000,
     cwd: '../..',
+    // See src/app/page.tsx — skips the homepage's server-side data prefetch,
+    // which page.route() mocks below can't intercept. CI starts the frontend
+    // itself (not via this webServer block, since reuseExistingServer finds
+    // it already running) and sets this same var in .github/workflows/ci.yml.
+    env: { E2E_TEST_MODE: 'true' },
   },
   use: {
     baseURL: process.env['BASE_URL'] ?? 'http://localhost:3000',
