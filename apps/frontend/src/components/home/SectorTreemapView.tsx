@@ -1,59 +1,11 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Treemap, ResponsiveContainer, Tooltip } from 'recharts';
 import { cellColor } from '@/lib/sectorColors';
-import type { MarketOverview, SectorRotationData } from '@/types';
-
-type Index = 'sp500' | 'ftse100';
-
-// Approximate market-cap weights by index (source: SPDR / iShares, rounded)
-const SP500_WEIGHTS: Record<string, number> = {
-  Technology: 29,
-  Financials: 13,
-  'Health Care': 12,
-  'Consumer Discretionary': 10,
-  Industrials: 9,
-  'Communication Services': 8,
-  'Consumer Staples': 6,
-  Energy: 4,
-  'Real Estate': 2.5,
-  Materials: 2.5,
-  Utilities: 2.5,
-};
-
-const FTSE_WEIGHTS: Record<string, number> = {
-  Financials: 18,
-  'Consumer Staples': 14,
-  'Health Care': 12,
-  Industrials: 11,
-  'Consumer Discretionary': 10,
-  Energy: 10,
-  Materials: 9,
-  'Communication Services': 5,
-  Technology: 4,
-  Utilities: 4,
-  'Real Estate': 3,
-};
-
-// Normalise rotation sector names to the weight-map names
-const ROTATION_TO_WEIGHT: Record<string, string> = {
-  'Consumer Disc.': 'Consumer Discretionary',
-  'Comm. Services': 'Communication Services',
-};
-
-function normSector(s: string): string {
-  return ROTATION_TO_WEIGHT[s] ?? s;
-}
+import type { TreemapItem } from '@/lib/sectorTreemapData';
 
 const CELL_GRAD_ID = 'cg-overlay';
-
-interface TreemapItem {
-  name: string;
-  value: number;
-  pct: number;
-  [key: string]: unknown;
-}
 
 interface ContentProps {
   x?: number;
@@ -177,46 +129,17 @@ function SectorTooltip({ active, payload }: TooltipProps): React.JSX.Element | n
   );
 }
 
-// Split into its own dynamically-imported chunk (see HomePageView.tsx) —
-// recharts + its transitive deps (d3-scale/d3-shape/d3-color, redux-toolkit,
+// Split into its own dynamically-imported chunk (see SectorRotationHeatmap.tsx)
+// — recharts + its transitive deps (d3-scale/d3-shape/d3-color, redux-toolkit,
 // immer, es-toolkit) are ~176 KiB of JS the homepage doesn't need until this
 // specific view actually renders with real data. Confirmed via
 // `next experimental-analyze` that recharts is imported nowhere else in the
-// app, so none of that weight has anywhere else to hide.
-export function TreemapView({
-  activeIndex,
-  rotationData,
-  overviewData,
-}: {
-  activeIndex: Index;
-  rotationData: SectorRotationData | undefined;
-  overviewData: MarketOverview | undefined;
-}): React.JSX.Element {
-  const weights = activeIndex === 'ftse100' ? FTSE_WEIGHTS : SP500_WEIGHTS;
-
-  const treeData = useMemo<TreemapItem[]>(() => {
-    const pctMap = new Map<string, number>();
-    if (rotationData?.rows.length && rotationData.dates.length) {
-      const lastIdx = rotationData.dates.length - 1;
-      for (const row of rotationData.rows) {
-        pctMap.set(normSector(row.sector), row.changes[lastIdx] ?? 0);
-      }
-    } else if (activeIndex === 'sp500' && overviewData?.sectors.length) {
-      for (const s of overviewData.sectors) {
-        pctMap.set(s.sector, s.changesPercentage);
-      }
-    }
-    return Object.entries(weights)
-      .map(([name, value]) => ({ name, value, pct: pctMap.get(name) ?? 0 }))
-      .sort((a, b) => b.value - a.value);
-  }, [activeIndex, rotationData, overviewData, weights]);
-
-  if (!treeData.some((d) => d.pct !== 0)) {
-    return (
-      <div className="h-64 flex items-center justify-center text-sm text-gray-500">No data</div>
-    );
-  }
-
+// app, so none of that weight has anywhere else to hide. The caller decides
+// whether there's anything to plot *before* mounting this component (see
+// computeSectorTreeData in @/lib/sectorTreemapData) — this component assumes
+// treeData is always non-empty, since a "no data" render still needs to
+// trigger loading this whole chunk if the decision were made in here instead.
+export function TreemapView({ treeData }: { treeData: TreemapItem[] }): React.JSX.Element {
   return (
     <ResponsiveContainer width="100%" height={256}>
       <Treemap data={treeData} dataKey="value" content={<CustomContent />}>
