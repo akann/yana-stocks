@@ -917,6 +917,21 @@ wheels = [
 ]
 
 [[package]]
+name = "opentelemetry-instrumentation-confluent-kafka"
+version = "0.65b0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-instrumentation" },
+    { name = "opentelemetry-semantic-conventions" },
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7a/d9/7f3bc64982b65f56163fe0161fd8c4bc2dfef2c52a19337d41326343de08/opentelemetry_instrumentation_confluent_kafka-0.65b0.tar.gz", hash = "sha256:48637af517ddf368c5d9589f71b3d78dae1a2fe7c026fc43c23307ab2d98ee52", size = 13089, upload-time = "2026-07-16T15:26:02.099Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/da/40/f1bf142a5c82592a6e40dcc09bf4a79ed472e6acfc0d6b463e42119c91b0/opentelemetry_instrumentation_confluent_kafka-0.65b0-py3-none-any.whl", hash = "sha256:aa92e49402b0dda65f8a24b2bf9d4558043309b9c0e494041616c479183748b2", size = 12858, upload-time = "2026-07-16T15:25:07.345Z" },
+]
+
+[[package]]
 name = "opentelemetry-instrumentation-pymongo"
 version = "0.65b0"
 source = { registry = "https://pypi.org/simple" }
@@ -1449,6 +1464,7 @@ dependencies = [
     { name = "confluent-kafka" },
     { name = "httpx" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-instrumentation-confluent-kafka" },
     { name = "opentelemetry-instrumentation-pymongo" },
     { name = "opentelemetry-sdk" },
     { name = "prometheus-client" },
@@ -1474,6 +1490,7 @@ requires-dist = [
     { name = "confluent-kafka", specifier = ">=2.6.0" },
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.42.1" },
+    { name = "opentelemetry-instrumentation-confluent-kafka", specifier = ">=0.65b0" },
     { name = "opentelemetry-instrumentation-pymongo", specifier = ">=0.63b1" },
     { name = "opentelemetry-sdk", specifier = ">=1.42.1" },
     { name = "prometheus-client", specifier = ">=0.25.0" },

@@ -7,9 +7,48 @@ import (
 	"time"
 
 	"github.com/segmentio/kafka-go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const topicUsersRegistered = "users.registered"
+
+// kafkaHeaderCarrier adapts kafka-go's []kafka.Header (a slice, not a map) to
+// propagation.TextMapCarrier so otel.GetTextMapPropagator().Inject can write a
+// W3C traceparent header onto an outgoing message. There's no official OTel
+// instrumentation package for segmentio/kafka-go (unlike kafkajs/confluent-kafka),
+// so this is hand-rolled — the consuming side just needs a standard
+// traceparent header, regardless of what produced it.
+type kafkaHeaderCarrier struct {
+	headers *[]kafka.Header
+}
+
+func (c kafkaHeaderCarrier) Get(key string) string {
+	for _, h := range *c.headers {
+		if h.Key == key {
+			return string(h.Value)
+		}
+	}
+	return ""
+}
+
+func (c kafkaHeaderCarrier) Set(key, value string) {
+	for i, h := range *c.headers {
+		if h.Key == key {
+			(*c.headers)[i].Value = []byte(value)
+			return
+		}
+	}
+	*c.headers = append(*c.headers, kafka.Header{Key: key, Value: []byte(value)})
+}
+
+func (c kafkaHeaderCarrier) Keys() []string {
+	keys := make([]string, len(*c.headers))
+	for i, h := range *c.headers {
+		keys[i] = h.Key
+	}
+	return keys
+}
 
 type UserRegisteredEvent struct {
 	UserID    string    `json:"userId"`
@@ -41,11 +80,25 @@ func (p *Publisher) PublishUserRegistered(ctx context.Context, userID, email str
 	if err != nil {
 		return err
 	}
-	return p.writer.WriteMessages(ctx, kafka.Message{
-		Topic: topicUsersRegistered,
-		Key:   []byte(userID),
-		Value: payload,
+
+	ctx, span := otel.Tracer("auth-service/kafka").Start(ctx, "send "+topicUsersRegistered,
+		trace.WithSpanKind(trace.SpanKindProducer),
+	)
+	defer span.End()
+
+	var headers []kafka.Header
+	otel.GetTextMapPropagator().Inject(ctx, kafkaHeaderCarrier{headers: &headers})
+
+	err = p.writer.WriteMessages(ctx, kafka.Message{
+		Topic:   topicUsersRegistered,
+		Key:     []byte(userID),
+		Value:   payload,
+		Headers: headers,
 	})
+	if err != nil {
+		span.RecordError(err)
+	}
+	return err
 }
 
 func (p *Publisher) Close() error {

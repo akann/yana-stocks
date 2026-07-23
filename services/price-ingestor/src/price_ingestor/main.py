@@ -48,6 +48,7 @@ def _configure_logging() -> None:
 def _configure_tracing() -> None:
     from opentelemetry import trace
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    from opentelemetry.instrumentation.confluent_kafka import ConfluentKafkaInstrumentor
     from opentelemetry.instrumentation.pymongo import PymongoInstrumentor
     from opentelemetry.sdk.resources import Resource
     from opentelemetry.sdk.trace import TracerProvider
@@ -60,6 +61,7 @@ def _configure_tracing() -> None:
     provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     trace.set_tracer_provider(provider)
     PymongoInstrumentor().instrument()
+    ConfluentKafkaInstrumentor().instrument()
 
 
 def run(settings: Settings) -> None:

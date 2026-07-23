@@ -49,7 +49,8 @@ yana-stocks/
 - Migrations: golang-migrate (runs at startup)
 - JWT: HS256, `iss: 'yana-stocks'`, 15min access token
 - Refresh tokens: opaque, Redis, 7d TTL, rotated on use
-- Kafka: Sarama — publishes `users.registered` event on registration
+- Kafka: `segmentio/kafka-go` — publishes `users.registered` event on
+  registration
 - Email: POSTs to `shared-services`' `email-api` (Kong, key-auth) — no longer
   talks to SMTP2GO directly
 
@@ -58,7 +59,9 @@ yana-stocks/
 - Framework: NestJS (latest)
 - MongoDB ORM: Mongoose via `@nestjs/mongoose`
 - Redis: ioredis
-- Kafka: KafkaJS via `@nestjs/microservices`
+- Kafka: plain `kafkajs` (each app's own
+  `kafka-consumer.service.ts`/`kafka-producer.service.ts` — not
+  `@nestjs/microservices`' `ClientKafka`)
 - Validation: `class-validator` + `class-transformer`
 - Auth: `@nestjs/jwt` + `@nestjs/passport`
 - Docs: `@nestjs/swagger`
@@ -552,14 +555,14 @@ yana-stocks/
 
 ## Kafka Topics
 
-| Topic                       | API version         | Partitions | Retention | Producer           | Consumer(s)                                                                                                                                                                                                                           |
-| --------------------------- | ------------------- | ---------- | --------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `users.registered`          | kafka.strimzi.io/v1 | 3          | 7d        | auth-service       | profile-service                                                                                                                                                                                                                       |
-| `stocks.prices.raw`         | kafka.strimzi.io/v1 | 3          | 24h       | price-ingestor     | price-processor                                                                                                                                                                                                                       |
-| `stocks.prices.processed`   | kafka.strimzi.io/v1 | 3          | 7d        | price-processor    | ml-predictor, portfolio-api                                                                                                                                                                                                           |
-| `stocks.signals.sentiment`  | kafka.strimzi.io/v1 | 3          | 7d        | sentiment-analyzer | portfolio-api                                                                                                                                                                                                                         |
-| `stocks.signals.prediction` | kafka.strimzi.io/v1 | 3          | 7d        | ml-predictor       | portfolio-api                                                                                                                                                                                                                         |
-| `stocks.portfolio.events`   | kafka.strimzi.io/v1 | 3          | 30d       | portfolio-service  | none (verified 2026-07-23 — no consumer exists anywhere in the codebase; the table previously said `price-processor`, which was never actually true — `price-processor`'s Kafka consumer only ever subscribes to `stocks.prices.raw`) |
+| Topic                       | API version         | Partitions | Retention | Producer           | Consumer(s)                                                                                                                                                                                                                                                                               |
+| --------------------------- | ------------------- | ---------- | --------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users.registered`          | kafka.strimzi.io/v1 | 3          | 7d        | auth-service       | profile-service                                                                                                                                                                                                                                                                           |
+| `stocks.prices.raw`         | kafka.strimzi.io/v1 | 3          | 24h       | price-ingestor     | price-processor                                                                                                                                                                                                                                                                           |
+| `stocks.prices.processed`   | kafka.strimzi.io/v1 | 3          | 7d        | price-processor    | portfolio-api (verified 2026-07-23 — `ml-predictor` has no Kafka consumer anywhere in its code; it reads price history directly from the shared MongoDB, same as its own symbol-selection logic. The table previously said `ml-predictor, portfolio-api`, which was never actually true.) |
+| `stocks.signals.sentiment`  | kafka.strimzi.io/v1 | 3          | 7d        | sentiment-analyzer | portfolio-api                                                                                                                                                                                                                                                                             |
+| `stocks.signals.prediction` | kafka.strimzi.io/v1 | 3          | 7d        | ml-predictor       | portfolio-api                                                                                                                                                                                                                                                                             |
+| `stocks.portfolio.events`   | kafka.strimzi.io/v1 | 3          | 30d       | portfolio-service  | none (verified 2026-07-23 — no consumer exists anywhere in the codebase; the table previously said `price-processor`, which was never actually true — `price-processor`'s Kafka consumer only ever subscribes to `stocks.prices.raw`)                                                     |
 
 **Kafka broker:** `kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092`
 
@@ -1386,30 +1389,50 @@ runtime with missing `.so` errors.
 
 ## Known Gaps — Deferred, Not Bugs
 
-**Kafka trace continuity** (researched 2026-07-23, not implemented): a trace
-does not stay connected across a Kafka hop — e.g. `price-ingestor` publishing to
-`stocks.prices.raw` and `price-processor`'s consume are two separate traces in
-Tempo, unlike the HTTP path (fixed same day via `propagateTraceparent: true` on
-the Sentry propagator — see auth-service's `instrument.ts` files). Researched
-whether to close this gap too; both required OTel instrumentation packages
-exist, are official, and are actively maintained:
-`@opentelemetry/instrumentation-kafkajs` (official
-`open-telemetry/opentelemetry-js-contrib`, supports `kafkajs >=0.3.0 <3` — this
-repo pins `^2.2.4`, in range) for the Node services, and
-`opentelemetry-instrumentation-confluent-kafka` (official
-`open-telemetry/opentelemetry-python-contrib`, Beta — same maturity tier as
-`opentelemetry-instrumentation-pymongo` already in use) for all three Python
-services, which uniformly use `confluent-kafka>=2.6.0`. Not yet built because
-it's a materially bigger change than the HTTP fix: Kafka instrumentation emits
-`Producer`/`Consumer`/`Client` span kinds per OTel's Messaging semantic
-conventions, not simple parent-child spans — a consumer span links back to the
-producer's trace via injected message headers rather than nesting inside it, so
-even once wired up it won't render in Tempo as a single unified span tree the
-way the HTTP case does. If picking this up, the package research is already done
-— go straight to instrumentation registration + end-to-end header-propagation
-verification (same method used for the HTTP propagator fix: capture actual
-headers, feed them into the other side's `extract()`, confirm the `trace_id`
-matches).
+**Kafka trace continuity** (closed 2026-07-23 — previously documented here as
+"researched, not implemented"; that turned out to be wrong on two of three
+legs). Re-investigating before building anything surfaced that the Node side was
+**already closed and nobody had noticed**:
+`@opentelemetry/auto-instrumentations-node@^0.77.0` (used by every NestJS app's
+`tracing.ts` via `getNodeAutoInstrumentations()`) bundles
+`@opentelemetry/instrumentation-kafkajs@^0.28.0` as a direct dependency, and
+none of the 4 apps ever disabled it (only `fs`/`dns`/`net` are disabled).
+Verified live with a standalone kafkajs producer/consumer against the local
+Redpanda broker: a `traceparent` header is injected on send, and the consumer
+span's `trace_id` matches the producer's exactly — this was true before any
+change in this pass.
+
+What was genuinely missing: the 3 Python services (`price-ingestor`,
+`sentiment-analyzer`, `ml-predictor` — all Kafka **producers only**, no consumer
+code exists in Python anywhere in this repo) had no Kafka instrumentation at
+all, and `auth-service` (which the tech-stack section previously and incorrectly
+said used Sarama — it actually uses `segmentio/kafka-go`) had none either. Both
+are now fixed:
+
+- **Python:** `opentelemetry-instrumentation-confluent-kafka` (official
+  `open-telemetry/opentelemetry-python-contrib`, same Beta maturity tier as
+  `opentelemetry-instrumentation-pymongo` already in use) added to all 3
+  services, with a single `ConfluentKafkaInstrumentor().instrument()` call in
+  each `_configure_tracing()`, right next to the existing
+  `PymongoInstrumentor()` call — no changes needed to any `kafka_producer.py`,
+  since `instrument()` patches the `confluent_kafka` module globally.
+- **Go:** no official OTel contrib package exists for `segmentio/kafka-go`
+  (unlike kafkajs/confluent-kafka), so `internal/kafka/publisher.go`'s
+  `PublishUserRegistered` hand-rolls a `Producer`-kind span and injects a W3C
+  `traceparent` via the already-correctly-configured global propagator
+  (`otel.GetTextMapPropagator().Inject(...)`, `tracing.go` already sets
+  `propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{})`)
+  into a small carrier adapting kafka-go's `[]kafka.Header` slice.
+
+Verified end-to-end for all 3 language pairs using the same method as the HTTP
+propagator fix (capture actual headers, feed them through the real consumer's
+`extract()`, confirm `trace_id` matches) against the local Redpanda broker:
+Python `price-ingestor` → Node `price-processor` (`stocks.prices.raw`), Go
+`auth-service` → Node `profile-service` (`users.registered`), and Node → Node
+generally (`price-processor`-style producer → `portfolio-api`-style consumer).
+All three showed a single matching `trace_id` across the producer and consumer
+span. This gap is fully closed — no remaining language or service is
+uninstrumented for Kafka trace propagation.
 
 ## Feature Implementation Progress
 
