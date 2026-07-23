@@ -16,10 +16,27 @@ class PredictionStorage:
     def __init__(self, uri: str) -> None:
         client: MongoClient[dict[str, Any]] = MongoClient(uri)
         db_name = uri.rsplit("/", 1)[-1].split("?")[0] or "prices"
-        db = client[db_name]
-        self._price_bars: Collection[dict[str, Any]] = db["price_bars"]
-        self._predictions: Collection[dict[str, Any]] = db["predictions"]
+        self._db = client[db_name]
+        self._price_bars: Collection[dict[str, Any]] = self._db["price_bars"]
+        self._predictions: Collection[dict[str, Any]] = self._db["predictions"]
         self._ensure_indexes()
+
+    def get_user_tracked_symbols(self) -> set[str]:
+        """Symbols any user actually holds or watches.
+
+        Reads the portfolio-service-owned `portfolios`/`watchlists`
+        collections directly (both live in this same shared `yana_stocks`
+        database, confirmed against the prod MONGODB_URI for both services)
+        rather than via a new HTTP endpoint — no schema contract beyond the
+        two field names below, which are stable.
+        """
+        portfolio_symbols = self._db["portfolios"].distinct("stocks.symbol")
+        watchlist_symbols = self._db["watchlists"].distinct("symbols")
+        return {
+            s.strip().upper()
+            for s in (*portfolio_symbols, *watchlist_symbols)
+            if isinstance(s, str) and s.strip()
+        }
 
     def _ensure_indexes(self) -> None:
         self._predictions.create_index(

@@ -135,6 +135,15 @@ yana-stocks/
 - **MinIO:** Store trained model artifacts (`yana-stocks-models` bucket)
 - **Pattern:** Argo Rollouts canary (10%→50%→100% on new model version)
 - **REST:** `/api/predict/:symbol`
+- **Symbol coverage (2026-07-23):** same fix as sentiment-analyzer's — tracked
+  symbols = `DEFAULT_SYMBOLS` baseline (~30 tickers across sectors, `config.py`)
+  unioned with whatever any user actually holds/watches (read directly from the
+  shared `yana_stocks` Mongo's `portfolios`/`watchlists` collections, confirmed
+  same `MONGODB_URI` as portfolio-service). No rotation/budget cap needed here
+  unlike sentiment-analyzer — training reads our own already-collected price
+  history, not a rate-limited external API, so the only cost is our own compute,
+  which comfortably trains this many small Prophet models within the hourly
+  refresh interval.
 
 ### 5. auth-service (Go)
 
@@ -1097,11 +1106,12 @@ MAX_SYMBOLS_PER_POLL=10              # optional, default 10 — see service note
 
 ```shell
 KAFKA_BROKERS=...
-MONGODB_URI=mongodb://...
+MONGODB_URI=mongodb://...            # same shared yana_stocks DB as portfolio-service
 MINIO_ENDPOINT=minio.minio.svc.cluster.local:9000
 MINIO_ACCESS_KEY=...
 MINIO_SECRET_KEY=...
 MINIO_BUCKET=yana-stocks-models
+SYMBOLS=AAPL,GOOGL,...               # optional, overrides DEFAULT_SYMBOLS baseline
 ```
 
 ### frontend

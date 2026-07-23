@@ -30,8 +30,8 @@ class PredictorService:
         self._models: dict[str, Prophet] = {}
 
     def initialize(self) -> None:
-        """Load or train models for all configured symbols."""
-        for symbol in self._settings.symbols:
+        """Load or train models for all tracked symbols."""
+        for symbol in self._tracked_symbols():
             model = self._load_or_train(symbol)
             if model is not None:
                 self._models[symbol] = model
@@ -39,7 +39,7 @@ class PredictorService:
 
     def refresh_all(self) -> None:
         """Retrain models and refresh predictions. Called by the scheduler."""
-        for symbol in self._settings.symbols:
+        for symbol in self._tracked_symbols():
             try:
                 model = self._load_or_train(symbol, force_train=True)
                 if model is not None:
@@ -47,6 +47,22 @@ class PredictorService:
                     self._run_predictions(symbol, model)
             except Exception as exc:
                 logger.error("Refresh failed for %s: %s", symbol, exc, exc_info=True)
+
+    def _tracked_symbols(self) -> list[str]:
+        """Baseline symbols plus whatever any user actually holds/watches.
+
+        Queried fresh each call (not cached at construction) so a symbol
+        added to a portfolio/watchlist gets picked up on the next scheduled
+        refresh without requiring a pod restart.
+        """
+        try:
+            dynamic_symbols = self._storage.get_user_tracked_symbols()
+        except Exception as exc:
+            logger.warning("Failed to load user-tracked symbols, using baseline only: %s", exc)
+            dynamic_symbols = set()
+
+        baseline = self._settings.symbols
+        return [*sorted(dynamic_symbols), *(s for s in baseline if s not in dynamic_symbols)]
 
     def get_predictions(self, symbol: str) -> list[dict[str, Any]]:
         return self._storage.get_predictions(symbol.upper())
