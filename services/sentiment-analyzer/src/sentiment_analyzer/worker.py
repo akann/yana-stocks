@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime, timedelta
 
+import sentry_sdk
+
 from .analyzer import SentimentAnalyzer
 from .config import Settings
 from .fmp_news_client import FmpNewsClient, NewsApiError
@@ -102,6 +104,7 @@ def run(settings: Settings) -> None:
             articles = []
         except Exception as exc:
             logger.error("Unexpected error fetching news: %s", exc)
+            sentry_sdk.capture_exception(exc)
             articles = []
 
         for article in articles:
@@ -126,6 +129,7 @@ def run(settings: Settings) -> None:
                     result = analyzer.analyze(headline)
                 except Exception as exc:
                     logger.error("FinBERT error for article %s: %s", url, exc)
+                    sentry_sdk.capture_exception(exc)
                     articles_failed_total.inc()
                     continue
 

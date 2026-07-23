@@ -7,6 +7,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
+import sentry_sdk
 import uvicorn
 from fastapi import FastAPI, HTTPException
 
@@ -27,6 +28,7 @@ async def _refresh_loop() -> None:
             await asyncio.to_thread(_service.refresh_all)
         except Exception as exc:
             logger.error("Scheduled refresh failed: %s", exc, exc_info=True)
+            sentry_sdk.capture_exception(exc)
 
 
 @asynccontextmanager
@@ -90,14 +92,25 @@ def _configure_logging() -> None:
 
 
 def _configure_tracing() -> None:
+    import sentry_sdk
     from opentelemetry import trace
+    from opentelemetry.baggage.propagation import W3CBaggagePropagator
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
     from opentelemetry.instrumentation.confluent_kafka import ConfluentKafkaInstrumentor
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
     from opentelemetry.instrumentation.pymongo import PymongoInstrumentor
+    from opentelemetry.propagate import set_global_textmap
+    from opentelemetry.propagators.composite import CompositePropagator
     from opentelemetry.sdk.resources import Resource
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    from opentelemetry.trace.propagation.tracecontext import (
+        TraceContextTextMapPropagator,
+    )
+    from sentry_sdk.integrations.opentelemetry import (
+        SentryPropagator,
+        SentrySpanProcessor,
+    )
 
     resource = Resource.create({"service.name": os.environ.get("OTEL_SERVICE_NAME", "ml-predictor")})
     provider = TracerProvider(resource=resource)
@@ -106,6 +119,28 @@ def _configure_tracing() -> None:
     PymongoInstrumentor().instrument()
     ConfluentKafkaInstrumentor().instrument()
     FastAPIInstrumentor.instrument_app(app)
+
+    # Sentry: error capture only — see price-ingestor's main.py for the full
+    # rationale (instrumenter="otel"/traces_sample_rate=0 stop Sentry from
+    # creating competing spans; SentryPropagator must be composed alongside
+    # the default W3C propagators, never registered alone, or traceparent
+    # propagation to/from the Node services breaks silently).
+    sentry_sdk.init(
+        dsn=os.environ.get("SENTRY_DSN"),
+        environment=os.environ.get("NODE_ENV", "production"),
+        instrumenter="otel",
+        traces_sample_rate=0,
+    )
+    provider.add_span_processor(SentrySpanProcessor())
+    set_global_textmap(
+        CompositePropagator(
+            [
+                TraceContextTextMapPropagator(),
+                W3CBaggagePropagator(),
+                SentryPropagator(),
+            ]
+        )
+    )
 
 
 def main() -> None:

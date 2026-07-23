@@ -46,13 +46,24 @@ def _configure_logging() -> None:
 
 
 def _configure_tracing() -> None:
+    import sentry_sdk
     from opentelemetry import trace
+    from opentelemetry.baggage.propagation import W3CBaggagePropagator
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
     from opentelemetry.instrumentation.confluent_kafka import ConfluentKafkaInstrumentor
     from opentelemetry.instrumentation.pymongo import PymongoInstrumentor
+    from opentelemetry.propagate import set_global_textmap
+    from opentelemetry.propagators.composite import CompositePropagator
     from opentelemetry.sdk.resources import Resource
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    from opentelemetry.trace.propagation.tracecontext import (
+        TraceContextTextMapPropagator,
+    )
+    from sentry_sdk.integrations.opentelemetry import (
+        SentryPropagator,
+        SentrySpanProcessor,
+    )
 
     resource = Resource.create(
         {"service.name": os.environ.get("OTEL_SERVICE_NAME", "price-ingestor")}
@@ -62,6 +73,32 @@ def _configure_tracing() -> None:
     trace.set_tracer_provider(provider)
     PymongoInstrumentor().instrument()
     ConfluentKafkaInstrumentor().instrument()
+
+    # Sentry: error capture only, matching the NestJS services' convention —
+    # OTel/Tempo remains the sole tracer. instrumenter="otel" + traces_sample_rate=0
+    # together stop Sentry from creating its own competing/duplicated spans;
+    # SentrySpanProcessor bridges the *existing* OTel spans so a captured error
+    # still links to the active trace_id. SentryPropagator only understands
+    # Sentry's own sentry-trace/baggage headers, not the standard W3C
+    # traceparent header every other service in this system relies on — it
+    # must be composed alongside the existing default propagators, never
+    # registered alone, or cross-service trace propagation silently breaks.
+    sentry_sdk.init(
+        dsn=os.environ.get("SENTRY_DSN"),
+        environment=os.environ.get("NODE_ENV", "production"),
+        instrumenter="otel",
+        traces_sample_rate=0,
+    )
+    provider.add_span_processor(SentrySpanProcessor())
+    set_global_textmap(
+        CompositePropagator(
+            [
+                TraceContextTextMapPropagator(),
+                W3CBaggagePropagator(),
+                SentryPropagator(),
+            ]
+        )
+    )
 
 
 def run(settings: Settings) -> None:

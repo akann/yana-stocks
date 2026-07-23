@@ -14,6 +14,7 @@ import (
 	"github.com/akann/yana-stocks/auth-service/internal/db"
 	"github.com/akann/yana-stocks/auth-service/internal/email"
 	kafkapub "github.com/akann/yana-stocks/auth-service/internal/kafka"
+	"github.com/getsentry/sentry-go"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/pquerna/otp/totp"
@@ -74,12 +75,14 @@ func (s *AuthService) Register(ctx context.Context, emailAddr, password string) 
 	go func() {
 		if err := s.publisher.PublishUserRegistered(context.Background(), user.ID, user.Email); err != nil {
 			slog.Error("kafka publish users.registered failed", "error", err)
+			sentry.CaptureException(err)
 		}
 	}()
 
 	go func() {
 		if err := s.emailer.SendVerification(emailAddr, s.cfg.FrontendURL, token); err != nil {
 			slog.Error("verification email failed", "email", emailAddr, "error", err)
+			sentry.CaptureException(err)
 		}
 	}()
 
@@ -281,6 +284,7 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, emailAddr string
 	go func() {
 		if err := s.emailer.SendPasswordReset(emailAddr, s.cfg.FrontendURL, token); err != nil {
 			slog.Error("password reset email failed", "email", emailAddr, "error", err)
+			sentry.CaptureException(err)
 		} else {
 			slog.Info("password reset email sent", "email", emailAddr)
 		}

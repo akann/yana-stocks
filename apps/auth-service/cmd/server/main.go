@@ -22,6 +22,7 @@ import (
 	"github.com/akann/yana-stocks/auth-service/internal/config"
 	"github.com/akann/yana-stocks/auth-service/internal/db"
 	"github.com/akann/yana-stocks/auth-service/internal/email"
+	"github.com/akann/yana-stocks/auth-service/internal/errtrack"
 	"github.com/akann/yana-stocks/auth-service/internal/handler"
 	kafkapub "github.com/akann/yana-stocks/auth-service/internal/kafka"
 	"github.com/akann/yana-stocks/auth-service/internal/logging"
@@ -29,6 +30,8 @@ import (
 	"github.com/akann/yana-stocks/auth-service/internal/middleware"
 	"github.com/akann/yana-stocks/auth-service/internal/service"
 	"github.com/akann/yana-stocks/auth-service/internal/tracing"
+	"github.com/getsentry/sentry-go"
+	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
@@ -54,6 +57,12 @@ func main() {
 			slog.Error("otel shutdown failed", "error", err)
 		}
 	}()
+
+	// Error tracking (Sentry) — error capture only, see internal/errtrack
+	if err := errtrack.Setup(); err != nil {
+		slog.Error("sentry init failed", "error", err)
+	}
+	defer sentry.Flush(2 * time.Second)
 
 	// Database
 	if err := db.RunMigrations(cfg.DatabaseURL); err != nil {
@@ -94,6 +103,9 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(logging.RequestLogger)
 	r.Use(metrics.RequestMetrics)
+	// Repanic: true so the panic still reaches chimw.Recoverer below and
+	// produces the existing 500 response — this middleware only reports.
+	r.Use(sentryhttp.New(sentryhttp.Options{Repanic: true}).Handle)
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.RequestID)
 

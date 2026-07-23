@@ -4,6 +4,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
+import sentry_sdk
 from prophet import Prophet
 
 from . import predictor as pred
@@ -47,6 +48,7 @@ class PredictorService:
                     self._run_predictions(symbol, model)
             except Exception as exc:
                 logger.error("Refresh failed for %s: %s", symbol, exc, exc_info=True)
+                sentry_sdk.capture_exception(exc)
 
     def _tracked_symbols(self) -> list[str]:
         """Baseline symbols plus whatever any user actually holds/watches.
