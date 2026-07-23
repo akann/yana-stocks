@@ -432,6 +432,62 @@ yana-stocks/
     by definition, sidestepping the whole class of failure. `CHROME_PATH` is now
     the fixed `/usr/bin/google-chrome-stable` instead of a `steps.<id>.outputs`
     value.
+  - **LHCI upload secrets were never actually set, 2026-07-23**: despite the
+    upload code path being built and documented as working, `LHCI_TOKEN`/
+    `LHCI_BASIC_AUTH_USERNAME`/`LHCI_BASIC_AUTH_PASSWORD` didn't exist as GitHub
+    Actions secrets on this repo at all — every real CI run failed the upload
+    step with "Must provide token for LHCI target" (non-blocking,
+    `continue-on-error`, so silently doing nothing rather than failing loudly).
+    Fixed by locating the values in Infisical (`k8s-homelab` project,
+    `/lighthouse-ci/` folder — note the Infisical key names have **no** `LHCI_`
+    prefix, only the GitHub secret names do) and adding them via
+    `gh secret set`. First real end-to-end upload confirmed working same day:
+    reports land at `lighthouse.yanatech.co.uk`, GitHub commit status posts.
+  - **First real Lighthouse report surfaced 2 genuine findings** (both fixed
+    2026-07-23): a WCAG AA contrast failure (`text-gray-400` on white ≈ 2.85:1,
+    needs 4.5:1 — 3 occurrences in `SectorRotationHeatmap.tsx` fixed to
+    `text-gray-500` ≈ 4.83:1, matching the pattern `MarketNews`'s "No news
+    available" already used) and ~176 KiB of unused JS on the homepage. Root
+    cause of the second: `recharts` (imported nowhere else in the app, confirmed
+    via `next experimental-analyze` — installed as `@next/bundle-analyzer`,
+    wired in behind `ANALYZE=true`, zero cost otherwise; Turbopack builds aren't
+    compatible with it, use `next build --webpack` or
+    `next experimental-analyze` instead) plus its transitive deps
+    (`d3-scale`/`d3-shape`/`d3-color`, `redux-toolkit`, `immer`, `es-toolkit`)
+    were being loaded on every homepage request even when
+    `SectorRotationHeatmap` has nothing to plot (the CI scan's unseeded DB
+    state). **First fix attempt didn't actually work** — wrapping `TreemapView`
+    in `next/dynamic()` looked right and passed all local checks, but the very
+    next real Lighthouse run (checked via the LHCI server's own API,
+    `GET /v1/projects/{id}/builds/{id}/runs`, since the dashboard/compare UI
+    wasn't showing enough detail reliably) still showed ~174 KiB unused JS, just
+    under different chunk hashes. Root cause: `next/dynamic`'s default
+    `ssr:true` still emits a required `<script src=... async>` tag for the chunk
+    in every SSR response regardless of whether that branch renders at runtime —
+    Next's SSR pass conservatively includes any dynamically-imported module
+    reachable in the tree, since it can't statically know a client-side
+    data-dependent conditional (`view === 'today'`, the default) won't take that
+    branch. Real fix needed two changes together: the treemap-emptiness check
+    (`computeSectorTreeData`, recharts-free, moved to
+    `src/lib/sectorTreemapData.ts`) had to move to the _parent_
+    (`SectorRotationHeatmap`) so it runs _before_ deciding whether to mount
+    `<TreemapView>` at all — otherwise the "no data" render still lives inside
+    the dynamically-imported component and still triggers loading it — **and**
+    `ssr: false` on the `dynamic()` call itself, since `ssr:true`'s
+    conservative-inclusion behavior ignores runtime conditionals regardless of
+    where the emptiness check lives. Verified for real this time: built a
+    production server, ran it standalone with no backend (genuinely empty data),
+    curled the homepage HTML and grepped for the chunk containing
+    `redux-toolkit`/`immer`/`d3-scale` — zero matches; loaded it in a real
+    browser afterward and confirmed zero network requests for that chunk even
+    after hydration fully settles. **Trade-off accepted knowingly**: when there
+    IS real sector data, the treemap now needs a client-side round-trip to
+    hydrate instead of painting synchronously in the SSR HTML the way the rest
+    of the homepage's SSR/ISR-prefetched sections do (see the SSR/ISR note
+    above) — regresses that specific, previously-verified goal for this one
+    section, in exchange for the no-data case (what Lighthouse CI actually
+    measures, deliberately, per its own "clean, unseeded homepage" design note)
+    no longer loading ~273 KiB it never uses.
 
 ### 9. api-docs (static nginx)
 
