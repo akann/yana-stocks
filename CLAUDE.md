@@ -1384,6 +1384,33 @@ runtime with missing `.so` errors.
 | Dashboard "Total Portfolio Value" shows $0.00       | Holdings valued at `shares × latestPrice`, but `latestPrice` is only written by the `stocks.prices.processed` Kafka consumer — never populated when the price pipeline isn't streaming (local dev, market closed, fresh deploy)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | `portfolio-service` `toResponse()` falls back to `avgCostBasis` when `latestPrice` is unset (same rule the portfolio page applies client-side); `addStock` seeds `latestPrice` with the trade price                                                                                                                                                                                                                                                             |
 | No sentiment data on any stock page (2026-07-23)    | Two stacked bugs. (1) FMP deprecated `/api/v3/stock_news` (cutoff 2025-08-31) — 403 "Legacy Endpoint" for this subscription, silently caught as a `WARNING` every poll, so sentiment data went dark for all tracked symbols. (2) Separately, `sentiment-analyzer` only ever tracked a hardcoded 10-symbol list with no `SYMBOL_KEYWORDS`/`SYMBOLS` override in prod — any other symbol (e.g. XOM) was never fetched at all, independent of bug (1). Live-tested and rejected two fixes for (2): pure portfolio/watchlist-driven tracking (prod Mongo only holds typo'd tickers like `APPL`/`TESLA`, not real symbols like XOM) and batching multiple symbols into one FMP call (a 25-symbol batch returned FMP's 250-article cap skewed almost entirely to trending tickers — `PG`/`CRM`/`V` got zero, XOM got 1 — so batching was dropped as unreliable for coverage). | (1) `fmp_news_client.py` switched to `/stable/news/stock` + renamed `tickers`→`symbols` param. (2) Baseline widened to ~30 tickers across sectors (`DEFAULT_SYMBOLS`) unioned with real user portfolio/watchlist symbols (read directly from the shared Mongo), round-robined through `max_symbols_per_poll` (default 10) each cycle via `worker.select_symbols_for_poll` so daily FMP requests stay under the 250 free-tier limit regardless of universe size. |
 
+## Known Gaps — Deferred, Not Bugs
+
+**Kafka trace continuity** (researched 2026-07-23, not implemented): a trace
+does not stay connected across a Kafka hop — e.g. `price-ingestor` publishing to
+`stocks.prices.raw` and `price-processor`'s consume are two separate traces in
+Tempo, unlike the HTTP path (fixed same day via `propagateTraceparent: true` on
+the Sentry propagator — see auth-service's `instrument.ts` files). Researched
+whether to close this gap too; both required OTel instrumentation packages
+exist, are official, and are actively maintained:
+`@opentelemetry/instrumentation-kafkajs` (official
+`open-telemetry/opentelemetry-js-contrib`, supports `kafkajs >=0.3.0 <3` — this
+repo pins `^2.2.4`, in range) for the Node services, and
+`opentelemetry-instrumentation-confluent-kafka` (official
+`open-telemetry/opentelemetry-python-contrib`, Beta — same maturity tier as
+`opentelemetry-instrumentation-pymongo` already in use) for all three Python
+services, which uniformly use `confluent-kafka>=2.6.0`. Not yet built because
+it's a materially bigger change than the HTTP fix: Kafka instrumentation emits
+`Producer`/`Consumer`/`Client` span kinds per OTel's Messaging semantic
+conventions, not simple parent-child spans — a consumer span links back to the
+producer's trace via injected message headers rather than nesting inside it, so
+even once wired up it won't render in Tempo as a single unified span tree the
+way the HTTP case does. If picking this up, the package research is already done
+— go straight to instrumentation registration + end-to-end header-propagation
+verification (same method used for the HTTP propagator fix: capture actual
+headers, feed them into the other side's `extract()`, confirm the `trace_id`
+matches).
+
 ## Feature Implementation Progress
 
 See `FUTURE_PLAN.md` for the full feature implementation plan (Steps 0–15),
