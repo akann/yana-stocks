@@ -51,7 +51,7 @@ def test_fetch_sends_correct_params(mock_client_class: MagicMock) -> None:
     client.fetch_articles(["AAPL"], since)
 
     call_kwargs = mock_client.get.call_args
-    assert call_kwargs[1]["params"]["tickers"] == "AAPL"
+    assert call_kwargs[1]["params"]["symbols"] == "AAPL"
     assert call_kwargs[1]["params"]["apikey"] == "my-key"
     assert call_kwargs[1]["params"]["from"] == "2024-01-14"
 

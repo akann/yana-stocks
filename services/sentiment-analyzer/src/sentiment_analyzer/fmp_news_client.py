@@ -10,7 +10,7 @@ class NewsApiError(Exception):
 
 
 class FmpNewsClient:
-    _BASE_URL = "https://financialmodelingprep.com/api/v3/stock_news"
+    _BASE_URL = "https://financialmodelingprep.com/stable/news/stock"
 
     def __init__(self, api_key: str) -> None:
         self._client = httpx.Client(timeout=30)
@@ -25,7 +25,7 @@ class FmpNewsClient:
                 response = self._client.get(
                     self._BASE_URL,
                     params={
-                        "tickers": symbol,
+                        "symbols": symbol,
                         "limit": 50,
                         "from": from_date,
                         "apikey": self._api_key,
