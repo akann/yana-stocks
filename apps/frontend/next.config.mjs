@@ -1,4 +1,7 @@
 import { withSentryConfig } from '@sentry/nextjs';
+import withBundleAnalyzerInit from '@next/bundle-analyzer';
+
+const withBundleAnalyzer = withBundleAnalyzerInit({ enabled: process.env.ANALYZE === 'true' });
 
 /** @type {import('next').NextConfig} */
 const config = {
@@ -49,7 +52,7 @@ const config = {
   },
 };
 
-export default withSentryConfig(config, {
+export default withSentryConfig(withBundleAnalyzer(config), {
   org: 'yanatech-tech-limited',
   project: 'yana-stocks-frontend',
   authToken: process.env.SENTRY_AUTH_TOKEN,
