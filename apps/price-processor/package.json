@@ -79,7 +79,8 @@
       "!**/logger.ts",
       "!**/metrics.ts",
       "!**/metrics.controller.ts",
-      "!**/generate-openapi.ts"
+      "!**/generate-openapi.ts",
+      "!**/health.controller.ts"
     ],
     "coverageDirectory": "../coverage",
     "coverageReporters": [
@@ -89,7 +90,7 @@
     ],
     "coverageThreshold": {
       "global": {
-        "statements": 40
+        "statements": 42
       }
     },
     "testEnvironment": "node"

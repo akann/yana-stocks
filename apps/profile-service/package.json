@@ -77,12 +77,13 @@
       "!**/logger.ts",
       "!**/metrics.ts",
       "!**/metrics.controller.ts",
-      "!**/generate-openapi.ts"
+      "!**/generate-openapi.ts",
+      "!**/health.controller.ts"
     ],
     "coverageDirectory": "../coverage",
     "coverageThreshold": {
       "global": {
-        "statements": 25
+        "statements": 26
       }
     },
     "testEnvironment": "node"

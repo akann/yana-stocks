@@ -81,6 +81,7 @@
       "!**/config/configuration.ts",
       "!**/scripts/**",
       "!**/generate-openapi.ts",
+      "!**/health.controller.ts",
       "!**/tracing.ts",
       "!**/instrument.ts",
       "!**/logger.ts",
@@ -95,7 +96,7 @@
     ],
     "coverageThreshold": {
       "global": {
-        "statements": 85
+        "statements": 87
       }
     },
     "testEnvironment": "node"
