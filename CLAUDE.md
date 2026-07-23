@@ -204,12 +204,18 @@ yana-stocks/
 
 - **Purpose:** Portfolio and watchlist management, trade history
 - **MongoDB:** Portfolios, watchlists, trades
-- **Kafka consumer:** `stocks.prices.processed` (for portfolio valuation),
-  `users.registered`
+- **Kafka consumer:** `stocks.prices.processed` (for portfolio valuation). The
+  KEDA `ScaledObject` for this service also configures a `users.registered`
+  trigger, but the app never actually subscribes to that topic — verified
+  2026-07-23, no `consumer.subscribe()` call for it anywhere in
+  `kafka-consumer.service.ts`. Same "wired at the infra layer, never finished in
+  code" pattern as the unused `stocks.portfolio.events` producer below — the
+  KEDA trigger can't reflect real lag since nothing ever joins that consumer
+  group for that topic.
 - **Kafka producer:** `stocks.portfolio.events`
 - **Pattern:** KEDA ScaledObject (scale 1→3, triggers on
-  `stocks.prices.processed` + `users.registered` lag; min 1 — serves HTTP
-  traffic)
+  `stocks.prices.processed` lag + a `users.registered` trigger that isn't backed
+  by real consumption, see above; min 1 — serves HTTP traffic)
 - **Endpoints:**
   - `GET/POST /portfolios`
   - `GET/PUT/DELETE /portfolios/:id`
@@ -546,14 +552,14 @@ yana-stocks/
 
 ## Kafka Topics
 
-| Topic                       | API version         | Partitions | Retention | Producer           | Consumer(s)                 |
-| --------------------------- | ------------------- | ---------- | --------- | ------------------ | --------------------------- |
-| `users.registered`          | kafka.strimzi.io/v1 | 3          | 7d        | auth-service       | profile-service             |
-| `stocks.prices.raw`         | kafka.strimzi.io/v1 | 3          | 24h       | price-ingestor     | price-processor             |
-| `stocks.prices.processed`   | kafka.strimzi.io/v1 | 3          | 7d        | price-processor    | ml-predictor, portfolio-api |
-| `stocks.signals.sentiment`  | kafka.strimzi.io/v1 | 3          | 7d        | sentiment-analyzer | portfolio-api               |
-| `stocks.signals.prediction` | kafka.strimzi.io/v1 | 3          | 7d        | ml-predictor       | portfolio-api               |
-| `stocks.portfolio.events`   | kafka.strimzi.io/v1 | 3          | 30d       | portfolio-service  | price-processor             |
+| Topic                       | API version         | Partitions | Retention | Producer           | Consumer(s)                                                                                                                                                                                                                           |
+| --------------------------- | ------------------- | ---------- | --------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `users.registered`          | kafka.strimzi.io/v1 | 3          | 7d        | auth-service       | profile-service                                                                                                                                                                                                                       |
+| `stocks.prices.raw`         | kafka.strimzi.io/v1 | 3          | 24h       | price-ingestor     | price-processor                                                                                                                                                                                                                       |
+| `stocks.prices.processed`   | kafka.strimzi.io/v1 | 3          | 7d        | price-processor    | ml-predictor, portfolio-api                                                                                                                                                                                                           |
+| `stocks.signals.sentiment`  | kafka.strimzi.io/v1 | 3          | 7d        | sentiment-analyzer | portfolio-api                                                                                                                                                                                                                         |
+| `stocks.signals.prediction` | kafka.strimzi.io/v1 | 3          | 7d        | ml-predictor       | portfolio-api                                                                                                                                                                                                                         |
+| `stocks.portfolio.events`   | kafka.strimzi.io/v1 | 3          | 30d       | portfolio-service  | none (verified 2026-07-23 — no consumer exists anywhere in the codebase; the table previously said `price-processor`, which was never actually true — `price-processor`'s Kafka consumer only ever subscribes to `stocks.prices.raw`) |
 
 **Kafka broker:** `kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092`
 
