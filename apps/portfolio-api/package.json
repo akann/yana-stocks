@@ -81,7 +81,11 @@
       "!**/config/configuration.ts",
       "!**/scripts/**",
       "!**/generate-openapi.ts",
-      "!**/tracing.ts"
+      "!**/tracing.ts",
+      "!**/instrument.ts",
+      "!**/logger.ts",
+      "!**/metrics.ts",
+      "!**/metrics.controller.ts"
     ],
     "coverageDirectory": "../coverage",
     "coverageReporters": [
@@ -91,7 +95,7 @@
     ],
     "coverageThreshold": {
       "global": {
-        "statements": 80
+        "statements": 85
       }
     },
     "testEnvironment": "node"

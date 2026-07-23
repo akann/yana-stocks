@@ -71,12 +71,18 @@
       "!**/main.ts",
       "!**/*.module.ts",
       "!**/*.dto.ts",
-      "!**/*.schema.ts"
+      "!**/*.schema.ts",
+      "!**/instrument.ts",
+      "!**/tracing.ts",
+      "!**/logger.ts",
+      "!**/metrics.ts",
+      "!**/metrics.controller.ts",
+      "!**/generate-openapi.ts"
     ],
     "coverageDirectory": "../coverage",
     "coverageThreshold": {
       "global": {
-        "statements": 15
+        "statements": 25
       }
     },
     "testEnvironment": "node"
