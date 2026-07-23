@@ -204,18 +204,18 @@ yana-stocks/
 
 - **Purpose:** Portfolio and watchlist management, trade history
 - **MongoDB:** Portfolios, watchlists, trades
-- **Kafka consumer:** `stocks.prices.processed` (for portfolio valuation). The
-  KEDA `ScaledObject` for this service also configures a `users.registered`
-  trigger, but the app never actually subscribes to that topic — verified
-  2026-07-23, no `consumer.subscribe()` call for it anywhere in
-  `kafka-consumer.service.ts`. Same "wired at the infra layer, never finished in
-  code" pattern as the unused `stocks.portfolio.events` producer below — the
-  KEDA trigger can't reflect real lag since nothing ever joins that consumer
-  group for that topic.
+- **Kafka consumer:** `stocks.prices.processed` (for portfolio valuation) only.
+  The KEDA `ScaledObject` previously also had a `users.registered` trigger, but
+  the app never actually subscribed to that topic (no `consumer.subscribe()`
+  call anywhere in `kafka-consumer.service.ts`), so it could never reflect real
+  lag — removed 2026-07-23 rather than left as misleading infra. Same "wired at
+  the infra layer, never finished in code" shape as the unused
+  `stocks.portfolio.events` producer below, which stays in place for now (no
+  downstream consumer or feature to justify keeping it, but also nothing
+  actively misleading about a topic simply having no consumer).
 - **Kafka producer:** `stocks.portfolio.events`
 - **Pattern:** KEDA ScaledObject (scale 1→3, triggers on
-  `stocks.prices.processed` lag + a `users.registered` trigger that isn't backed
-  by real consumption, see above; min 1 — serves HTTP traffic)
+  `stocks.prices.processed` lag only; min 1 — serves HTTP traffic)
 - **Endpoints:**
   - `GET/POST /portfolios`
   - `GET/PUT/DELETE /portfolios/:id`
