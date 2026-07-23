@@ -15,6 +15,21 @@ from .models import RawPriceMessage
 logger = logging.getLogger(__name__)
 
 
+def _configure_logging() -> None:
+    from pythonjsonlogger.json import JsonFormatter
+
+    handler = logging.StreamHandler()
+    handler.setFormatter(
+        JsonFormatter(
+            "{asctime}{levelname}{name}{message}",
+            style="{",
+            rename_fields={"asctime": "timestamp", "levelname": "level", "name": "logger"},
+            static_fields={"service": "price-ingestor"},
+        )
+    )
+    logging.basicConfig(level=logging.INFO, handlers=[handler])
+
+
 def _configure_tracing() -> None:
     from opentelemetry import trace
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -89,10 +104,7 @@ def run(settings: Settings) -> None:
 
 
 def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-    )
+    _configure_logging()
     _configure_tracing()
     run(Settings())
 

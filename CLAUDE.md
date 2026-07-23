@@ -1030,7 +1030,13 @@ Key config decisions:
   `@ApiResponse`)
 - All Kafka messages typed via `shared-types`
 - Error handling: NestJS exception filters, structured error responses
-- Logging: NestJS built-in logger, structured JSON in production
+- Logging: structured JSON in production across all 8 backend services — a small
+  `logger.ts` implementing Nest's `LoggerService` per NestJS service (wired via
+  `app.useLogger()`), `log/slog`'s stdlib JSON handler in `auth-service` (Go),
+  `python-json-logger` in the 3 Python services. This was fixed 2026-07-23 —
+  NestJS's own default `ConsoleLogger` was never actually JSON (no
+  `nestjs-pino`, no custom logger existed anywhere), so the previous version of
+  this line was aspirational, not real.
 
 ## Environment Variables per Service
 

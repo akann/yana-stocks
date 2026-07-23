@@ -12,7 +12,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -24,6 +24,7 @@ import (
 	"github.com/akann/yana-stocks/auth-service/internal/email"
 	"github.com/akann/yana-stocks/auth-service/internal/handler"
 	kafkapub "github.com/akann/yana-stocks/auth-service/internal/kafka"
+	"github.com/akann/yana-stocks/auth-service/internal/logging"
 	"github.com/akann/yana-stocks/auth-service/internal/middleware"
 	"github.com/akann/yana-stocks/auth-service/internal/service"
 	"github.com/akann/yana-stocks/auth-service/internal/tracing"
@@ -37,6 +38,8 @@ import (
 func main() {
 	_ = godotenv.Load()
 
+	logging.Setup("auth-service")
+
 	cfg := config.Load()
 	ctx := context.Background()
 
@@ -46,18 +49,20 @@ func main() {
 		tracingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := shutdownTracing(tracingCtx); err != nil {
-			log.Printf("OTEL shutdown error: %v", err)
+			slog.Error("otel shutdown failed", "error", err)
 		}
 	}()
 
 	// Database
 	if err := db.RunMigrations(cfg.DatabaseURL); err != nil {
-		log.Fatalf("migration failed: %v", err)
+		slog.Error("migration failed", "error", err)
+		os.Exit(1)
 	}
 
 	pool, err := db.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("db connect failed: %v", err)
+		slog.Error("db connect failed", "error", err)
+		os.Exit(1)
 	}
 	defer pool.Close()
 
@@ -66,7 +71,8 @@ func main() {
 	// Redis
 	redisOpts, err := redis.ParseURL(cfg.RedisURL)
 	if err != nil {
-		log.Fatalf("redis URL parse failed: %v", err)
+		slog.Error("redis URL parse failed", "error", err)
+		os.Exit(1)
 	}
 	rdb := redis.NewClient(redisOpts)
 	defer rdb.Close()
@@ -84,7 +90,7 @@ func main() {
 
 	// Router
 	r := chi.NewRouter()
-	r.Use(chimw.Logger)
+	r.Use(logging.RequestLogger)
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.RequestID)
 
@@ -125,9 +131,10 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("auth-service listening on :%s", cfg.Port)
+		slog.Info("auth-service listening", "port", cfg.Port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server error: %v", err)
+			slog.Error("server error", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -138,5 +145,5 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	srv.Shutdown(shutdownCtx)
-	log.Println("auth-service stopped")
+	slog.Info("auth-service stopped")
 }

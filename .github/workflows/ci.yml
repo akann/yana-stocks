@@ -713,7 +713,7 @@ jobs:
         run: pnpm audit --audit-level=high
 
   # ─────────────────────────────────────────────────────────────────
-  # 9. Python quality (ruff + mypy — no pytest to avoid model downloads)
+  # 9. Python quality (ruff + mypy + pytest)
   #    Runs in parallel with integration-tests (independent of TS services)
   # ─────────────────────────────────────────────────────────────────
   python-quality:
@@ -747,6 +747,10 @@ jobs:
       - name: Mypy
         working-directory: ${{ matrix.service.path }}
         run: uv run mypy src/
+
+      - name: Unit tests (pytest)
+        working-directory: ${{ matrix.service.path }}
+        run: uv run pytest
 
   # ─────────────────────────────────────────────────────────────────
   # 10. Build and push Docker images  (main branch only)

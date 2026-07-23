@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -73,13 +73,13 @@ func (s *AuthService) Register(ctx context.Context, emailAddr, password string) 
 
 	go func() {
 		if err := s.publisher.PublishUserRegistered(context.Background(), user.ID, user.Email); err != nil {
-			log.Printf("kafka publish users.registered failed: %v", err)
+			slog.Error("kafka publish users.registered failed", "error", err)
 		}
 	}()
 
 	go func() {
 		if err := s.emailer.SendVerification(emailAddr, s.cfg.FrontendURL, token); err != nil {
-			log.Printf("verification email failed for %s: %v", emailAddr, err)
+			slog.Error("verification email failed", "email", emailAddr, "error", err)
 		}
 	}()
 
@@ -260,11 +260,11 @@ func (s *AuthService) signJWT(userID, emailAddr string) (string, error) {
 func (s *AuthService) RequestPasswordReset(ctx context.Context, emailAddr string) error {
 	user, err := s.queries.GetUserByEmail(ctx, emailAddr)
 	if err != nil {
-		log.Printf("password reset requested for unknown email: %s", emailAddr)
+		slog.Info("password reset requested for unknown email", "email", emailAddr)
 		return nil
 	}
 	if !user.IsVerified {
-		log.Printf("password reset requested for unverified email: %s", emailAddr)
+		slog.Info("password reset requested for unverified email", "email", emailAddr)
 		return nil
 	}
 
@@ -277,12 +277,12 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, emailAddr string
 		return err
 	}
 
-	log.Printf("password reset token issued for: %s", emailAddr)
+	slog.Info("password reset token issued", "email", emailAddr)
 	go func() {
 		if err := s.emailer.SendPasswordReset(emailAddr, s.cfg.FrontendURL, token); err != nil {
-			log.Printf("password reset email failed for %s: %v", emailAddr, err)
+			slog.Error("password reset email failed", "email", emailAddr, "error", err)
 		} else {
-			log.Printf("password reset email sent to: %s", emailAddr)
+			slog.Info("password reset email sent", "email", emailAddr)
 		}
 	}()
 
@@ -293,7 +293,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 	key := passwordResetKey(token)
 	userID, err := s.redis.Get(ctx, key).Result()
 	if err != nil {
-		log.Printf("password reset failed: invalid or expired token")
+		slog.Info("password reset failed: invalid or expired token")
 		return ErrInvalidToken
 	}
 
@@ -307,7 +307,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 	}
 
 	s.redis.Del(ctx, key)
-	log.Printf("password reset completed for user: %s", userID)
+	slog.Info("password reset completed", "user_id", userID)
 	return nil
 }
 
@@ -353,7 +353,7 @@ func (s *AuthService) VerifyAndEnableMFA(ctx context.Context, userID, code strin
 	}
 
 	s.redis.Del(ctx, mfaPendingKey(userID))
-	log.Printf("MFA enabled for user: %s", userID)
+	slog.Info("MFA enabled", "user_id", userID)
 	return nil
 }
 
@@ -361,7 +361,7 @@ func (s *AuthService) DisableMFA(ctx context.Context, userID string) error {
 	if err := s.queries.ClearMFA(ctx, userID); err != nil {
 		return err
 	}
-	log.Printf("MFA disabled for user: %s", userID)
+	slog.Info("MFA disabled", "user_id", userID)
 	return nil
 }
 
