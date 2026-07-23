@@ -32,6 +32,7 @@ dev = [
     "ruff>=0.9.0",
     "mypy>=1.14.0",
     "bandit>=1.9.0",
+    "pytest-cov>=7.1.0",
 ]
 
 [project.scripts]
@@ -71,3 +72,6 @@ disallow_untyped_defs = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["-ra", "--strict-markers", "-v"]
+
+[tool.coverage.report]
+fail_under = 35

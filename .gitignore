@@ -25,6 +25,9 @@ lib-cov
 coverage
 *.lcov
 
+# Go coverage profile (apps/auth-service test:cov)
+coverage.out
+
 # nyc test coverage
 .nyc_output
 
@@ -149,6 +152,8 @@ __pycache__/
 .venv/
 *.egg-info/
 .python-version
+.coverage
+htmlcov/
 .ruff_cache/
 .mypy_cache/
 

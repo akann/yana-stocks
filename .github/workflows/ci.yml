@@ -221,7 +221,7 @@ jobs:
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
           TURBO_TEAM: yana-stocks
         run: |
-          pnpm turbo run lint type-check test \
+          pnpm turbo run lint type-check test:cov \
             --filter='${{ steps.turbo-filter.outputs.filter }}' \
             --concurrency=4 \
             --output-logs=new-only
@@ -750,7 +750,7 @@ jobs:
 
       - name: Unit tests (pytest)
         working-directory: ${{ matrix.service.path }}
-        run: uv run pytest
+        run: uv run pytest --cov=src
 
   # ─────────────────────────────────────────────────────────────────
   # 10. Build and push Docker images  (main branch only)

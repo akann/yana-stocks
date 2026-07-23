@@ -7,6 +7,7 @@
     "format": "command -v gofmt >/dev/null 2>&1 && gofmt -w ./cmd ./internal || (echo 'Go not installed — skipping auth-service format' && exit 0)",
     "format:check": "command -v gofmt >/dev/null 2>&1 && test -z \"$(gofmt -l ./cmd ./internal)\" || (echo 'Go not installed — skipping auth-service format check' && exit 0)",
     "lint": "command -v go >/dev/null 2>&1 && go vet ./... || (echo 'Go not installed — skipping auth-service lint' && exit 0)",
-    "test": "command -v go >/dev/null 2>&1 && go test ./... || (echo 'Go not installed — skipping auth-service test' && exit 0)"
+    "test": "command -v go >/dev/null 2>&1 && go test ./... || (echo 'Go not installed — skipping auth-service test' && exit 0)",
+    "test:cov": "command -v go >/dev/null 2>&1 || { echo 'Go not installed — skipping auth-service test:cov'; exit 0; }; go test ./... -coverprofile=coverage.out && go tool cover -func=coverage.out | tail -1 | awk '{gsub(/%/,\"\",$3); if ($3+0 < 15) { print \"FAIL: coverage \" $3 \"% below 15% threshold\"; exit 1 } else { print \"OK: coverage \" $3 \"%\" } }'"
   }
 }

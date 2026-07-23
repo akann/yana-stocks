@@ -81,6 +81,11 @@
       "lcov",
       "html"
     ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 30
+      }
+    },
     "testEnvironment": "node"
   }
 }

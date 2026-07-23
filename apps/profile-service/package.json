@@ -74,6 +74,11 @@
       "!**/*.schema.ts"
     ],
     "coverageDirectory": "../coverage",
+    "coverageThreshold": {
+      "global": {
+        "statements": 15
+      }
+    },
     "testEnvironment": "node"
   }
 }
