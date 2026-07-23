@@ -5,8 +5,10 @@ import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 import { of } from 'rxjs';
 import { PortfolioProxyController } from './portfolio-proxy.controller';
+import { StocksService } from '../stocks/stocks.service';
 
 const mockRequest = jest.fn();
+const mockIsKnownSymbol = jest.fn();
 
 function mockRes() {
   const mock = { status: jest.fn(), json: jest.fn() };
@@ -23,6 +25,7 @@ describe('PortfolioProxyController', () => {
 
   beforeEach(async () => {
     mockRequest.mockReturnValue(of({ status: 200, data: [] }));
+    mockIsKnownSymbol.mockReset().mockResolvedValue(true);
     const module = await Test.createTestingModule({
       controllers: [PortfolioProxyController],
       providers: [
@@ -31,11 +34,13 @@ describe('PortfolioProxyController', () => {
           provide: ConfigService,
           useValue: { getOrThrow: jest.fn().mockReturnValue('http://portfolio:3000') },
         },
+        { provide: StocksService, useValue: { isKnownSymbol: mockIsKnownSymbol } },
       ],
     }).compile();
     controller = module.get(PortfolioProxyController);
     jest.clearAllMocks();
     mockRequest.mockReturnValue(of({ status: 200, data: [] }));
+    mockIsKnownSymbol.mockResolvedValue(true);
   });
 
   it('forwards GET /api/portfolio/portfolios → GET /portfolios on portfolio service', async () => {
@@ -94,5 +99,78 @@ describe('PortfolioProxyController', () => {
     );
     const callArgs = mockRequest.mock.calls[0]![0] as { headers: Record<string, string> };
     expect(callArgs.headers['authorization']).toBeUndefined();
+  });
+
+  describe('addStock', () => {
+    it('forwards to portfolio-service when the symbol is known', async () => {
+      const res = mockRes();
+      await controller.addStock(
+        { symbol: 'AAPL' },
+        req('POST', '/api/portfolio/portfolios/abc/stocks', { symbol: 'AAPL' }),
+        res as unknown as Response,
+        undefined,
+      );
+      expect(mockIsKnownSymbol).toHaveBeenCalledWith('AAPL');
+      expect(mockRequest).toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    it('rejects with 400 and never forwards when the symbol is unknown', async () => {
+      mockIsKnownSymbol.mockResolvedValue(false);
+      const res = mockRes();
+
+      await expect(
+        controller.addStock(
+          { symbol: 'APPL' },
+          req('POST', '/api/portfolio/portfolios/abc/stocks', { symbol: 'APPL' }),
+          res as unknown as Response,
+          undefined,
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(mockRequest).not.toHaveBeenCalled();
+    });
+
+    it('rejects with 400 when no symbol is provided', async () => {
+      const res = mockRes();
+      await expect(
+        controller.addStock(
+          {},
+          req('POST', '/api/portfolio/portfolios/abc/stocks', {}),
+          res as unknown as Response,
+          undefined,
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(mockIsKnownSymbol).not.toHaveBeenCalled();
+      expect(mockRequest).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('addWatchlistSymbol', () => {
+    it('forwards to portfolio-service when the symbol is known', async () => {
+      const res = mockRes();
+      await controller.addWatchlistSymbol(
+        { symbol: 'XOM' },
+        req('POST', '/api/portfolio/watchlists/abc/symbols', { symbol: 'XOM' }),
+        res as unknown as Response,
+        undefined,
+      );
+      expect(mockIsKnownSymbol).toHaveBeenCalledWith('XOM');
+      expect(mockRequest).toHaveBeenCalled();
+    });
+
+    it('rejects with 400 and never forwards when the symbol is unknown', async () => {
+      mockIsKnownSymbol.mockResolvedValue(false);
+      const res = mockRes();
+
+      await expect(
+        controller.addWatchlistSymbol(
+          { symbol: 'NOTREAL' },
+          req('POST', '/api/portfolio/watchlists/abc/symbols', { symbol: 'NOTREAL' }),
+          res as unknown as Response,
+          undefined,
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(mockRequest).not.toHaveBeenCalled();
+    });
   });
 });

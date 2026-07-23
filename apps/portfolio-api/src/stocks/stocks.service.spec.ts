@@ -401,6 +401,28 @@ describe('StocksService', () => {
     });
   });
 
+  describe('isKnownSymbol', () => {
+    it('returns true for a symbol present in the asset universe', async () => {
+      redis.get.mockResolvedValue(JSON.stringify(mockEquityAssets));
+      await expect(service.isKnownSymbol('AAPL')).resolves.toBe(true);
+    });
+
+    it('is case-insensitive', async () => {
+      redis.get.mockResolvedValue(JSON.stringify(mockEquityAssets));
+      await expect(service.isKnownSymbol('aapl')).resolves.toBe(true);
+    });
+
+    it('returns false for a typo not in the asset universe', async () => {
+      redis.get.mockResolvedValue(JSON.stringify(mockEquityAssets));
+      await expect(service.isKnownSymbol('APPL')).resolves.toBe(false);
+    });
+
+    it('returns false for an empty string without querying the asset universe', async () => {
+      await expect(service.isKnownSymbol('   ')).resolves.toBe(false);
+      expect(redis.get).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getAssets', () => {
     it('returns from Redis cache when present (us market)', async () => {
       redis.get.mockResolvedValue(JSON.stringify(mockEquityAssets));

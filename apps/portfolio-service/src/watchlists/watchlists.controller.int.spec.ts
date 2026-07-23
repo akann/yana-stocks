@@ -172,6 +172,15 @@ describe('WatchlistsController (integration)', () => {
       const unchanged = await watchlistModel.findById(doc._id).lean<Watchlist>().exec();
       expect(unchanged!.symbols).toEqual([]);
     });
+
+    it('returns 400 for a missing symbol', async () => {
+      const doc = await watchlistModel.create({ userId: USER_ID, name: 'Mine', symbols: [] });
+      await request(server)
+        .post(`/watchlists/${doc._id.toString()}/symbols`)
+        .set('Authorization', AUTH)
+        .send({})
+        .expect(400);
+    });
   });
 
   describe('DELETE /watchlists/:id/symbols/:symbol — cross-tenant isolation', () => {

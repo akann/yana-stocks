@@ -15,3 +15,11 @@ export class CreateWatchlistDto {
   @ArrayMaxSize(50)
   symbols?: string[];
 }
+
+export class AddWatchlistSymbolDto {
+  @ApiProperty({ example: 'AAPL' })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(10)
+  symbol!: string;
+}

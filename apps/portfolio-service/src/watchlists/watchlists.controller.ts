@@ -19,7 +19,7 @@ import {
 } from '@nestjs/swagger';
 import { NotFoundDto, UnauthorizedDto } from '@yana-stocks/shared-dto';
 import { UserFromTokenGuard } from '../common/current-user.decorator';
-import { CreateWatchlistDto } from './dto/create-watchlist.dto';
+import { AddWatchlistSymbolDto, CreateWatchlistDto } from './dto/create-watchlist.dto';
 import { Watchlist } from './schemas/watchlist.schema';
 import { WatchlistsService } from './watchlists.service';
 
@@ -76,8 +76,11 @@ export class WatchlistsController {
     description: 'Missing or invalid bearer token',
   })
   @ApiResponse({ status: 404, type: NotFoundDto, description: 'Watchlist not found' })
-  addSymbol(@Param('id') id: string, @Body('symbol') symbol: string): Promise<Watchlist> {
-    return this.watchlistsService.addSymbol(id, symbol);
+  addSymbol(
+    @Param('id') id: string,
+    @Body(ValidationPipe) dto: AddWatchlistSymbolDto,
+  ): Promise<Watchlist> {
+    return this.watchlistsService.addSymbol(id, dto.symbol);
   }
 
   @Delete(':id/symbols/:symbol')

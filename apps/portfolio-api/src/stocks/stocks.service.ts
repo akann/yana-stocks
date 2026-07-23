@@ -351,6 +351,24 @@ export class StocksService {
     return all;
   }
 
+  /**
+   * Whether `symbol` is a real, tradable ticker — checked against the same
+   * us/etf/uk asset universe (and Redis cache) that `market/assets` search
+   * already serves, so this never disagrees with what the add-stock/
+   * add-to-watchlist autocomplete actually offered the user.
+   */
+  async isKnownSymbol(symbol: string): Promise<boolean> {
+    const target = symbol.trim().toUpperCase();
+    if (!target) return false;
+
+    const [us, etf, uk] = await Promise.all([
+      this.loadMarketAssets('us'),
+      this.loadMarketAssets('etf'),
+      this.loadMarketAssets('uk'),
+    ]);
+    return [...us, ...etf, ...uk].some((a) => a.symbol.toUpperCase() === target);
+  }
+
   async getAssets(
     search: string,
     page: number,
