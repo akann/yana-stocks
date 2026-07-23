@@ -6,6 +6,7 @@ import { SentryModule, SentryGlobalFilter } from '@sentry/nestjs/setup';
 import configuration from './config/configuration';
 import { AuthProxyController } from './auth/auth-proxy.controller';
 import { HealthController } from './health.controller';
+import { MetricsController } from './metrics.controller';
 import { PortfolioProxyController } from './portfolio/portfolio-proxy.controller';
 import { PredictProxyController } from './predict/predict-proxy.controller';
 import { ProfileProxyController } from './profile/profile-proxy.controller';
@@ -32,6 +33,7 @@ import { StocksModule } from './stocks/stocks.module';
     AuthProxyController,
     ProfileProxyController,
     HealthController,
+    MetricsController,
     PortfolioProxyController,
     PredictProxyController,
   ],

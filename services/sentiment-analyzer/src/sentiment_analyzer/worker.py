@@ -7,6 +7,7 @@ from .analyzer import SentimentAnalyzer
 from .config import Settings
 from .fmp_news_client import FmpNewsClient, NewsApiError
 from .kafka_producer import KafkaProducer
+from .metrics import articles_failed_total, articles_processed_total
 from .storage import ArticleStorage
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,9 @@ def run(settings: Settings) -> None:
         nonlocal running
         logger.info("Received signal %d, shutting down", sig)
         running = False
+        from opentelemetry import trace
+
+        trace.get_tracer_provider().shutdown()  # type: ignore[attr-defined]
 
     signal.signal(signal.SIGTERM, _shutdown)
     signal.signal(signal.SIGINT, _shutdown)
@@ -109,6 +113,7 @@ def run(settings: Settings) -> None:
             if not storage.is_new(url):
                 continue
 
+            articles_processed_total.inc()
             analyzed_at = datetime.now(tz=UTC)
             published_at = FmpNewsClient.parse_published_at(article.get("created_at"))
 
@@ -121,6 +126,7 @@ def run(settings: Settings) -> None:
                     result = analyzer.analyze(headline)
                 except Exception as exc:
                     logger.error("FinBERT error for article %s: %s", url, exc)
+                    articles_failed_total.inc()
                     continue
 
                 storage.save(

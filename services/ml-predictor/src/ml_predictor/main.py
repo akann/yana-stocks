@@ -11,6 +11,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 
 from .config import Settings
+from .metrics import instrument as instrument_metrics
 from .service import PredictorService
 
 logger = logging.getLogger(__name__)
@@ -37,8 +38,13 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     task.cancel()
     await asyncio.gather(task, return_exceptions=True)
 
+    from opentelemetry import trace
+
+    await asyncio.to_thread(trace.get_tracer_provider().shutdown)  # type: ignore[attr-defined]
+
 
 app = FastAPI(title="ML Predictor", version="1.0.0", lifespan=lifespan)
+instrument_metrics(app)
 
 
 @app.get("/health")

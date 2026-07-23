@@ -2,6 +2,7 @@ import logging
 import os
 
 from .config import Settings
+from .metrics import configure_metrics
 from .worker import run
 
 
@@ -52,6 +53,7 @@ def _configure_tracing() -> None:
 def main() -> None:
     _configure_logging()
     _configure_tracing()
+    configure_metrics()
     run(Settings())  # type: ignore[call-arg]  # required fields populated from env vars
 
 

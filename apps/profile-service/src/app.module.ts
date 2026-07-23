@@ -6,6 +6,7 @@ import { SentryModule, SentryGlobalFilter } from '@sentry/nestjs/setup';
 import configuration from './config/configuration';
 import { HealthController } from './health.controller';
 import { KafkaModule } from './kafka/kafka.module';
+import { MetricsController } from './metrics.controller';
 import { ProfileModule } from './profile/profile.module';
 
 @Module({
@@ -21,7 +22,7 @@ import { ProfileModule } from './profile/profile.module';
     ProfileModule,
     KafkaModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, MetricsController],
   providers: [
     {
       provide: APP_FILTER,

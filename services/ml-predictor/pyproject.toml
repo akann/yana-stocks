@@ -19,6 +19,7 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi>=0.63b1",
     "opentelemetry-instrumentation-pymongo>=0.63b1",
     "python-json-logger>=4.1.0",
+    "prometheus-client>=0.25.0",
 ]
 
 [dependency-groups]

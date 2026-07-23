@@ -25,12 +25,14 @@ import (
 	"github.com/akann/yana-stocks/auth-service/internal/handler"
 	kafkapub "github.com/akann/yana-stocks/auth-service/internal/kafka"
 	"github.com/akann/yana-stocks/auth-service/internal/logging"
+	"github.com/akann/yana-stocks/auth-service/internal/metrics"
 	"github.com/akann/yana-stocks/auth-service/internal/middleware"
 	"github.com/akann/yana-stocks/auth-service/internal/service"
 	"github.com/akann/yana-stocks/auth-service/internal/tracing"
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
@@ -91,6 +93,7 @@ func main() {
 	// Router
 	r := chi.NewRouter()
 	r.Use(logging.RequestLogger)
+	r.Use(metrics.RequestMetrics)
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.RequestID)
 
@@ -98,6 +101,8 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))
 	})
+
+	r.Handle("/metrics", promhttp.Handler())
 
 	r.Route("/api/auth", func(r chi.Router) {
 		r.Post("/register", authHandler.Register)

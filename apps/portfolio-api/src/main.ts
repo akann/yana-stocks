@@ -4,10 +4,12 @@ import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { JsonLogger } from './logger';
+import { metricsMiddleware } from './metrics';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.useLogger(new JsonLogger('portfolio-api'));
+  app.use(metricsMiddleware);
   const config = app.get(ConfigService);
 
   const corsOrigin = config.get<string>('CORS_ORIGIN');
@@ -15,7 +17,7 @@ async function bootstrap(): Promise<void> {
     app.enableCors({ origin: corsOrigin, credentials: true });
   }
 
-  app.setGlobalPrefix('api', { exclude: ['health'] });
+  app.setGlobalPrefix('api', { exclude: ['health', 'metrics'] });
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Portfolio API')

@@ -5,6 +5,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { SentryModule, SentryGlobalFilter } from '@sentry/nestjs/setup';
 import configuration from './config/configuration';
 import { HealthController } from './health.controller';
+import { MetricsController } from './metrics.controller';
 import { PricesModule } from './prices/prices.module';
 
 @Module({
@@ -19,7 +20,7 @@ import { PricesModule } from './prices/prices.module';
     }),
     PricesModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, MetricsController],
   providers: [
     {
       provide: APP_FILTER,

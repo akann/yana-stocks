@@ -10,6 +10,7 @@ from polygon.websocket.models.models import EquityAgg
 
 from .config import Settings
 from .kafka_producer import KafkaProducer
+from .metrics import bars_published_total, configure_metrics
 from .models import RawPriceMessage
 
 logger = logging.getLogger(__name__)
@@ -78,6 +79,9 @@ def run(settings: Settings) -> None:
         nonlocal stopping
         logger.info("Received signal %d, shutting down", sig)
         stopping = True
+        from opentelemetry import trace
+
+        trace.get_tracer_provider().shutdown()  # type: ignore[attr-defined]
 
     signal.signal(signal.SIGTERM, _shutdown)
     signal.signal(signal.SIGINT, _shutdown)
@@ -103,6 +107,7 @@ def run(settings: Settings) -> None:
                 ).isoformat(),
             )
             producer.publish(bar)
+            bars_published_total.labels(symbol=bar.symbol).inc()
             logger.debug("Published bar: %s close=%.2f", bar.symbol, bar.close)
 
         producer.flush()
@@ -120,6 +125,7 @@ def run(settings: Settings) -> None:
 def main() -> None:
     _configure_logging()
     _configure_tracing()
+    configure_metrics()
     run(Settings())
 
 

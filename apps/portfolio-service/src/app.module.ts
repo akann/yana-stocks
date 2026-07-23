@@ -6,6 +6,7 @@ import { SentryModule, SentryGlobalFilter } from '@sentry/nestjs/setup';
 import configuration from './config/configuration';
 import { HealthController } from './health.controller';
 import { KafkaModule } from './kafka/kafka.module';
+import { MetricsController } from './metrics.controller';
 import { PortfoliosModule } from './portfolios/portfolios.module';
 import { TradesModule } from './trades/trades.module';
 import { WatchlistsModule } from './watchlists/watchlists.module';
@@ -25,7 +26,7 @@ import { WatchlistsModule } from './watchlists/watchlists.module';
     TradesModule,
     WatchlistsModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, MetricsController],
   providers: [
     {
       provide: APP_FILTER,
