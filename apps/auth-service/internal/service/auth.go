@@ -260,11 +260,11 @@ func (s *AuthService) signJWT(userID, emailAddr string) (string, error) {
 func (s *AuthService) RequestPasswordReset(ctx context.Context, emailAddr string) error {
 	user, err := s.queries.GetUserByEmail(ctx, emailAddr)
 	if err != nil {
-		slog.Info("password reset requested for unknown email", "email", emailAddr)
+		slog.InfoContext(ctx, "password reset requested for unknown email", "email", emailAddr)
 		return nil
 	}
 	if !user.IsVerified {
-		slog.Info("password reset requested for unverified email", "email", emailAddr)
+		slog.InfoContext(ctx, "password reset requested for unverified email", "email", emailAddr)
 		return nil
 	}
 
@@ -277,7 +277,7 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, emailAddr string
 		return err
 	}
 
-	slog.Info("password reset token issued", "email", emailAddr)
+	slog.InfoContext(ctx, "password reset token issued", "email", emailAddr)
 	go func() {
 		if err := s.emailer.SendPasswordReset(emailAddr, s.cfg.FrontendURL, token); err != nil {
 			slog.Error("password reset email failed", "email", emailAddr, "error", err)
@@ -293,7 +293,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 	key := passwordResetKey(token)
 	userID, err := s.redis.Get(ctx, key).Result()
 	if err != nil {
-		slog.Info("password reset failed: invalid or expired token")
+		slog.InfoContext(ctx, "password reset failed: invalid or expired token")
 		return ErrInvalidToken
 	}
 
@@ -307,7 +307,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, token, newPassword stri
 	}
 
 	s.redis.Del(ctx, key)
-	slog.Info("password reset completed", "user_id", userID)
+	slog.InfoContext(ctx, "password reset completed", "user_id", userID)
 	return nil
 }
 
@@ -353,7 +353,7 @@ func (s *AuthService) VerifyAndEnableMFA(ctx context.Context, userID, code strin
 	}
 
 	s.redis.Del(ctx, mfaPendingKey(userID))
-	slog.Info("MFA enabled", "user_id", userID)
+	slog.InfoContext(ctx, "MFA enabled", "user_id", userID)
 	return nil
 }
 
@@ -361,7 +361,7 @@ func (s *AuthService) DisableMFA(ctx context.Context, userID string) error {
 	if err := s.queries.ClearMFA(ctx, userID); err != nil {
 		return err
 	}
-	slog.Info("MFA disabled", "user_id", userID)
+	slog.InfoContext(ctx, "MFA disabled", "user_id", userID)
 	return nil
 }
 

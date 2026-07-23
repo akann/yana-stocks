@@ -5,10 +5,24 @@ from .config import Settings
 from .worker import run
 
 
+class _TraceContextFilter(logging.Filter):
+    """Stamps trace_id/span_id onto a record when a real OTel span is active."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        from opentelemetry import trace
+
+        span_context = trace.get_current_span().get_span_context()
+        if span_context.is_valid:
+            record.trace_id = format(span_context.trace_id, "032x")
+            record.span_id = format(span_context.span_id, "016x")
+        return True
+
+
 def _configure_logging() -> None:
     from pythonjsonlogger.json import JsonFormatter
 
     handler = logging.StreamHandler()
+    handler.addFilter(_TraceContextFilter())
     handler.setFormatter(
         JsonFormatter(
             "{asctime}{levelname}{name}{message}",

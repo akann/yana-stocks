@@ -1,4 +1,5 @@
 import { LoggerService } from '@nestjs/common';
+import { trace } from '@opentelemetry/api';
 
 /** Structured JSON logger, wired in via app.useLogger() in main.ts. */
 export class JsonLogger implements LoggerService {
@@ -27,16 +28,20 @@ export class JsonLogger implements LoggerService {
   private write(level: string, message: unknown, optionalParams: unknown[]): void {
     const context =
       optionalParams.length > 0 ? optionalParams[optionalParams.length - 1] : undefined;
-    const trace = optionalParams.length > 1 ? optionalParams.slice(0, -1) : [];
+    const errorTrace = optionalParams.length > 1 ? optionalParams.slice(0, -1) : [];
+    const spanContext = trace.getActiveSpan()?.spanContext();
 
     process.stdout.write(
       JSON.stringify({
         timestamp: new Date().toISOString(),
         level,
         service: this.service,
+        ...(spanContext && { trace_id: spanContext.traceId, span_id: spanContext.spanId }),
         ...(typeof context === 'string' && { context }),
         message: typeof message === 'string' ? message : JSON.stringify(message),
-        ...(trace.length > 0 && { trace: trace.length === 1 ? trace[0] : trace }),
+        ...(errorTrace.length > 0 && {
+          trace: errorTrace.length === 1 ? errorTrace[0] : errorTrace,
+        }),
       }) + '\n',
     );
   }
