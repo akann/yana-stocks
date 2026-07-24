@@ -29,18 +29,3 @@ export interface ProcessedPriceMessage {
   };
   timestamp: string;
 }
-
-export type PortfolioEventType =
-  | 'portfolio_created'
-  | 'portfolio_updated'
-  | 'stock_added'
-  | 'stock_removed'
-  | 'trade_executed';
-
-export interface PortfolioEventMessage {
-  type: PortfolioEventType;
-  portfolioId: string;
-  userId: string;
-  payload: Record<string, unknown>;
-  timestamp: string;
-}

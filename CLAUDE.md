@@ -211,12 +211,16 @@ yana-stocks/
   The KEDA `ScaledObject` previously also had a `users.registered` trigger, but
   the app never actually subscribed to that topic (no `consumer.subscribe()`
   call anywhere in `kafka-consumer.service.ts`), so it could never reflect real
-  lag — removed 2026-07-23 rather than left as misleading infra. Same "wired at
-  the infra layer, never finished in code" shape as the unused
-  `stocks.portfolio.events` producer below, which stays in place for now (no
-  downstream consumer or feature to justify keeping it, but also nothing
-  actively misleading about a topic simply having no consumer).
-- **Kafka producer:** `stocks.portfolio.events`
+  lag — removed 2026-07-23 rather than left as misleading infra.
+- **Kafka producer:** none — consume-only since 2026-07-24. The
+  `stocks.portfolio.events` producer (same "wired at the infra layer, never
+  finished in code" shape as the KEDA trigger above) was removed entirely after
+  confirming nothing anywhere consumed it: `KafkaProducerService` +
+  `emitPortfolioEvent` call sites, the `CurrentUser` param decorator that
+  existed only to stamp `userId` on those events, the
+  `PortfolioEventType`/`PortfolioEventMessage` shared types, the
+  `PORTFOLIO_EVENTS` topic constant, and the Strimzi `KafkaTopic` CR in
+  `k8s-apps`.
 - **Pattern:** KEDA ScaledObject (scale 1→3, triggers on
   `stocks.prices.processed` lag only; min 1 — serves HTTP traffic)
 - **Endpoints:**
@@ -562,7 +566,10 @@ yana-stocks/
 | `stocks.prices.processed`   | kafka.strimzi.io/v1 | 3          | 7d        | price-processor    | portfolio-api (verified 2026-07-23 — `ml-predictor` has no Kafka consumer anywhere in its code; it reads price history directly from the shared MongoDB, same as its own symbol-selection logic. The table previously said `ml-predictor, portfolio-api`, which was never actually true.) |
 | `stocks.signals.sentiment`  | kafka.strimzi.io/v1 | 3          | 7d        | sentiment-analyzer | portfolio-api                                                                                                                                                                                                                                                                             |
 | `stocks.signals.prediction` | kafka.strimzi.io/v1 | 3          | 7d        | ml-predictor       | portfolio-api                                                                                                                                                                                                                                                                             |
-| `stocks.portfolio.events`   | kafka.strimzi.io/v1 | 3          | 30d       | portfolio-service  | none (verified 2026-07-23 — no consumer exists anywhere in the codebase; the table previously said `price-processor`, which was never actually true — `price-processor`'s Kafka consumer only ever subscribes to `stocks.prices.raw`)                                                     |
+
+(`stocks.portfolio.events` — previously produced by `portfolio-service` with no
+consumer anywhere — was removed entirely 2026-07-24: producer code, shared
+types, topic constant, and the `KafkaTopic` CR in `k8s-apps`.)
 
 **Kafka broker:** `kafka-cluster-kafka-bootstrap.kafka.svc.cluster.local:9092`
 
@@ -679,7 +686,7 @@ KAFKA_TOPICS = {
   PRICES_PROCESSED: 'stocks.prices.processed',
   SIGNALS_SENTIMENT: 'stocks.signals.sentiment',
   SIGNALS_PREDICTION: 'stocks.signals.prediction',
-  PORTFOLIO_EVENTS: 'stocks.portfolio.events',
+  USERS_REGISTERED: 'users.registered',
 };
 ```
 
@@ -1220,7 +1227,6 @@ Following CLAUDE.md, scaffold apps/price-processor as a NestJS app with:
 Following CLAUDE.md, scaffold apps/portfolio-service as a NestJS app with:
 - Mongoose for MongoDB (Portfolio, Watchlist, Trade schemas)
 - Kafka consumer for stocks.prices.processed (portfolio valuation)
-- Kafka producer for stocks.portfolio.events
 - CRUD endpoints for portfolios, watchlists, trades
 - JWT guard on all endpoints
 - Swagger decorators

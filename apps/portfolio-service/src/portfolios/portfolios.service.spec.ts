@@ -1,12 +1,8 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import type { AuthUser } from '../common/current-user.decorator';
-import { KafkaProducerService } from '../kafka/kafka-producer.service';
 import { TradeRepository } from '../trades/trade.repository';
 import { PortfolioRepository } from './portfolio.repository';
 import { PortfoliosService } from './portfolios.service';
-
-const mockUser: AuthUser = { id: 'user-1', email: 'user@example.com' };
 
 const mockPortfolioDoc = {
   _id: { toString: () => 'portfolio-1' },
@@ -27,7 +23,6 @@ describe('PortfoliosService', () => {
     >
   >;
   let tradeRepo: jest.Mocked<Pick<TradeRepository, 'record'>>;
-  let kafkaProducer: jest.Mocked<KafkaProducerService>;
 
   beforeEach(async () => {
     portfolioRepo = {
@@ -59,17 +54,10 @@ describe('PortfoliosService', () => {
         PortfoliosService,
         { provide: PortfolioRepository, useValue: portfolioRepo },
         { provide: TradeRepository, useValue: tradeRepo },
-        {
-          provide: KafkaProducerService,
-          useValue: {
-            emitPortfolioEvent: jest.fn().mockResolvedValue(undefined),
-          } satisfies Partial<KafkaProducerService>,
-        },
       ],
     }).compile();
 
     service = module.get<PortfoliosService>(PortfoliosService);
-    kafkaProducer = module.get(KafkaProducerService);
   });
 
   describe('findAll', () => {
@@ -110,14 +98,11 @@ describe('PortfoliosService', () => {
   });
 
   describe('create', () => {
-    it('creates a portfolio and emits a portfolio_created event', async () => {
-      const result = await service.create({ name: 'New Portfolio' }, mockUser);
+    it('creates a portfolio', async () => {
+      const result = await service.create({ name: 'New Portfolio' });
 
       expect(portfolioRepo.create).toHaveBeenCalledWith('New Portfolio');
       expect(result.name).toBe('My Portfolio');
-      expect(kafkaProducer.emitPortfolioEvent).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'portfolio_created', userId: 'user-1' }),
-      );
     });
   });
 
@@ -169,15 +154,12 @@ describe('PortfoliosService', () => {
   });
 
   describe('addStock', () => {
-    it('adds a new holding, records a trade, and emits stock_added event', async () => {
-      await service.addStock('portfolio-1', { symbol: 'AAPL', shares: 10, price: 150 }, mockUser);
+    it('adds a new holding and records a trade', async () => {
+      await service.addStock('portfolio-1', { symbol: 'AAPL', shares: 10, price: 150 });
 
       expect(portfolioRepo.findByIdForMutation).toHaveBeenCalledWith('portfolio-1');
       expect(tradeRepo.record).toHaveBeenCalledWith(
         expect.objectContaining({ symbol: 'AAPL', type: 'buy', shares: 10, price: 150 }),
-      );
-      expect(kafkaProducer.emitPortfolioEvent).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'stock_added' }),
       );
     });
 
@@ -194,7 +176,7 @@ describe('PortfoliosService', () => {
         }),
       } as unknown as Awaited<ReturnType<PortfolioRepository['findByIdForMutation']>>);
 
-      await service.addStock('portfolio-1', { symbol: 'AAPL', shares: 10, price: 120 }, mockUser);
+      await service.addStock('portfolio-1', { symbol: 'AAPL', shares: 10, price: 120 });
 
       // (10*100 + 10*120) / 20 = 110
       expect(existing.shares).toBe(20);
@@ -216,7 +198,7 @@ describe('PortfoliosService', () => {
         }),
       } as unknown as Awaited<ReturnType<PortfolioRepository['findByIdForMutation']>>);
 
-      await service.addStock('portfolio-1', { symbol: 'MSFT', shares: 5, price: 400 }, mockUser);
+      await service.addStock('portfolio-1', { symbol: 'MSFT', shares: 5, price: 400 });
 
       expect(stocks[0]?.latestPrice).toBe(400);
     });
@@ -231,7 +213,7 @@ describe('PortfoliosService', () => {
         }),
       } as unknown as Awaited<ReturnType<PortfolioRepository['findByIdForMutation']>>);
 
-      await service.addStock('portfolio-1', { symbol: 'AAPL', shares: 10, price: 120 }, mockUser);
+      await service.addStock('portfolio-1', { symbol: 'AAPL', shares: 10, price: 120 });
 
       expect(existing.latestPrice).toBe(180);
     });
@@ -240,7 +222,7 @@ describe('PortfoliosService', () => {
       portfolioRepo.findByIdForMutation.mockResolvedValue(null);
 
       await expect(
-        service.addStock('portfolio-1', { symbol: 'AAPL', shares: 5, price: 150 }, mockUser),
+        service.addStock('portfolio-1', { symbol: 'AAPL', shares: 5, price: 150 }),
       ).rejects.toThrow(NotFoundException);
       expect(portfolioRepo.findByIdForMutation).toHaveBeenCalledWith('portfolio-1');
     });

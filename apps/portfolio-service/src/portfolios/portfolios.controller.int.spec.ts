@@ -6,7 +6,6 @@ import { Model } from 'mongoose';
 import request from 'supertest';
 import { AppModule } from '../app.module';
 import { KafkaConsumerService } from '../kafka/kafka-consumer.service';
-import { KafkaProducerService } from '../kafka/kafka-producer.service';
 import { Trade } from '../trades/schemas/trade.schema';
 import { Portfolio } from './schemas/portfolio.schema';
 
@@ -46,11 +45,6 @@ describe('PortfoliosController (integration)', () => {
   let portfolioModel: Model<Portfolio>;
   let tradeModel: Model<Trade>;
 
-  const kafkaProducerMock = {
-    emitPortfolioEvent: jest.fn().mockResolvedValue(undefined),
-    onModuleInit: jest.fn(),
-    onModuleDestroy: jest.fn(),
-  };
   const kafkaConsumerMock = {
     onModuleInit: jest.fn(),
     onModuleDestroy: jest.fn(),
@@ -60,8 +54,6 @@ describe('PortfoliosController (integration)', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     })
-      .overrideProvider(KafkaProducerService)
-      .useValue(kafkaProducerMock)
       .overrideProvider(KafkaConsumerService)
       .useValue(kafkaConsumerMock)
       .compile();
@@ -103,18 +95,6 @@ describe('PortfoliosController (integration)', () => {
       const doc = await portfolioModel.findById(body.id).lean<Portfolio>().exec();
       expect(doc).not.toBeNull();
       expect(doc!.name).toBe('My Tech Portfolio');
-    });
-
-    it('emits a portfolio_created Kafka event', async () => {
-      await request(server)
-        .post('/portfolios')
-        .set('Authorization', AUTH)
-        .send({ name: 'Event Portfolio' })
-        .expect(201);
-
-      expect(kafkaProducerMock.emitPortfolioEvent).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'portfolio_created', userId: USER_ID }),
-      );
     });
 
     it('returns 401 without an Authorization header', async () => {
@@ -184,7 +164,7 @@ describe('PortfoliosController (integration)', () => {
   });
 
   describe('POST /portfolios/:id/stocks', () => {
-    it('adds a stock holding, records a trade, and emits stock_added', async () => {
+    it('adds a stock holding and records a trade', async () => {
       const doc = await portfolioModel.create({
         userId: USER_ID,
         name: 'Trading Portfolio',
@@ -209,10 +189,6 @@ describe('PortfoliosController (integration)', () => {
       expect(trade).not.toBeNull();
       expect(trade!.type).toBe('buy');
       expect(trade!.shares).toBe(10);
-
-      expect(kafkaProducerMock.emitPortfolioEvent).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'stock_added', userId: USER_ID }),
-      );
     });
 
     it('averages cost basis when the same symbol is added again', async () => {

@@ -144,7 +144,6 @@ A **pre-commit hook** (husky + lint-staged) runs on every `git commit`:
 | `stocks.prices.processed`   | 3          | 7d        | price-processor    | ml-predictor, portfolio-api |
 | `stocks.signals.sentiment`  | 3          | 7d        | sentiment-analyzer | portfolio-api               |
 | `stocks.signals.prediction` | 3          | 7d        | ml-predictor       | portfolio-api               |
-| `stocks.portfolio.events`   | 3          | 30d       | portfolio-service  | price-processor             |
 
 ## Auth Flow
 

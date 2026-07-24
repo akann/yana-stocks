@@ -1,8 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { AddStockDto, CreatePortfolioDto } from '@yana-stocks/shared-dto';
 import type { Portfolio as PortfolioType, PortfolioStock } from '@yana-stocks/shared-types';
-import type { AuthUser } from '../common/current-user.decorator';
-import { KafkaProducerService } from '../kafka/kafka-producer.service';
 import { TradeRepository } from '../trades/trade.repository';
 import { UpdatePortfolioDto } from './dto/update-portfolio.dto';
 import { PortfolioRepository } from './portfolio.repository';
@@ -13,7 +11,6 @@ export class PortfoliosService {
   constructor(
     private readonly repo: PortfolioRepository,
     private readonly tradeRepo: TradeRepository,
-    private readonly kafkaProducer: KafkaProducerService,
   ) {}
 
   async findAll(): Promise<PortfolioType[]> {
@@ -27,21 +24,13 @@ export class PortfoliosService {
     return this.toResponse(doc);
   }
 
-  async create(dto: CreatePortfolioDto, user: AuthUser): Promise<PortfolioType> {
+  async create(dto: CreatePortfolioDto): Promise<PortfolioType> {
     const doc = await this.repo.create(dto.name);
     const plain = doc.toObject() as Portfolio & {
       _id: { toString(): string };
       createdAt: Date;
       updatedAt: Date;
     };
-
-    await this.kafkaProducer.emitPortfolioEvent({
-      type: 'portfolio_created',
-      portfolioId: plain._id.toString(),
-      userId: user.id,
-      payload: { name: dto.name },
-      timestamp: new Date().toISOString(),
-    });
 
     return this.toResponse(plain);
   }
@@ -57,7 +46,7 @@ export class PortfoliosService {
     if (!result) throw new NotFoundException('Portfolio not found');
   }
 
-  async addStock(id: string, dto: AddStockDto, user: AuthUser): Promise<PortfolioType> {
+  async addStock(id: string, dto: AddStockDto): Promise<PortfolioType> {
     const doc = await this.repo.findByIdForMutation(id);
     if (!doc) throw new NotFoundException('Portfolio not found');
 
@@ -88,14 +77,6 @@ export class PortfoliosService {
       price: dto.price,
       totalAmount: dto.shares * dto.price,
       executedAt: new Date(),
-    });
-
-    await this.kafkaProducer.emitPortfolioEvent({
-      type: 'stock_added',
-      portfolioId: id,
-      userId: user.id,
-      payload: { symbol: dto.symbol, shares: dto.shares, price: dto.price },
-      timestamp: new Date().toISOString(),
     });
 
     return this.toResponse(saved.toObject<Portfolio>());

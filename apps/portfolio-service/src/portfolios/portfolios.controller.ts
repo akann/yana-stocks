@@ -24,7 +24,7 @@ import {
   NotFoundDto,
   UnauthorizedDto,
 } from '@yana-stocks/shared-dto';
-import { AuthUser, CurrentUser, UserFromTokenGuard } from '../common/current-user.decorator';
+import { UserFromTokenGuard } from '../common/current-user.decorator';
 import { UpdatePortfolioDto } from './dto/update-portfolio.dto';
 import { Portfolio } from './schemas/portfolio.schema';
 import { PortfoliosService } from './portfolios.service';
@@ -69,11 +69,8 @@ export class PortfoliosController {
     type: UnauthorizedDto,
     description: 'Missing or invalid bearer token',
   })
-  create(
-    @Body(ValidationPipe) dto: CreatePortfolioDto,
-    @CurrentUser() user: AuthUser,
-  ): Promise<Portfolio> {
-    return this.portfoliosService.create(dto, user);
+  create(@Body(ValidationPipe) dto: CreatePortfolioDto): Promise<Portfolio> {
+    return this.portfoliosService.create(dto);
   }
 
   @Put(':id')
@@ -115,11 +112,7 @@ export class PortfoliosController {
     description: 'Missing or invalid bearer token',
   })
   @ApiResponse({ status: 404, type: NotFoundDto, description: 'Portfolio not found' })
-  addStock(
-    @Param('id') id: string,
-    @Body(ValidationPipe) dto: AddStockDto,
-    @CurrentUser() user: AuthUser,
-  ): Promise<Portfolio> {
-    return this.portfoliosService.addStock(id, dto, user);
+  addStock(@Param('id') id: string, @Body(ValidationPipe) dto: AddStockDto): Promise<Portfolio> {
+    return this.portfoliosService.addStock(id, dto);
   }
 }

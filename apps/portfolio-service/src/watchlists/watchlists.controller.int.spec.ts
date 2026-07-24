@@ -6,7 +6,6 @@ import { Model } from 'mongoose';
 import request from 'supertest';
 import { AppModule } from '../app.module';
 import { KafkaConsumerService } from '../kafka/kafka-consumer.service';
-import { KafkaProducerService } from '../kafka/kafka-producer.service';
 import { Watchlist } from './schemas/watchlist.schema';
 
 interface WatchlistResponse {
@@ -39,12 +38,6 @@ describe('WatchlistsController (integration)', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(KafkaProducerService)
-      .useValue({
-        emitPortfolioEvent: jest.fn().mockResolvedValue(undefined),
-        onModuleInit: jest.fn(),
-        onModuleDestroy: jest.fn(),
-      })
       .overrideProvider(KafkaConsumerService)
       .useValue({ onModuleInit: jest.fn(), onModuleDestroy: jest.fn() })
       .compile();
