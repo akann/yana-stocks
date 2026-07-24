@@ -1437,8 +1437,35 @@ Python `price-ingestor` → Node `price-processor` (`stocks.prices.raw`), Go
 `auth-service` → Node `profile-service` (`users.registered`), and Node → Node
 generally (`price-processor`-style producer → `portfolio-api`-style consumer).
 All three showed a single matching `trace_id` across the producer and consumer
-span. This gap is fully closed — no remaining language or service is
-uninstrumented for Kafka trace propagation.
+span.
+
+**Correction (2026-07-24) — the Python leg was NOT actually closed in
+production.** Live verification (Tempo trace inspection + reading the newest
+messages off the prod broker with `print.headers`) showed
+`stocks.signals.prediction` and `stocks.signals.sentiment` messages carrying
+**no headers at all**, and `portfolio-api`'s consumer spans as link-less root
+spans in single-service traces — despite the instrumented image being deployed.
+Root cause: `ConfluentKafkaInstrumentor().instrument()` patches the `Producer`
+class **on the `confluent_kafka` module**, but every `kafka_producer.py` binds
+`Producer` into its own namespace at import time — before `_configure_tracing()`
+runs — so the app's producers were built from the original, unpatched class.
+(The 2026-07-23 local verification passed because it exercised a fresh
+post-instrument producer, not the app's real import path.) Fixed by wrapping
+explicitly at construction —
+`ConfluentKafkaInstrumentor.instrument_producer(Producer(...))` in each of the 3
+services' `kafka_producer.py` — which is import-order-proof (the proxy tracer
+picks up the real provider once it's set), and removing the misleading global
+`instrument()` calls. Re-verified by reproducing the exact prod import order
+(producer constructed before tracing config) against local Redpanda and reading
+the message back: `traceparent` present. A regression test
+(`test_producer_is_wrapped_for_trace_propagation`) guards the wrap.
+
+One related fact checked in the kafkajs source while diagnosing: for
+`eachMessage` consumers (all of ours), `@opentelemetry/instrumentation-kafkajs`
+creates the consumer span with the **propagated context as its parent** — the
+consumer _continues the producer's trace_ (same `trace_id`), it does not create
+a separate trace with a span link; links are only used on the `eachBatch` path,
+which nothing here uses.
 
 ## Feature Implementation Progress
 

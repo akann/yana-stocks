@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from confluent_kafka import Producer
+from opentelemetry.instrumentation.confluent_kafka import ConfluentKafkaInstrumentor
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,16 @@ PREDICTION_TOPIC = "stocks.signals.prediction"
 
 class KafkaProducer:
     def __init__(self, brokers: str) -> None:
-        self._producer: Producer = Producer({"bootstrap.servers": brokers})
+        # Wrapped explicitly: ConfluentKafkaInstrumentor().instrument() patches
+        # the class on the confluent_kafka module, but this module's `Producer`
+        # name is bound at import time — before tracing setup runs — so producers
+        # built from it were never proxied and no traceparent reached the wire
+        # (confirmed on the live broker, 2026-07-24). The explicit wrap is
+        # import-order-proof; its proxy tracer picks up the real provider once
+        # _configure_tracing() sets it.
+        self._producer: Producer = ConfluentKafkaInstrumentor.instrument_producer(
+            Producer({"bootstrap.servers": brokers})
+        )
 
     def publish(
         self,

@@ -40,7 +40,6 @@ def _configure_tracing() -> None:
     from opentelemetry import trace
     from opentelemetry.baggage.propagation import W3CBaggagePropagator
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-    from opentelemetry.instrumentation.confluent_kafka import ConfluentKafkaInstrumentor
     from opentelemetry.instrumentation.pymongo import PymongoInstrumentor
     from opentelemetry.propagate import set_global_textmap
     from opentelemetry.propagators.composite import CompositePropagator
@@ -60,7 +59,10 @@ def _configure_tracing() -> None:
     provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
     trace.set_tracer_provider(provider)
     PymongoInstrumentor().instrument()
-    ConfluentKafkaInstrumentor().instrument()
+    # Kafka producer instrumentation is applied explicitly in kafka_producer.py
+    # (ConfluentKafkaInstrumentor.instrument_producer) — the module-level
+    # instrument() patch binds too late to reach the Producer name imported
+    # there, so it was silently a no-op for this app's producer.
 
     # Sentry: error capture only — see price-ingestor's main.py for the full
     # rationale (instrumenter="otel"/traces_sample_rate=0 stop Sentry from

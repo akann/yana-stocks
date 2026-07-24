@@ -1,7 +1,9 @@
 import json
-from unittest.mock import patch
+from typing import cast
+from unittest.mock import MagicMock, patch
 
 import pytest
+from opentelemetry.instrumentation.confluent_kafka import ProxiedProducer
 
 from price_ingestor.kafka_producer import TOPIC, KafkaProducer
 from price_ingestor.models import RawPriceMessage
@@ -11,6 +13,22 @@ from price_ingestor.models import RawPriceMessage
 def producer() -> KafkaProducer:
     with patch("price_ingestor.kafka_producer.ConfluentProducer"):
         return KafkaProducer("localhost:9092")
+
+
+def _inner(producer: KafkaProducer) -> MagicMock:
+    """The mocked confluent producer inside the OTel proxy wrapper."""
+    proxied = cast(ProxiedProducer, producer._producer)
+    return cast(MagicMock, proxied.original_producer())  # type: ignore[no-untyped-call]
+
+
+def test_producer_is_wrapped_for_trace_propagation(producer: KafkaProducer) -> None:
+    """Regression guard: the producer must be the OTel ProxiedProducer.
+
+    An unwrapped confluent Producer publishes without a traceparent header —
+    the module-level instrument() patch can't reach the class name bound in
+    kafka_producer.py, which is exactly how prod shipped without propagation
+    (found live 2026-07-24)."""
+    assert isinstance(producer._producer, ProxiedProducer)
 
 
 def _make_message() -> RawPriceMessage:
@@ -27,19 +45,19 @@ def _make_message() -> RawPriceMessage:
 
 def test_publish_uses_correct_topic(producer: KafkaProducer) -> None:
     producer.publish(_make_message())
-    call_kwargs = producer._producer.produce.call_args.kwargs
+    call_kwargs = _inner(producer).produce.call_args.kwargs
     assert call_kwargs["topic"] == TOPIC
 
 
 def test_publish_uses_symbol_as_key(producer: KafkaProducer) -> None:
     producer.publish(_make_message())
-    call_kwargs = producer._producer.produce.call_args.kwargs
+    call_kwargs = _inner(producer).produce.call_args.kwargs
     assert call_kwargs["key"] == b"AAPL"
 
 
 def test_publish_serialises_all_ohlcv_fields(producer: KafkaProducer) -> None:
     producer.publish(_make_message())
-    call_kwargs = producer._producer.produce.call_args.kwargs
+    call_kwargs = _inner(producer).produce.call_args.kwargs
     payload = json.loads(call_kwargs["value"])
     assert payload["symbol"] == "AAPL"
     assert payload["open"] == 149.5
@@ -53,7 +71,7 @@ def test_publish_serialises_all_ohlcv_fields(producer: KafkaProducer) -> None:
 def test_publish_does_not_include_tick_fields(producer: KafkaProducer) -> None:
     """price/bid/ask are gone — RawPriceMessage is now a complete OHLCV bar."""
     producer.publish(_make_message())
-    call_kwargs = producer._producer.produce.call_args.kwargs
+    call_kwargs = _inner(producer).produce.call_args.kwargs
     payload = json.loads(call_kwargs["value"])
     assert "price" not in payload
     assert "bid" not in payload

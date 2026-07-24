@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from confluent_kafka import Producer
+from opentelemetry.instrumentation.confluent_kafka import ConfluentKafkaInstrumentor
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,13 @@ SENTIMENT_TOPIC = "stocks.signals.sentiment"
 
 class KafkaProducer:
     def __init__(self, brokers: str) -> None:
-        self._producer: Producer = Producer({"bootstrap.servers": brokers})
+        # Wrapped explicitly — see ml-predictor's kafka_producer.py for the full
+        # rationale: the module-level instrument() patch never reaches the
+        # `Producer` name bound here at import time, so producers built from it
+        # carried no traceparent (confirmed on the live broker, 2026-07-24).
+        self._producer: Producer = ConfluentKafkaInstrumentor.instrument_producer(
+            Producer({"bootstrap.servers": brokers})
+        )
 
     def publish(
         self,
