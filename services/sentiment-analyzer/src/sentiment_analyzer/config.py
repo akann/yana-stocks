@@ -6,9 +6,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # Baseline tickers always eligible for sentiment coverage, spanning major
 # sectors so a commonly-viewed stock (e.g. XOM) has a signal even before any
 # user holds or watches it. Rotated through max_symbols_per_poll at a time
-# (see worker.select_symbols_for_poll) rather than fetched every cycle, since
-# FMP's free tier (250 req/day) can't sustain one request per symbol per poll
-# for a list this size.
+# (see worker.select_symbols_for_poll) rather than fetched every cycle — not
+# because the Starter plan can't sustain one request per symbol per poll (it
+# can, easily), but so a much larger tracked universe down the line still
+# can't blow through the per-minute rate limit in one burst.
 DEFAULT_SYMBOLS: list[str] = [
     "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA",  # tech
     "JPM", "V", "MA", "BAC", "GS",  # financials
@@ -33,14 +34,16 @@ class Settings(BaseSettings):
     poll_interval_seconds: float = 300.0
     # Comma-separated ticker list, e.g. AAPL,GOOGL,MSFT
     symbols: list[str] = DEFAULT_SYMBOLS
-    # FMP's free tier is 250 requests/day and fetch_articles makes one
-    # request per symbol per poll (batching many symbols into one call was
-    # tried and rejected — it starves less-newsy tickers of coverage in
-    # favour of whatever's trending). This bounds symbols-per-poll so total
-    # daily requests stay under budget regardless of how large `symbols` or
-    # user holdings grow; the rest of the universe rotates in over
+    # We're on FMP's Starter plan (~300 req/min, no daily cap — not the free
+    # tier's 250/day), and fetch_articles makes one request per symbol per
+    # poll (batching many symbols into one call was tried and rejected — it
+    # starves less-newsy tickers of coverage in favour of whatever's
+    # trending). 50 comfortably covers the current ~30-ticker DEFAULT_SYMBOLS
+    # baseline every single poll — no more slow rotation for the common
+    # case — while still bounding worst-case burst size if `symbols` or user
+    # holdings grow much larger than that; the excess rotates in over
     # subsequent polls instead of being dropped.
-    max_symbols_per_poll: int = 10
+    max_symbols_per_poll: int = 50
 
     @field_validator("symbols", mode="before")
     @classmethod
