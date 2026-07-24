@@ -1467,6 +1467,24 @@ consumer _continues the producer's trace_ (same `trace_id`), it does not create
 a separate trace with a span link; links are only used on the `eachBatch` path,
 which nothing here uses.
 
+**Second finding, same day — bare `SentryPropagator` extraction dropped the
+consumer spans the producer fix enabled.** Once Python producers started
+injecting headers, `portfolio-api`'s consumer `process` spans disappeared
+entirely instead of joining the producer's trace. Root cause:
+`SentryPropagator.extract` reads **only** `sentry-trace` (its `traceparent`
+support is inject-only, behind `propagateTraceparent`), and an error-only
+upstream (`traces_sample_rate: 0` — every Go/Python service here) always stamps
+`sentry-trace` "not sampled" — so the parent-based sampler dropped the consumer
+span. Proven by extracting the real prod headers through both propagators: same
+`trace_id`, but bare Sentry → `traceFlags 0` (dropped), composite →
+`traceFlags 3` (kept). Fixed in all 4 NestJS `tracing.ts` files:
+`textMapPropagator` is now
+`new core.CompositePropagator({ propagators: [new SentryPropagator(), new core.W3CTraceContextPropagator()] })`
+— W3C **after** Sentry so the standard `traceparent` decides the remote parent
+and its sampling flag on extract (and a `traceparent` is always injected
+regardless of Sentry client options). This mirrors the composite pattern the
+Go/Python sides already used.
+
 ## Feature Implementation Progress
 
 See `FUTURE_PLAN.md` for the full feature implementation plan (Steps 0–15),

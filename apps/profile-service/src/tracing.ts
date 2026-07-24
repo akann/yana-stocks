@@ -3,7 +3,7 @@
 // provider.
 import './instrument';
 
-import { NodeSDK, resources } from '@opentelemetry/sdk-node';
+import { NodeSDK, core, resources } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { SentryContextManager } from '@sentry/nestjs';
@@ -36,7 +36,17 @@ if (endpoint) {
     // (0 traces across all 4 Sentry-wired services vs 465/hr on
     // auth-service). No SentrySpanProcessor either — still error-capture-only.
     contextManager: new SentryContextManager(),
-    textMapPropagator: new SentryPropagator(),
+    // W3C TraceContext composed AFTER Sentry's propagator so that on extract
+    // the standard traceparent header decides the remote parent — including
+    // its sampling flag. SentryPropagator alone reads only sentry-trace, and
+    // an error-only upstream (traces_sample_rate: 0 — every Go/Python service
+    // here) always stamps sentry-trace "not sampled", which made the
+    // parent-based sampler silently drop every Kafka consumer span the moment
+    // producers began injecting headers (found live 2026-07-24). On inject it
+    // also guarantees a traceparent regardless of Sentry client options.
+    textMapPropagator: new core.CompositePropagator({
+      propagators: [new SentryPropagator(), new core.W3CTraceContextPropagator()],
+    }),
   });
 
   sdk.start();
