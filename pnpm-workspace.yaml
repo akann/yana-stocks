@@ -69,9 +69,23 @@ overrides:
 # Next.js's own image-optimization binary — a version bump changes the
 # underlying libvips build and needs real testing that image optimization
 # still works, not a silent override. Accepted at --audit-level=high threshold.
+#
+# GHSA-r28c-9q8g-f849: postcss path traversal via auto-loaded sourceMappingURL
+# (fix >=8.5.18), pulled in ~10 paths deep through @sentry/nextjs and next's
+# own webpack toolchain (terser-webpack-plugin, next>postcss). Build-time CSS
+# tooling only — never processes untrusted input at runtime in this app.
+# Accepted at --audit-level=high threshold.
+#
+# GHSA-mh99-v99m-4gvg: brace-expansion DoS via unbounded expansion length (fix
+# >=5.0.8), pulled in ~100 paths deep through glob>minimatch in
+# @opentelemetry/auto-instrumentations-node and @sentry/nextjs's bundler
+# plugins. Build-time/instrumentation tooling only, far too broad a surface to
+# force an override here. Accepted at --audit-level=high threshold.
 auditConfig:
   ignoreGhsas:
     - GHSA-h67p-54hq-rp68
     - GHSA-52cp-r559-cp3m
     - GHSA-45rx-2jwx-cxfr
     - GHSA-f88m-g3jw-g9cj
+    - GHSA-r28c-9q8g-f849
+    - GHSA-mh99-v99m-4gvg
