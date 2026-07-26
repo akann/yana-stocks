@@ -95,9 +95,12 @@ yana-stocks/
 
 ### 1. price-ingestor (Python)
 
-- **Purpose:** Poll Alpaca API for real-time stock prices, publish to Kafka
+- **Purpose:** Consume Massive (Polygon.io) WebSocket feed for real-time stock
+  prices, publish to Kafka
 - **Kafka producer:** `stocks.prices.raw`
-- **Data source:** Alpaca Markets free tier (paper trading API)
+- **Data source:** Massive (Polygon.io) Starter plan — `starterfeed.polygon.io`
+  WebSocket, `AM.*` minute aggregates (push). Replaced Alpaca + Yahoo Finance —
+  see Build Order Step 0 and the Data Sources section below
 - **Pattern:** KEDA ScaledObject (scale 0→N based on Kafka consumer lag)
 - **No DB** — pure producer
 
@@ -760,7 +763,9 @@ services:
 - **Redis:** `redis-master.redis.svc.cluster.local:6379`
 - **PostgreSQL:** CNPG cluster per service in `yana-stocks` namespace
 - **MinIO:** `minio.minio.svc.cluster.local:9000`
-- **Alpaca API:** `https://data.alpaca.markets` (free tier, paper trading)
+- **Massive (Polygon.io):** `starterfeed.polygon.io` WebSocket + REST
+  `/v2/aggs`/`/v2/snapshot`, Starter plan — see Data Sources section for the
+  full external API list (Massive, FMP, Twelve Data)
 
 ## Kubernetes Patterns
 
@@ -1109,9 +1114,7 @@ PORT=3006                                      # dev only; prod uses 3000
 ### price-ingestor (Python)
 
 ```shell
-ALPACA_API_KEY=...
-ALPACA_API_SECRET=...
-ALPACA_BASE_URL=https://data.alpaca.markets
+MASSIVE_API_KEY=...                       # polygon.io Starter plan
 KAFKA_BROKERS=...
 SYMBOLS=AAPL,GOOGL,MSFT,AMZN,TSLA,NVDA,META,JPM,V,JNJ
 ```
