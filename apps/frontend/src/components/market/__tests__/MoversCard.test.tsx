@@ -23,7 +23,6 @@ jest.mock('@/lib/api', () => ({
   api: { get: jest.fn() },
 }));
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { api } = require('@/lib/api') as { api: { get: jest.Mock } };
 
 function wrapper({ children }: { children: React.ReactNode }) {
