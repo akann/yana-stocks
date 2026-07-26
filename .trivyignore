@@ -1,34 +1,23 @@
 # Trivy has its own ignore mechanism, separate from pnpm audit's
-# `pnpm-workspace.yaml` -> `auditConfig.ignoreGhsas`. These three entries
-# mirror decisions already made and documented there — same CVEs, same
-# reasoning, kept consistent across both scanners:
+# `pnpm-workspace.yaml` -> `auditConfig.ignoreGhsas`. Kept consistent with
+# that file's reasoning.
 #
-# CVE-2026-59892 (GHSA-45rx-2jwx-cxfr): @opentelemetry/propagator-jaeger DoS
-# via malformed HTTP header. Deep in the OpenTelemetry SDK bundle shared
-# across auth-service/portfolio-api/portfolio-service/price-processor/
-# profile-service; not overridden due to peer-dependency risk. Fix >=2.9.0.
-CVE-2026-59892
-
-# CVE-2026-59869 (GHSA-52cp-r559-cp3m): js-yaml v4 line DoS via merge-key
-# chains, pulled in via eslint>@eslint/eslintrc>js-yaml. Not overridden:
-# eslint's config loader may be pinned to a specific js-yaml major. Dev-only
-# dep, not reachable in production. Fix >=4.3.0.
-CVE-2026-59869
-
-# GHSA-f88m-g3jw-g9cj: sharp's bundled libvips carries CVE-2026-33327/33328/
-# 35590/35591. sharp is Next.js's image-processing binary; fix >=0.35.0.
-GHSA-f88m-g3jw-g9cj
-
+# 2026-07-26: re-investigated every entry that used to live here
+# (CVE-2026-59892/propagator-jaeger, CVE-2026-59869/js-yaml v4,
+# GHSA-f88m-g3jw-g9cj/sharp, GHSA-r28c-9q8g-f849/postcss) — all 4 had real
+# fixes available (version bumps, not silent overrides; see
+# pnpm-workspace.yaml for what changed and how each was verified) and are
+# no longer accepted findings. Only one remains, now narrowly scoped rather
+# than a blanket accept:
+#
 # CVE-2026-14257 (GHSA-mh99-v99m-4gvg): brace-expansion DoS via unbounded
-# expansion length, pulled in ~100 paths deep through glob>minimatch in
-# @opentelemetry/auto-instrumentations-node and @sentry/nextjs's bundler
-# plugins — build-time/instrumentation tooling only. Fix >=5.0.8. Mirrors
-# pnpm-workspace.yaml's ignoreGhsas entry added 2026-07-26.
+# expansion length (fix >=5.0.8). Fixed for every consumer except one edge:
+# minimatch@3.1.5 (pulled in by @eslint/config-array, @eslint/eslintrc, and
+# @lhci/cli's chrome-launcher>rimraf>glob chain) hard-requires
+# brace-expansion's old v1.x default-export-as-function shape — forcing v5
+# there broke `pnpm lint` outright (confirmed live:
+# `TypeError: expand is not a function`), and no v1.x release fixes this
+# CVE (checked the full version list upstream). Dev-only lint/CI tooling,
+# never reachable at runtime. Mirrors pnpm-workspace.yaml's scoped
+# `minimatch@3.1.5>brace-expansion` override.
 CVE-2026-14257
-
-# GHSA-r28c-9q8g-f849: postcss path traversal via auto-loaded
-# sourceMappingURL, pulled in ~10 paths deep through @sentry/nextjs and
-# next's own webpack toolchain — build-time CSS tooling only, never
-# processes untrusted input at runtime. Fix >=8.5.18. Mirrors
-# pnpm-workspace.yaml's ignoreGhsas entry added 2026-07-26.
-GHSA-r28c-9q8g-f849

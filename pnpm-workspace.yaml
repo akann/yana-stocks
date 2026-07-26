@@ -27,18 +27,31 @@ overrides:
   '@types/react': ^18.3.18
   '@types/react-dom': ^18.3.5
   multer: ^2.2.0
-  postcss: ^8.5.10
+  # GHSA-r28c-9q8g-f849: postcss path traversal via auto-loaded
+  # sourceMappingURL (fix >=8.5.18). Previous range (^8.5.10) was wide enough
+  # to allow the fix but the lockfile hadn't re-resolved past 8.5.15 — bumped
+  # the floor so it actually picks up a patched version. Same major, low risk.
+  postcss: ^8.5.18
   # GHSA-ph9p-34f9-6g65: tmp path traversal, pulled in transitively by
   # @lhci/cli (inquirer>external-editor>tmp, and directly). Fixed upstream.
   tmp: ^0.2.6
   # GHSA-395f-4hp3-45gv: shell-quote quadratic-complexity DoS, pulled in by
   # concurrently. Fixed upstream.
   shell-quote: ^1.8.5
-  # GHSA-3jxr-9vmj-r5cp: brace-expansion DoS via exponential-time expansion,
-  # pulled in transitively across multiple apps (e.g.
-  # @opentelemetry/auto-instrumentations-node>...>rimraf>glob>minimatch>brace-expansion).
-  # Leaf utility, low risk to override globally. Fixed upstream.
-  brace-expansion: ^2.1.2
+  # GHSA-3jxr-9vmj-r5cp (fixed by the original ^2.1.2 pin) + GHSA-mh99-v99m-4gvg
+  # / CVE-2026-14257 (DoS via unbounded expansion length, fix >=5.0.8, a major
+  # bump this range previously capped below). Global bump verified safe for
+  # every consumer EXCEPT minimatch@3.1.5 (pulled in by
+  # @eslint/config-array>eslint, not overridable without breaking lint —
+  # confirmed live: `pnpm lint` threw `TypeError: expand is not a function`,
+  # v5 changed brace-expansion's module export shape and old minimatch's
+  # `braceExpand()` still expects the v1/v2 default-export-as-function form).
+  # Scoped exception below keeps that one edge on its original working
+  # version; the CVE has no v1.x backport (checked full version list), so
+  # that one narrow path stays genuinely accepted-risk — dev-only lint
+  # tooling, never exposed to attacker-controlled input.
+  brace-expansion: ^5.0.8
+  'minimatch@3.1.5>brace-expansion': ^1.1.16
   # GHSA-v2hh-gcrm-f6hx / GHSA-4c8g-83qw-93j6: fast-uri host-confusion
   # vulnerabilities (literal backslash authority delimiter; failed IDN
   # canonicalization), pulled in via
@@ -46,46 +59,85 @@ overrides:
   # >=3.1.4 covers both fixes. Leaf utility within ajv's tolerated peer range
   # (verified via `pnpm install` + a clean frontend build). Fixed upstream.
   fast-uri: ^3.1.4
+  # GHSA-52cp-r559-cp3m: js-yaml v4 line DoS via merge-key chains, pulled in
+  # via @nestjs/swagger and eslint-config-next's cosmiconfig chain at
+  # 4.1.1/4.2.0. Global floor bump to the latest 4.x (same major, dump/load
+  # API unchanged).
+  js-yaml: ^4.3.0
+  # GHSA-h67p-54hq-rp68 (merge-key aliases, moderate) + GHSA-52cp-r559-cp3m
+  # (merge-key chains) both also apply to @istanbuljs/load-nyc-config's
+  # js-yaml v3 dependency. Originally thought unfixable without a v4 jump
+  # (v4 dropped safeLoad/safeDump, which this package calls) — turned out
+  # both are actually patched on the v3 line itself at 3.15.0, no v4 needed.
+  # Verified via `pnpm audit`: 0 high/moderate js-yaml findings remain.
+  '@istanbuljs/load-nyc-config>js-yaml': ^3.15.0
+  # uuid: missing buffer bounds check in v3/v5/v6 when a caller-supplied
+  # buffer is provided (fix >=11.1.1), via @lhci/cli (dev/CI-only, Lighthouse
+  # upload tool — not reachable in production). Moderate, below the
+  # --audit-level=high gate, but genuinely fixable: verified `lhci --version`
+  # still runs correctly after the bump.
+  uuid: ^14.0.1
+  # protobufjs: DoS via infinite loop in .proto option parsing (fix
+  # >=7.6.5), via @opentelemetry/sdk-node's exporter chain. One patch version
+  # above what was already resolved (7.6.4) — trivial, same-minor bump.
+  protobufjs: ^7.6.5
+  # Mongoose: prototype pollution in update casting via a __proto__-prefixed
+  # dotted path (fix >=8.24.1), via @nestjs/mongoose in portfolio-service.
+  # One patch version above what was already resolved (8.24.0) — trivial,
+  # same-minor bump; @nestjs/mongoose's own peer range (^7||^8||^9) already
+  # allows it.
+  mongoose: ^8.24.1
+  # GHSA-f88m-g3jw-g9cj: sharp inherited libvips CVEs (fix >=0.35.0). Next.js
+  # declares `sharp: ^0.34.5` as its own optional dependency, capping below
+  # the fix — overridden past that range only after real verification: Node
+  # engine already satisfies sharp 0.35's raised >=20.9.0 floor (.nvmrc
+  # pins 24), and sharp's own v0.35.0 breaking-changes list (checked against
+  # upstream release notes) is all either irrelevant here (Node 18 drop,
+  # `install` script removal, JP2K rename) or additive (AVIF tuning,
+  # `limitInputChannels` default of 5). Traced actual usage first: this app's
+  # only `next/image` element (ProfilePage.tsx's MFA QR code) has
+  # `unoptimized` set, so Next's image optimizer — the thing that would
+  # actually invoke sharp — is never exercised by any live code path right
+  # now. Verified the native binary itself works regardless: loaded
+  # sharp@0.35.3 directly and ran a real resize + WebP + AVIF transcode
+  # (AVIF specifically, since that's what changed in 0.35.0) — all succeeded,
+  # produced valid output files.
+  sharp: ^0.35.3
 
-# GHSA-h67p-54hq-rp68: js-yaml v3 DoS via merge key aliases (moderate).
-# @istanbuljs/load-nyc-config@1.1.0 (latest) requires js-yaml@^3.x — no v4 migration
-# from upstream. Cannot override to v4 (breaking API change). Dev-only dep (jest
-# coverage); not reachable in production. Accepted at --audit-level=high threshold.
+# 2026-07-26 pass: all 6 previously-ignored findings re-investigated on the
+# premise that ignoring should be the fallback, not the default, even for
+# entries added in earlier sessions. Result — 5 of 6 had a real fix
+# available and are no longer accepted findings at all:
+#   - GHSA-r28c-9q8g-f849 (postcss) — fixed, see override above.
+#   - GHSA-mh99-v99m-4gvg (brace-expansion) — fixed for every consumer
+#     except one narrow path (minimatch@3.1.5, pulled in by
+#     @eslint/config-array/eslintrc and @lhci/cli's chrome-launcher — see
+#     the scoped exception above). That one edge remains a genuine,
+#     narrowly-scoped accepted risk: dev-only lint/CI tooling, no v1.x
+#     backport exists upstream, and forcing it broke `pnpm lint` outright
+#     (confirmed live). Kept in ignoreGhsas below, but no longer a blanket
+#     accept — everywhere else got the real fix.
+#   - GHSA-52cp-r559-cp3m and GHSA-h67p-54hq-rp68 (js-yaml v4 and v3) —
+#     both fixed; turned out both are patched on their existing majors
+#     (4.3.0 and 3.15.0), no v3→v4 jump ever needed. The original reasoning
+#     ("no v4 migration path", "risks breaking lint") was solving the wrong
+#     problem — the real fix was checking for a same-major patch release
+#     first.
+#   - GHSA-45rx-2jwx-cxfr (propagator-jaeger) — fixed by bumping
+#     @opentelemetry/sdk-node itself (^0.219.0 → ^0.221.0) across all 5
+#     consuming apps' package.json, not by overriding the leaf package.
+#     npm's 0.x caret semantics had silently capped the old range at
+#     exactly 0.219.0, which pinned propagator-jaeger at an exact,
+#     unpatched 2.8.0; sdk-node@0.221.0 bundles a patched 2.10.0 directly.
+#   - GHSA-f88m-g3jw-g9cj (sharp) — fixed, see override above (verified via
+#     a direct native-binary transcode test, not just a version bump).
+# Also found and fixed 3 moderate findings that were never gated (below
+# --audit-level=high) but genuinely fixable in one patch/minor version:
+# uuid, protobufjs, mongoose — see overrides above.
 #
-# GHSA-52cp-r559-cp3m: js-yaml v4 line DoS via merge-key chains, pulled in via
-# eslint>@eslint/eslintrc>js-yaml (fix >=4.3.0). Not overridden: eslint's own
-# config loader may be pinned to a specific js-yaml major, and a blanket
-# override risks breaking lint entirely. Dev-only dep; not reachable in
-# production. Accepted at --audit-level=high threshold.
-#
-# GHSA-45rx-2jwx-cxfr: @opentelemetry/propagator-jaeger DoS via unhandled
-# exception on a malformed header (fix >=2.9.0). Deep in the OpenTelemetry SDK
-# bundle shared across auth-service, portfolio-api, portfolio-service,
-# price-processor, and profile-service — an override risks peer-dependency
-# mismatches across all of them, too broad a blast radius to force here.
-# Accepted at --audit-level=high threshold.
-#
-# GHSA-f88m-g3jw-g9cj: sharp inherited libvips CVEs (fix >=0.35.0). This is
-# Next.js's own image-optimization binary — a version bump changes the
-# underlying libvips build and needs real testing that image optimization
-# still works, not a silent override. Accepted at --audit-level=high threshold.
-#
-# GHSA-r28c-9q8g-f849: postcss path traversal via auto-loaded sourceMappingURL
-# (fix >=8.5.18), pulled in ~10 paths deep through @sentry/nextjs and next's
-# own webpack toolchain (terser-webpack-plugin, next>postcss). Build-time CSS
-# tooling only — never processes untrusted input at runtime in this app.
-# Accepted at --audit-level=high threshold.
-#
-# GHSA-mh99-v99m-4gvg: brace-expansion DoS via unbounded expansion length (fix
-# >=5.0.8), pulled in ~100 paths deep through glob>minimatch in
-# @opentelemetry/auto-instrumentations-node and @sentry/nextjs's bundler
-# plugins. Build-time/instrumentation tooling only, far too broad a surface to
-# force an override here. Accepted at --audit-level=high threshold.
+# Full verification for this pass: `pnpm audit --audit-level=high` (clean),
+# `pnpm lint`/`pnpm type-check`/`pnpm test`/`pnpm build` all green across
+# every package.
 auditConfig:
   ignoreGhsas:
-    - GHSA-h67p-54hq-rp68
-    - GHSA-52cp-r559-cp3m
-    - GHSA-45rx-2jwx-cxfr
-    - GHSA-f88m-g3jw-g9cj
-    - GHSA-r28c-9q8g-f849
     - GHSA-mh99-v99m-4gvg

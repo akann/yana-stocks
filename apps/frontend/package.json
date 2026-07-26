@@ -14,9 +14,9 @@
     "lighthouse": "lhci autorun"
   },
   "dependencies": {
-    "@opentelemetry/auto-instrumentations-node": "^0.77.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.79.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
-    "@opentelemetry/sdk-node": "^0.219.0",
+    "@opentelemetry/sdk-node": "^0.221.0",
     "@sentry/nextjs": "^10.64.0",
     "@tanstack/react-query": "^5.64.2",
     "axios": "^1.7.9",
