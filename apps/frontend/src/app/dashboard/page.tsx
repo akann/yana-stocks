@@ -63,7 +63,7 @@ export default function DashboardPage(): React.JSX.Element {
           {portfolios.map((p) => (
             <div key={p.id} className="bg-[#f2f5f7] border border-gray-200 rounded-xl p-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-medium text-gray-900">{p.name}</h3>
+                <h2 className="font-medium text-gray-900">{p.name}</h2>
                 {p.totalValue != null && (
                   <span className="text-sm text-gray-600">${p.totalValue.toFixed(2)}</span>
                 )}
