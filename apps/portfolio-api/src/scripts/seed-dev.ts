@@ -997,7 +997,7 @@ async function seed(): Promise<void> {
       symbol,
       score: sentiment.score,
       label: sentiment.label,
-      source: 'NewsAPI',
+      source: 'FMP',
       headline: sentiment.headline,
       publishedAt: new Date(now.getTime() - Math.random() * 3_600_000),
       analyzedAt: now,

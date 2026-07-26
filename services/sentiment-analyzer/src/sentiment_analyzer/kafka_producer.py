@@ -38,7 +38,7 @@ class KafkaProducer:
             "symbol": symbol,
             "score": score,
             "label": label,
-            "source": "newsapi",
+            "source": "FMP",
             "headline": headline,
             "articleUrl": article_url,
             "publishedAt": published_at.isoformat(),
