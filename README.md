@@ -48,6 +48,18 @@ packages/
 | ML storage      | MinIO (`yana-stocks-models` bucket)                                                 |
 | Data source     | Massive (Polygon.io) Starter — US prices; FMP — news/analyst; Twelve Data Grow — UK |
 
+## External APIs
+
+| API                              | Plan              | Env var                                     | Free tier available?                                                                           | Used by                                                                                                           | Base URL                                                               |
+| -------------------------------- | ----------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Massive (Polygon.io)             | Starter, $29/mo   | `MASSIVE_API_KEY`                           | No — Polygon's free tier has no real-time WebSocket and 5 req/min REST, unusable here          | `price-ingestor` (WS), `price-processor` (REST history/quotes), `portfolio-api` (`/market/assets` US/ETF listing) | `https://api.polygon.io` (REST) / `starterfeed.polygon.io` (WebSocket) |
+| Financial Modeling Prep (FMP)    | Starter           | `FMP_API_KEY`                               | Yes — free tier is 250 req/day, upgraded to Starter (~300 req/min, no daily cap) on 2026-07-24 | `sentiment-analyzer` (news), `portfolio-api` (analyst ratings, sector performance, screener, movers fallback)     | `https://financialmodelingprep.com/stable`                             |
+| Twelve Data                      | Grow              | `TWELVE_DATA_API_KEY`                       | Yes — free tier is ~8 req/min, 800/day, but on paid Grow plan                                  | `price-processor` (UK/international history+quotes), `portfolio-api` (FTSE 100 sector rotation)                   | `https://api.twelvedata.com`                                           |
+| HuggingFace (`ProsusAI/finbert`) | N/A — self-hosted | `HUGGINGFACE_MODEL` (model name, not a key) | Effectively free always — downloaded model run locally, not a metered API call                 | `sentiment-analyzer`                                                                                              | `https://huggingface.co/ProsusAI/finbert`                              |
+
+Nothing here currently runs on a free plan — all three paid providers were
+upgraded off their free tiers as usage grew. Sentry is excluded from this table.
+
 ## Prerequisites
 
 - Node.js ≥ 24
@@ -137,13 +149,13 @@ A **pre-commit hook** (husky + lint-staged) runs on every `git commit`:
 
 ## Kafka Topics
 
-| Topic                       | Partitions | Retention | Producer           | Consumer(s)                 |
-| --------------------------- | ---------- | --------- | ------------------ | --------------------------- |
-| `users.registered`          | 3          | 7d        | auth-service       | profile-service             |
-| `stocks.prices.raw`         | 3          | 24h       | price-ingestor     | price-processor             |
-| `stocks.prices.processed`   | 3          | 7d        | price-processor    | ml-predictor, portfolio-api |
-| `stocks.signals.sentiment`  | 3          | 7d        | sentiment-analyzer | portfolio-api               |
-| `stocks.signals.prediction` | 3          | 7d        | ml-predictor       | portfolio-api               |
+| Topic                       | Partitions | Retention | Producer           | Consumer(s)     |
+| --------------------------- | ---------- | --------- | ------------------ | --------------- |
+| `users.registered`          | 3          | 7d        | auth-service       | profile-service |
+| `stocks.prices.raw`         | 3          | 24h       | price-ingestor     | price-processor |
+| `stocks.prices.processed`   | 3          | 7d        | price-processor    | portfolio-api   |
+| `stocks.signals.sentiment`  | 3          | 7d        | sentiment-analyzer | portfolio-api   |
+| `stocks.signals.prediction` | 3          | 7d        | ml-predictor       | portfolio-api   |
 
 ## Auth Flow
 
