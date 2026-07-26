@@ -18,3 +18,17 @@ CVE-2026-59869
 # GHSA-f88m-g3jw-g9cj: sharp's bundled libvips carries CVE-2026-33327/33328/
 # 35590/35591. sharp is Next.js's image-processing binary; fix >=0.35.0.
 GHSA-f88m-g3jw-g9cj
+
+# CVE-2026-14257 (GHSA-mh99-v99m-4gvg): brace-expansion DoS via unbounded
+# expansion length, pulled in ~100 paths deep through glob>minimatch in
+# @opentelemetry/auto-instrumentations-node and @sentry/nextjs's bundler
+# plugins — build-time/instrumentation tooling only. Fix >=5.0.8. Mirrors
+# pnpm-workspace.yaml's ignoreGhsas entry added 2026-07-26.
+CVE-2026-14257
+
+# GHSA-r28c-9q8g-f849: postcss path traversal via auto-loaded
+# sourceMappingURL, pulled in ~10 paths deep through @sentry/nextjs and
+# next's own webpack toolchain — build-time CSS tooling only, never
+# processes untrusted input at runtime. Fix >=8.5.18. Mirrors
+# pnpm-workspace.yaml's ignoreGhsas entry added 2026-07-26.
+GHSA-r28c-9q8g-f849
