@@ -101,7 +101,10 @@ yana-stocks/
 - **Data source:** Massive (Polygon.io) Starter plan — `starterfeed.polygon.io`
   WebSocket, `AM.*` minute aggregates (push). Replaced Alpaca + Yahoo Finance —
   see Build Order Step 0 and the Data Sources section below
-- **Pattern:** KEDA ScaledObject (scale 0→N based on Kafka consumer lag)
+- **Pattern:** standard Deployment, fixed at 1 replica — no autoscaler (verified
+  2026-07-26 against the live `k8s-apps` manifests; no `keda-scaledobject.yaml`
+  exists for this service, unlike sentiment-analyzer/price-processor/
+  profile-service/portfolio-service/portfolio-api)
 - **No DB** — pure producer
 
 ### 2. price-processor (NestJS)
@@ -120,7 +123,9 @@ yana-stocks/
 - **Purpose:** Consume news feed, run FinBERT NLP, publish sentiment signals
 - **Kafka producer:** `stocks.signals.sentiment`
 - **MongoDB:** Store articles + sentiment scores
-- **Pattern:** KEDA ScaledObject (scale based on queue depth)
+- **Pattern:** KEDA ScaledObject, triggers on `stocks.prices.processed` lag,
+  threshold 100, `minReplicaCount: 0` — the only service in this stack that
+  actually scales to zero
 - **Model:** `ProsusAI/finbert` from HuggingFace
 - **News source:** FMP `/stable/news/stock`, one request per symbol per poll
   (deliberately not batched — see 2026-07-23 fix below). Tracked symbols =
@@ -728,16 +733,16 @@ apps/yana-stocks/
 │   ├── deployment.yaml            # migrations run at startup (golang-migrate)
 │   ├── service.yaml
 │   └── kafka-topic.yaml           # users.registered KafkaTopic
-├── profile-service/
+├── profile-service/                # KEDA ScaledObject (min 1)
 │   ├── external-secret.yaml       # MONGODB_URI, KAFKA_BROKERS
 │   ├── deployment.yaml
 │   └── service.yaml
-├── price-ingestor/                # KEDA ScaledObject
-├── price-processor/
-├── sentiment-analyzer/            # KEDA ScaledObject
+├── price-ingestor/                # standard Deployment, fixed 1 replica (no autoscaler)
+├── price-processor/                # KEDA ScaledObject (min 1)
+├── sentiment-analyzer/            # KEDA ScaledObject (min 0 — scales to zero)
 ├── ml-predictor/                  # Argo Rollouts canary (no deployment.yaml)
-├── portfolio-service/
-├── portfolio-api/
+├── portfolio-service/              # KEDA ScaledObject (min 1)
+├── portfolio-api/                  # KEDA ScaledObject (min 1)
 ├── api-docs/                      # Static nginx Swagger hub (Authentik-protected, api-docs.yanatech.co.uk)
 └── frontend/
     └── ingress.yaml               # stocks.yanatech.co.uk via ingress-nginx
@@ -769,9 +774,17 @@ services:
 
 ## Kubernetes Patterns
 
-- **KEDA:** `price-ingestor`, `sentiment-analyzer` — scale on Kafka consumer lag
+- **KEDA:** `price-processor`, `profile-service`, `portfolio-service`,
+  `portfolio-api` — scale on Kafka consumer lag, `minReplicaCount: 1` (never
+  scale to zero). `sentiment-analyzer` also uses KEDA on Kafka consumer lag but
+  with `minReplicaCount: 0` — it's the one service that actually scales to zero,
+  not `price-ingestor`. (Verified 2026-07-26 by reading the live `k8s-apps`
+  `keda-scaledobject.yaml` files directly — `price-ingestor` is NOT KEDA-scaled
+  despite earlier versions of this doc saying so; it has no `ScaledObject` at
+  all, just a fixed-replica Deployment.)
 - **Argo Rollouts:** `ml-predictor` — canary 10%→50%→100%
-- **Standard Deployment:** all other services
+- **Standard Deployment:** `auth-service`, `frontend`, `api-docs`, and
+  `price-ingestor` (fixed at 1 replica, no autoscaler)
 - **Images:** pushed to `harbor.yanatech.co.uk/yana-stocks/<service>:<tag>`
 - **Secrets:** ESO from Infisical project `k8s-homelab` (ID
   `69b39965-b778-47a7-ba52-2cd66a7aad0a`)
