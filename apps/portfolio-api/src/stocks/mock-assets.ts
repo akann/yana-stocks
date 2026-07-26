@@ -2,8 +2,8 @@ import type { AssetEntry } from './price-cache.types';
 
 /**
  * Curated list of ~230 actively-traded US equities used as a fallback when
- * ALPACA_API_KEY / ALPACA_API_SECRET are not set (local dev, CI without creds).
- * Mirrors the shape returned by Alpaca's GET /v2/assets endpoint.
+ * MASSIVE_API_KEY is not set (local dev, CI without creds).
+ * Mirrors the shape returned by Massive's asset-listing endpoint.
  */
 export const MOCK_ASSETS: AssetEntry[] = [
   // Technology — NASDAQ

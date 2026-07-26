@@ -1060,7 +1060,7 @@ async function seed(): Promise<void> {
   // Bust movers cache so it recomputes on next request
   pipeline.del('papi:movers');
 
-  // Seed full asset list so /market/assets works without Alpaca credentials
+  // Seed full asset list so /market/assets works without Massive credentials
   pipeline.set('papi:assets:all', JSON.stringify(MOCK_ASSETS), 'EX', TTL);
 
   await pipeline.exec();
