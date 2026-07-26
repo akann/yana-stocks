@@ -130,6 +130,8 @@ export function Navbar(): React.JSX.Element {
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setMenuOpen((o) => !o)}
+                aria-expanded={menuOpen}
+                aria-label={`Account menu for ${profile?.displayName ?? 'My Account'}`}
                 className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors px-2 py-1 rounded hover:bg-white/10"
               >
                 <span className="hidden sm:block text-sm">
