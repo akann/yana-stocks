@@ -30,7 +30,7 @@ import type { MarketOverview, SectorRotationData } from '@/types';
 // like the rest of the homepage's SSR/ISR-prefetched sections do.
 const TreemapView = dynamic(
   () => import('@/components/home/SectorTreemapView').then((m) => m.TreemapView),
-  { ssr: false, loading: () => <div className="h-64 bg-gray-50 animate-pulse rounded-lg" /> },
+  { ssr: false, loading: () => <div className="flex-1 bg-gray-50 animate-pulse rounded-lg" /> },
 );
 
 type Index = SectorIndex;
@@ -55,13 +55,13 @@ function HistoryView({
   const isEmpty = !data?.rows.length || !data.dates.length;
   if (isEmpty) {
     return (
-      <div className="h-64 flex items-center justify-center text-sm text-gray-500">
+      <div className="flex-1 flex items-center justify-center text-sm text-gray-500">
         {activeIndex === 'ftse100' ? 'No FTSE 100 sector history' : 'No sector data available'}
       </div>
     );
   }
   return (
-    <div className="overflow-x-auto">
+    <div className="flex-1 overflow-x-auto overflow-y-auto min-h-0">
       <table className="w-full text-xs border-collapse" style={{ minWidth: 480 }}>
         <thead>
           <tr>
@@ -148,7 +148,7 @@ export function SectorRotationHeatmap(): React.JSX.Element {
   const hasTreemapData = treeData.some((d) => d.pct !== 0);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
+    <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col min-h-0 h-[350px]">
       <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
         <h2 className="text-sm font-semibold text-gray-700">Sector Rotation</h2>
         <div className="flex items-center gap-2">
@@ -187,10 +187,10 @@ export function SectorRotationHeatmap(): React.JSX.Element {
         </div>
       </div>
 
-      {isLoading && <div className="h-64 bg-gray-50 animate-pulse rounded-lg" />}
+      {isLoading && <div className="flex-1 bg-gray-50 animate-pulse rounded-lg" />}
 
       {!isLoading && view === 'today' && !hasTreemapData && (
-        <div className="h-64 flex items-center justify-center text-sm text-gray-500">No data</div>
+        <div className="flex-1 flex items-center justify-center text-sm text-gray-500">No data</div>
       )}
 
       {!isLoading && view === 'today' && hasTreemapData && <TreemapView treeData={treeData} />}
