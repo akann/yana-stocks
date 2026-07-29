@@ -59,6 +59,21 @@ describe('RedisService', () => {
     });
   });
 
+  describe('setNx()', () => {
+    it('returns true and passes EX/NX flags when the key is acquired', async () => {
+      mockClient.set.mockResolvedValue('OK');
+      const result = await service.setNx('lock:k', '1', 90);
+      expect(result).toBe(true);
+      expect(mockClient.set).toHaveBeenCalledWith('lock:k', '1', 'EX', 90, 'NX');
+    });
+
+    it('returns false when the key is already held', async () => {
+      mockClient.set.mockResolvedValue(null);
+      const result = await service.setNx('lock:k', '1', 90);
+      expect(result).toBe(false);
+    });
+  });
+
   describe('del()', () => {
     it('delegates to redis.del', async () => {
       await service.del('k');

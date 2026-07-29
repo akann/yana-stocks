@@ -224,6 +224,8 @@ const SCREENER_SYMBOLS = [
 export class StocksService {
   private readonly logger = new Logger(StocksService.name);
   private readonly priceProcessorUrl: string;
+  private readonly mlPredictorUrl: string;
+  private static readonly TRACKING_INFLIGHT_TTL_SECONDS = 90;
 
   constructor(
     private readonly redis: RedisService,
@@ -231,6 +233,69 @@ export class StocksService {
     private readonly config: ConfigService,
   ) {
     this.priceProcessorUrl = config.getOrThrow<string>('priceProcessorUrl');
+    this.mlPredictorUrl = config.getOrThrow<string>('mlPredictorUrl');
+  }
+
+  /**
+   * Best-effort: backfill price history and get a trained model/prediction
+   * for `symbol`, without making the caller wait or fail. Fire-and-forget
+   * from PortfolioProxyController (on add) and StocksController (on a
+   * prediction cache miss for a real page visit). Sentiment/news are NOT
+   * touched here — sentiment-analyzer stays on its existing 5-min poll; a
+   * symbol only gets instant sentiment/news once it's actually added to a
+   * portfolio/watchlist (see CLAUDE.md). Never throws.
+   */
+  async ensureTracking(symbol: string): Promise<void> {
+    const target = symbol.trim().toUpperCase();
+    if (!target) return;
+
+    const lockKey = `papi:tracking-inflight:${target}`;
+    try {
+      const acquired = await this.redis.setNx(
+        lockKey,
+        '1',
+        StocksService.TRACKING_INFLIGHT_TTL_SECONDS,
+      );
+      if (!acquired) {
+        this.logger.debug(`ensureTracking(${target}): already in flight, skipping`);
+        return;
+      }
+    } catch (err) {
+      // Redis down — degrade to "always attempt" rather than "never fire".
+      // Duplicate backfill/train work is wasteful, not harmful.
+      this.logger.warn(
+        `ensureTracking(${target}): lock check failed, proceeding anyway: ${String(err)}`,
+      );
+    }
+
+    try {
+      // Response body is discarded — the point is price-processor's own
+      // freshness-flag-driven backfill (fetchAndStoreHistory), which always
+      // pulls the full lookback window regardless of `limit`.
+      await firstValueFrom(
+        this.httpService.get(
+          `${this.priceProcessorUrl}/prices/${target}/history?interval=1d&limit=1`,
+          {
+            timeout: 8000,
+          },
+        ),
+      );
+    } catch (err) {
+      this.logger.warn(
+        `ensureTracking(${target}): price-processor backfill failed: ${String(err)}`,
+      );
+      // fall through — still worth trying ml-predictor in case data already existed
+    }
+
+    try {
+      await firstValueFrom(
+        this.httpService.post(`${this.mlPredictorUrl}/api/track/${target}`, null, {
+          timeout: 20000, // generous: Prophet fit is CPU-bound and this is fire-and-forget
+        }),
+      );
+    } catch (err) {
+      this.logger.warn(`ensureTracking(${target}): ml-predictor track failed: ${String(err)}`);
+    }
   }
 
   async getStock(symbol: string): Promise<AggregateStockResponse> {

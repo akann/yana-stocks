@@ -13,6 +13,7 @@ describe('StocksController', () => {
     getFactorPerformance: jest.fn(),
     getScreener: jest.fn(),
     getAssets: jest.fn(),
+    ensureTracking: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -28,8 +29,21 @@ describe('StocksController', () => {
   // ── getStock ──────────────────────────────────────────────────────────────
 
   it('getStock uppercases the symbol', async () => {
+    mockService.getStock.mockResolvedValue({ symbol: 'AAPL', prediction: null });
     await controller.getStock('aapl');
     expect(mockService.getStock).toHaveBeenCalledWith('AAPL');
+  });
+
+  it('getStock fires ensureTracking (not awaited) when no prediction is present', async () => {
+    mockService.getStock.mockResolvedValue({ symbol: 'AAPL', prediction: null });
+    await controller.getStock('aapl');
+    expect(mockService.ensureTracking).toHaveBeenCalledWith('AAPL');
+  });
+
+  it('getStock does not fire ensureTracking when a prediction is already present', async () => {
+    mockService.getStock.mockResolvedValue({ symbol: 'AAPL', prediction: { horizon: '1d' } });
+    await controller.getStock('aapl');
+    expect(mockService.ensureTracking).not.toHaveBeenCalled();
   });
 
   // ── getHistory ────────────────────────────────────────────────────────────

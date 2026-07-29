@@ -39,7 +39,8 @@ export class PortfolioProxyController {
     @Res() res: Response,
     @Headers('authorization') auth: string | undefined,
   ): Promise<void> {
-    await this.assertKnownSymbol(body?.symbol);
+    const symbol = await this.assertKnownSymbol(body?.symbol);
+    void this.stocks.ensureTracking(symbol);
     return this.forward(req, res, auth);
   }
 
@@ -50,7 +51,29 @@ export class PortfolioProxyController {
     @Res() res: Response,
     @Headers('authorization') auth: string | undefined,
   ): Promise<void> {
-    await this.assertKnownSymbol(body?.symbol);
+    const symbol = await this.assertKnownSymbol(body?.symbol);
+    void this.stocks.ensureTracking(symbol);
+    return this.forward(req, res, auth);
+  }
+
+  // Declared ahead of the catch-all proxy() below for the same reason as
+  // addStock/addWatchlistSymbol above. Closes a gap: watchlist creation with
+  // an initial symbols[] used to fall through to proxy() completely
+  // unvalidated — a typo'd ticker in the initial list would previously be
+  // silently persisted with no tracking kicked off for it either.
+  @Post('watchlists')
+  async createWatchlist(
+    @Body() body: { name?: string; symbols?: string[] },
+    @Req() req: Request,
+    @Res() res: Response,
+    @Headers('authorization') auth: string | undefined,
+  ): Promise<void> {
+    const symbols = body?.symbols ?? [];
+    const normalized: string[] = [];
+    for (const s of symbols) {
+      normalized.push(await this.assertKnownSymbol(s));
+    }
+    normalized.forEach((s) => void this.stocks.ensureTracking(s));
     return this.forward(req, res, auth);
   }
 
@@ -63,10 +86,12 @@ export class PortfolioProxyController {
     return this.forward(req, res, auth);
   }
 
-  private async assertKnownSymbol(symbol: string | undefined): Promise<void> {
-    if (!symbol || !(await this.stocks.isKnownSymbol(symbol))) {
+  private async assertKnownSymbol(symbol: string | undefined): Promise<string> {
+    const target = symbol?.trim().toUpperCase() ?? '';
+    if (!target || !(await this.stocks.isKnownSymbol(target))) {
       throw new HttpException(`Unknown symbol: ${symbol ?? ''}`, HttpStatus.BAD_REQUEST);
     }
+    return target;
   }
 
   private async forward(req: Request, res: Response, auth: string | undefined): Promise<void> {

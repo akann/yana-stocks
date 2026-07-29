@@ -50,6 +50,30 @@ class PredictorService:
                 logger.error("Refresh failed for %s: %s", symbol, exc, exc_info=True)
                 sentry_sdk.capture_exception(exc)
 
+    def track_symbol(self, symbol: str) -> bool:
+        """On-demand: get `symbol` to a working prediction state ASAP.
+
+        Cache-first (force_train=False, unlike refresh_all's force_train=True)
+        — this is "make sure something exists now", not "retrain now". Called
+        from POST /api/track/{symbol}, itself invoked fire-and-forget by
+        portfolio-api. The caller never inspects the response body beyond
+        logging, so every failure mode here is caught and logged, never
+        raised — this method must not throw.
+        """
+        symbol = symbol.upper()
+        try:
+            model = self._load_or_train(symbol, force_train=False)
+            if model is None:
+                logger.info("track_symbol(%s): insufficient training data, skipped", symbol)
+                return False
+            self._models[symbol] = model
+            self._run_predictions(symbol, model)
+            return True
+        except Exception as exc:
+            logger.error("track_symbol(%s) failed: %s", symbol, exc, exc_info=True)
+            sentry_sdk.capture_exception(exc)
+            return False
+
     def _tracked_symbols(self) -> list[str]:
         """Baseline symbols plus whatever any user actually holds/watches.
 

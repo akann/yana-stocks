@@ -158,6 +158,20 @@ yana-stocks/
   history, not a rate-limited external API, so the only cost is our own compute,
   which comfortably trains this many small Prophet models within the hourly
   refresh interval.
+- **On-demand tracking (2026-07-29):** `POST /api/track/:symbol` — internal-only
+  (no Kong route, not on any public Ingress), called fire-and-forget by
+  `portfolio-api`'s `StocksService.ensureTracking()` when a symbol is added to a
+  portfolio/watchlist or first visited with no cached prediction yet.
+  Cache-first (`force_train=False`, unlike the hourly `refresh_all()`'s
+  `force_train=True`) — trains only if no MinIO model exists yet for that
+  symbol. Relies entirely on `price-processor` already having backfilled
+  `price_bars` for the symbol (`ensureTracking` triggers that first); if fewer
+  than 10 daily bars exist yet, `track_symbol()` logs and returns `False` rather
+  than failing — the next hourly `refresh_all()` will pick it up once enough
+  history exists. Added to close a real gap: a genuinely new symbol previously
+  had zero predictions for up to an hour after being added (the poll interval),
+  and would never get one at all until someone happened to visit its chart (the
+  only thing that triggered `price-processor`'s on-demand history backfill).
 
 ### 5. auth-service (Go)
 
@@ -260,6 +274,42 @@ yana-stocks/
   - `GET /market/assets?search=&page=&limit=&market=us|etf|uk|all` — browse
     tradable assets with search and pagination; `market=all` merges US
     equities + ETF + UK and deduplicates by symbol (public)
+- **Instant tracking (2026-07-29):** `StocksService.ensureTracking(symbol)` —
+  best-effort, fire-and-forget (`void`-called, never awaited by its callers,
+  never throws). Backfills price history via `price-processor`'s existing
+  on-demand history endpoint, then calls `ml-predictor`'s new
+  `POST /api/track/:symbol`. Guarded by a short-TTL (90s) Redis NX lock
+  (`papi:tracking-inflight:<symbol>`, `RedisService.setNx()`) so a burst of
+  concurrent requests for the same symbol doesn't fire duplicate work — a Redis
+  outage degrades to "always attempt" rather than "never fire." Three call
+  sites, all in `PortfolioProxyController`/`StocksController`, not inside
+  `StocksService.getStock()` itself (that's also called internally by
+  `getMovers()` for every `DEFAULT_SYMBOLS` baseline ticker, which don't need
+  this — they're already covered by ml-predictor's hourly refresh):
+  1. `addStock`/`addWatchlistSymbol` — after `assertKnownSymbol` passes.
+  2. `createWatchlist` (`POST /watchlists` with an initial `symbols[]`) — this
+     path previously fell through to the catch-all proxy with **zero**
+     validation or tracking; now validated the same as the other two.
+  3. `StocksController.getStock` — only when the aggregated response has no
+     cached `prediction`, i.e. a real page visit for a symbol nobody's tracked
+     yet.
+
+  **Deliberate scope limit:** sentiment/news are _not_ touched by
+  `ensureTracking` — `sentiment-analyzer` stays on its existing 5-min poll (see
+  its CLAUDE.md section), which already gives held/watched symbols a fresh fetch
+  on the very next cycle. That means sentiment/news only go instant via the
+  _add_ path (once a symbol is actually in `portfolios`/`watchlists`, which
+  `sentiment-analyzer` reads directly); a bare `/stocks/:symbol` visit with no
+  add gets instant predictions but not instant sentiment/news, since
+  `sentiment-analyzer` has no way to discover a merely-viewed symbol at all.
+
+  **Why HTTP, not Kafka:** `portfolio-service` previously had a Kafka producer
+  (`stocks.portfolio.events`) for portfolio/watchlist changes, deleted entirely
+  on 2026-07-24 because no consumer ever subscribed to it — "wired at the infra
+  layer, never finished in code" (see Known Bugs Fixed-adjacent history in
+  `portfolio-service`'s section above). Reusing that shape here was rejected in
+  favor of plain fire-and-forget HTTP calls, which carry no orphaned-infra risk
+  and need no new `KafkaTopic` CR.
 
 ### 8. frontend (Next.js 16)
 
@@ -1119,8 +1169,8 @@ KAFKA_BROKERS=localhost:19092
 AUTH_SERVICE_URL=http://localhost:3004         # prod: http://auth-service:3000
 PROFILE_SERVICE_URL=http://localhost:3007      # prod: http://profile-service:3000
 PORTFOLIO_SERVICE_URL=http://localhost:3005    # prod: http://portfolio-service:3000
-PRICE_PROCESSOR_URL=http://price-processor:3000
-ML_PREDICTOR_URL=http://ml-predictor:8000
+PRICE_PROCESSOR_URL=http://price-processor:3000  # also used by StocksService.ensureTracking()
+ML_PREDICTOR_URL=http://ml-predictor:8000        # also used by StocksService.ensureTracking()
 PORT=3006                                      # dev only; prod uses 3000
 ```
 

@@ -39,8 +39,18 @@ export class StocksController {
     description: 'Missing or invalid bearer token',
   })
   @ApiResponse({ status: 404, type: NotFoundDto, description: 'No data available for this symbol' })
-  getStock(@Param('symbol') symbol: string): Promise<AggregateStockResponse> {
-    return this.stocksService.getStock(symbol.toUpperCase());
+  async getStock(@Param('symbol') symbol: string): Promise<AggregateStockResponse> {
+    const target = symbol.toUpperCase();
+    const result = await this.stocksService.getStock(target);
+    // Visit-trigger: only fires for a real page visit missing a prediction —
+    // deliberately not inside StocksService.getStock() itself, since
+    // getMovers() also calls that internally for every DEFAULT_SYMBOLS
+    // baseline ticker, which don't need this (already handled by
+    // ml-predictor's hourly refresh_all()).
+    if (!result.prediction) {
+      void this.stocksService.ensureTracking(target);
+    }
+    return result;
   }
 
   @Get('stocks/:symbol/history')

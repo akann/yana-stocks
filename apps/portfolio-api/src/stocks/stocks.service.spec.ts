@@ -123,12 +123,14 @@ describe('StocksService', () => {
             set: jest.fn().mockResolvedValue(undefined),
             scan: jest.fn().mockResolvedValue([]),
             mget: jest.fn().mockResolvedValue([]),
+            setNx: jest.fn().mockResolvedValue(true),
           } satisfies Partial<RedisService>,
         },
         {
           provide: HttpService,
           useValue: {
             get: jest.fn(),
+            post: jest.fn(),
           } satisfies Partial<HttpService>,
         },
         {
@@ -1165,6 +1167,93 @@ describe('StocksService', () => {
       await service.getFactorPerformance();
 
       expect(redis.set).toHaveBeenCalledWith('papi:factors', expect.any(String), 900);
+    });
+  });
+
+  describe('ensureTracking', () => {
+    beforeEach(() => {
+      httpService.get.mockReturnValue(of({ data: [] } as AxiosResponse));
+      httpService.post.mockReturnValue(
+        of({ data: { symbol: 'AAPL', tracked: true } } as AxiosResponse),
+      );
+    });
+
+    it('acquires the in-flight lock and calls price-processor then ml-predictor', async () => {
+      await service.ensureTracking('AAPL');
+
+      expect(redis.setNx).toHaveBeenCalledWith('papi:tracking-inflight:AAPL', '1', 90);
+      expect(httpService.get).toHaveBeenCalledWith(
+        expect.stringContaining('/prices/AAPL/history?interval=1d&limit=1'),
+        expect.objectContaining({ timeout: 8000 }),
+      );
+      expect(httpService.post).toHaveBeenCalledWith(
+        expect.stringContaining('/api/track/AAPL'),
+        null,
+        expect.objectContaining({ timeout: 20000 }),
+      );
+    });
+
+    it('normalizes (trims/uppercases) the symbol before use', async () => {
+      await service.ensureTracking('  tsla ');
+
+      expect(redis.setNx).toHaveBeenCalledWith('papi:tracking-inflight:TSLA', '1', 90);
+      expect(httpService.get).toHaveBeenCalledWith(
+        expect.stringContaining('/prices/TSLA/history'),
+        expect.anything(),
+      );
+      expect(httpService.post).toHaveBeenCalledWith(
+        expect.stringContaining('/api/track/TSLA'),
+        null,
+        expect.anything(),
+      );
+    });
+
+    it('skips work when the in-flight lock is already held', async () => {
+      redis.setNx.mockResolvedValue(false);
+
+      await service.ensureTracking('AAPL');
+
+      expect(httpService.get).not.toHaveBeenCalled();
+      expect(httpService.post).not.toHaveBeenCalled();
+    });
+
+    it('still attempts tracking when the Redis lock check itself fails', async () => {
+      redis.setNx.mockRejectedValue(new Error('redis down'));
+
+      await service.ensureTracking('AAPL');
+
+      expect(httpService.post).toHaveBeenCalledWith(
+        expect.stringContaining('/api/track/AAPL'),
+        null,
+        expect.anything(),
+      );
+    });
+
+    it('still calls ml-predictor when price-processor backfill fails', async () => {
+      httpService.get.mockReturnValue(throwError(() => new Error('price-processor down')));
+
+      await service.ensureTracking('AAPL');
+
+      expect(httpService.post).toHaveBeenCalledWith(
+        expect.stringContaining('/api/track/AAPL'),
+        null,
+        expect.anything(),
+      );
+    });
+
+    it('never throws even when both downstream calls fail', async () => {
+      httpService.get.mockReturnValue(throwError(() => new Error('price-processor down')));
+      httpService.post.mockReturnValue(throwError(() => new Error('ml-predictor down')));
+
+      await expect(service.ensureTracking('AAPL')).resolves.toBeUndefined();
+    });
+
+    it('no-ops on an empty/whitespace symbol', async () => {
+      await service.ensureTracking('   ');
+
+      expect(redis.setNx).not.toHaveBeenCalled();
+      expect(httpService.get).not.toHaveBeenCalled();
+      expect(httpService.post).not.toHaveBeenCalled();
     });
   });
 });

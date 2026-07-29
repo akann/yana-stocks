@@ -62,6 +62,18 @@ def predict(symbol: str) -> dict[str, Any]:
     return {"symbol": symbol.upper(), "predictions": preds}
 
 
+@app.post("/api/track/{symbol}")
+async def track_symbol(symbol: str) -> dict[str, Any]:
+    """Internal-only (no Kong route) — called fire-and-forget by portfolio-api
+    when a symbol is added to a portfolio/watchlist or first visited with no
+    cached prediction. Always 200; `tracked` is informational only, since the
+    caller doesn't branch on it (real diagnosis happens via this service's
+    own logs/Sentry).
+    """
+    tracked = await asyncio.to_thread(_service.track_symbol, symbol.upper())
+    return {"symbol": symbol.upper(), "tracked": tracked}
+
+
 class _TraceContextFilter(logging.Filter):
     """Stamps trace_id/span_id onto a record when a real OTel span is active."""
 
