@@ -454,7 +454,7 @@ describe('StocksService', () => {
       expect(redis.get).toHaveBeenCalledWith('papi:assets:etf');
     });
 
-    it('falls back to MOCK_ASSETS when no Massive API key is set and caches', async () => {
+    it('falls back to MOCK_ASSETS when no Massive API key is set and caches with a short TTL', async () => {
       redis.get.mockResolvedValue(null);
       (configService.get as jest.Mock).mockReturnValue('');
 
@@ -462,7 +462,10 @@ describe('StocksService', () => {
 
       expect(result.total).toBeGreaterThan(0);
       expect(result.data[0]?.assetClass).toBe('us_equity');
-      expect(redis.set).toHaveBeenCalledWith('papi:assets:us', expect.any(String), 86400);
+      // Fallback data must not be cached as long as real data (86400s) — a
+      // transient Massive failure should self-heal on the next request, not
+      // get locked in for a full day.
+      expect(redis.set).toHaveBeenCalledWith('papi:assets:us', expect.any(String), 60);
     });
 
     it('falls back to MOCK_ETF_ASSETS when no Massive API key is set for etf market', async () => {
@@ -473,7 +476,7 @@ describe('StocksService', () => {
 
       expect(result.total).toBeGreaterThan(0);
       expect(result.data[0]?.assetClass).toBe('us_etf');
-      expect(redis.set).toHaveBeenCalledWith('papi:assets:etf', expect.any(String), 86400);
+      expect(redis.set).toHaveBeenCalledWith('papi:assets:etf', expect.any(String), 60);
     });
 
     it('fetches from Massive when API key is set and caches the result', async () => {
@@ -518,8 +521,10 @@ describe('StocksService', () => {
           active: true,
         },
       ];
-      const nextUrl =
-        'https://api.polygon.io/v3/reference/tickers?cursor=abc123&apiKey=MY_MASSIVE_KEY';
+      // Polygon's real next_url only ever carries the pagination cursor, never
+      // the apiKey — this mock deliberately matches that (see the fix in
+      // fetchAssetsFromMassive) rather than the old, incorrect assumption.
+      const nextUrl = 'https://api.polygon.io/v3/reference/tickers?cursor=abc123';
 
       httpService.get
         .mockReturnValueOnce(of({ data: { results: page1, next_url: nextUrl } } as AxiosResponse))
@@ -534,7 +539,9 @@ describe('StocksService', () => {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         expect.objectContaining({ params: expect.objectContaining({ type: 'CS' }) }),
       );
-      expect(httpService.get).toHaveBeenNthCalledWith(2, nextUrl, { params: {} });
+      expect(httpService.get).toHaveBeenNthCalledWith(2, nextUrl, {
+        params: { apiKey: 'MY_MASSIVE_KEY' },
+      });
       expect(result.data).toHaveLength(2);
       expect(result.data.map((a) => a.symbol)).toEqual(['AAPL', 'STOR']);
     });
@@ -566,6 +573,7 @@ describe('StocksService', () => {
 
       expect(result.total).toBeGreaterThan(0);
       expect(result.data[0]?.assetClass).toBe('us_equity');
+      expect(redis.set).toHaveBeenCalledWith('papi:assets:us', expect.any(String), 60);
     });
 
     it('filters by symbol prefix (case-insensitive)', async () => {

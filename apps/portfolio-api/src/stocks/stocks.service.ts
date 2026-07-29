@@ -337,17 +337,25 @@ export class StocksService {
   private async loadMarketAssets(market: AssetMarket): Promise<AssetEntry[]> {
     const CACHE_KEY = `papi:assets:${market}`;
     const CACHE_TTL = 86400;
+    // Deliberately short — a fallback (Massive down/unauthorized/misconfigured)
+    // must not get cached as if it were real data for a full day; this lets
+    // the next request retry Massive again soon instead of silently serving
+    // the tiny curated dev list to every user until the long TTL expires.
+    const FALLBACK_TTL = 60;
     const cached = await this.redis.get(CACHE_KEY);
     if (cached) return JSON.parse(cached) as AssetEntry[];
     let all: AssetEntry[];
+    let ttl = CACHE_TTL;
     if (market === 'uk') {
       all = MOCK_UK_ASSETS;
     } else if (market === 'global') {
       all = MOCK_GLOBAL_ASSETS;
     } else {
-      all = await this.fetchAssetsFromMassive(market === 'etf' ? 'ETF' : 'CS');
+      const result = await this.fetchAssetsFromMassive(market === 'etf' ? 'ETF' : 'CS');
+      all = result.assets;
+      if (result.isFallback) ttl = FALLBACK_TTL;
     }
-    await this.redis.set(CACHE_KEY, JSON.stringify(all), CACHE_TTL);
+    await this.redis.set(CACHE_KEY, JSON.stringify(all), ttl);
     return all;
   }
 
@@ -867,13 +875,15 @@ export class StocksService {
     }
   }
 
-  private async fetchAssetsFromMassive(type: 'CS' | 'ETF'): Promise<AssetEntry[]> {
+  private async fetchAssetsFromMassive(
+    type: 'CS' | 'ETF',
+  ): Promise<{ assets: AssetEntry[]; isFallback: boolean }> {
     const assetClass: 'us_equity' | 'us_etf' = type === 'ETF' ? 'us_etf' : 'us_equity';
     const apiKey = this.config.get<string>('massiveApiKey') ?? '';
 
     if (!apiKey) {
       this.logger.warn('MASSIVE_API_KEY not set — using curated dev asset list');
-      return type === 'ETF' ? MOCK_ETF_ASSETS : MOCK_ASSETS;
+      return { assets: type === 'ETF' ? MOCK_ETF_ASSETS : MOCK_ASSETS, isFallback: true };
     }
 
     try {
@@ -890,16 +900,18 @@ export class StocksService {
       while (url) {
         const pageUrl: string = url;
         const resp = await firstValueFrom(
-          this.httpService.get<PolygonTickersResponse>(pageUrl, { params: params ?? {} }),
+          this.httpService.get<PolygonTickersResponse>(pageUrl, { params: params ?? { apiKey } }),
         );
         collected.push(...(resp.data.results ?? []));
 
-        // next_url already contains the apiKey in the query string
+        // next_url carries the pagination cursor but NOT the apiKey — it must
+        // be re-attached on every page or Polygon 401s from page 2 onward
+        // (confirmed live: next_url only ever contains `cursor=...`).
         url = resp.data.next_url ?? null;
         params = null;
       }
 
-      return collected
+      const assets = collected
         .filter(
           (t): t is PolygonTickerResult & { ticker: string; name: string } =>
             typeof t.ticker === 'string' &&
@@ -914,9 +926,10 @@ export class StocksService {
           tradable: true,
           assetClass,
         }));
+      return { assets, isFallback: false };
     } catch (err) {
       this.logger.error(`Massive assets fetch failed, falling back to dev list: ${String(err)}`);
-      return type === 'ETF' ? MOCK_ETF_ASSETS : MOCK_ASSETS;
+      return { assets: type === 'ETF' ? MOCK_ETF_ASSETS : MOCK_ASSETS, isFallback: true };
     }
   }
 }
