@@ -10,10 +10,16 @@ export const metadata: Metadata = {
     canonical: 'https://stocks.yanatech.co.uk/',
   },
   openGraph: {
+    // Next.js's per-segment openGraph object replaces (not merges with)
+    // layout.tsx's, so siteName/type/locale must be repeated here — omitting
+    // them caused og:site_name to silently disappear in production.
+    siteName: 'YanaStocks',
+    type: 'website',
+    locale: 'en_GB',
     url: 'https://stocks.yanatech.co.uk/',
-    title: 'YanaStocks by Akan Nkweini — Real-Time Stock Market Data & ML Predictions',
+    title: 'YanaStocks — Real-Time Stock Data & ML Predictions',
     description:
-      'Live US stock prices, FinBERT sentiment analysis, ML-powered price predictions, and personal portfolio management by Akan Nkweini.',
+      'Live US stock prices, FinBERT sentiment, ML-powered predictions, and portfolio management by Akan Nkweini.',
   },
 };
 

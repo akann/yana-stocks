@@ -31,11 +31,11 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   metadataBase: new URL('https://stocks.yanatech.co.uk'),
   title: {
-    default: 'YanaStocks by Akan Nkweini — Real-Time Stock Market Data & ML Predictions',
+    default: 'YanaStocks — Real-Time Stock Data & ML Predictions',
     template: '%s | YanaStocks',
   },
   description:
-    'YanaStocks by Akan Nkweini — live US stock prices, FinBERT sentiment analysis, ML-powered price predictions, and personal portfolio management. Track AAPL, GOOGL, MSFT, TSLA, NVDA and more.',
+    'Live US stock prices, FinBERT sentiment analysis, and ML-powered price predictions, plus personal portfolio and watchlist management by Akan Nkweini.',
   keywords: [
     'YanaStocks',
     'Akan Nkweini',

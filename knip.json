@@ -7,7 +7,7 @@
     ".": {},
     "apps/frontend": {
       "entry": [
-        "src/app/**/{page,layout,loading,error,not-found,route}.{tsx,ts}",
+        "src/app/**/{page,layout,loading,error,not-found,route,opengraph-image,twitter-image}.{tsx,ts}",
         "src/instrumentation.{ts,node.ts}",
         "src/**/*.{test,spec}.{ts,tsx}",
         "jest.setup.ts"
