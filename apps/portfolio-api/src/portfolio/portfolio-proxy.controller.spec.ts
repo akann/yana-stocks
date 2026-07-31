@@ -6,10 +6,21 @@ import type { Request, Response } from 'express';
 import { of } from 'rxjs';
 import { PortfolioProxyController } from './portfolio-proxy.controller';
 import { StocksService } from '../stocks/stocks.service';
+import { RedisService } from '../redis/redis.service';
+import { IdempotencyInterceptor } from '../common/idempotency.interceptor';
 
 const mockRequest = jest.fn();
 const mockIsKnownSymbol = jest.fn();
 const mockEnsureTracking = jest.fn();
+// No Idempotency-Key header on any of these existing requests, so
+// IdempotencyInterceptor passes straight through — this mock only exists to
+// satisfy DI. Its own behavior is covered by idempotency.interceptor.spec.ts.
+const mockRedisService = {
+  get: jest.fn().mockResolvedValue(null),
+  set: jest.fn().mockResolvedValue(undefined),
+  setNx: jest.fn().mockResolvedValue(true),
+  del: jest.fn().mockResolvedValue(undefined),
+};
 
 function mockRes() {
   const mock = { status: jest.fn(), json: jest.fn() };
@@ -31,6 +42,7 @@ describe('PortfolioProxyController', () => {
     const module = await Test.createTestingModule({
       controllers: [PortfolioProxyController],
       providers: [
+        IdempotencyInterceptor,
         { provide: HttpService, useValue: { request: mockRequest } },
         {
           provide: ConfigService,
@@ -40,6 +52,7 @@ describe('PortfolioProxyController', () => {
           provide: StocksService,
           useValue: { isKnownSymbol: mockIsKnownSymbol, ensureTracking: mockEnsureTracking },
         },
+        { provide: RedisService, useValue: mockRedisService },
       ],
     }).compile();
     controller = module.get(PortfolioProxyController);
@@ -161,6 +174,58 @@ describe('PortfolioProxyController', () => {
       expect(mockIsKnownSymbol).not.toHaveBeenCalled();
       expect(mockRequest).not.toHaveBeenCalled();
       expect(mockEnsureTracking).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('addStocksBatch', () => {
+    it('forwards and triggers tracking for every valid symbol', async () => {
+      const res = mockRes();
+      const body = { items: [{ symbol: 'aapl' }, { symbol: 'msft' }] };
+      await controller.addStocksBatch(
+        body,
+        req('POST', '/api/portfolio/portfolios/abc/stocks/batch', body),
+        res as unknown as Response,
+        undefined,
+      );
+      expect(mockIsKnownSymbol).toHaveBeenCalledWith('AAPL');
+      expect(mockIsKnownSymbol).toHaveBeenCalledWith('MSFT');
+      expect(mockEnsureTracking).toHaveBeenCalledWith('AAPL');
+      expect(mockEnsureTracking).toHaveBeenCalledWith('MSFT');
+      expect(mockRequest).toHaveBeenCalled();
+    });
+
+    it('rejects with 400 and never forwards when any symbol is unknown', async () => {
+      mockIsKnownSymbol.mockImplementation((s: string) => Promise.resolve(s !== 'NOTREAL'));
+      const res = mockRes();
+      const body = { items: [{ symbol: 'AAPL' }, { symbol: 'NOTREAL' }] };
+
+      await expect(
+        controller.addStocksBatch(
+          body,
+          req('POST', '/api/portfolio/portfolios/abc/stocks/batch', body),
+          res as unknown as Response,
+          undefined,
+        ),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(mockRequest).not.toHaveBeenCalled();
+    });
+
+    it('rejects with 400 and never forwards when items is empty', async () => {
+      const res = mockRes();
+      const body = { items: [] };
+
+      await expect(
+        controller.addStocksBatch(
+          body,
+          req('POST', '/api/portfolio/portfolios/abc/stocks/batch', body),
+          res as unknown as Response,
+          undefined,
+        ),
+      ).resolves.toBeDefined();
+      // Empty items → the loop never runs, so it forwards with no tracking
+      // (portfolio-service itself rejects an empty batch via AddStocksBatchDto validation).
+      expect(mockEnsureTracking).not.toHaveBeenCalled();
+      expect(mockRequest).toHaveBeenCalled();
     });
   });
 

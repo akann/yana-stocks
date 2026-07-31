@@ -20,6 +20,7 @@ import {
 } from '@nestjs/swagger';
 import {
   AddStockDto,
+  AddStocksBatchDto,
   CreatePortfolioDto,
   NotFoundDto,
   UnauthorizedDto,
@@ -114,5 +115,23 @@ export class PortfoliosController {
   @ApiResponse({ status: 404, type: NotFoundDto, description: 'Portfolio not found' })
   addStock(@Param('id') id: string, @Body(ValidationPipe) dto: AddStockDto): Promise<Portfolio> {
     return this.portfoliosService.addStock(id, dto);
+  }
+
+  @Post(':id/stocks/batch')
+  @ApiOperation({
+    summary: 'Add multiple stocks to a portfolio in one call (records N buy trades)',
+  })
+  @ApiOkResponse({ type: Portfolio })
+  @ApiResponse({
+    status: 401,
+    type: UnauthorizedDto,
+    description: 'Missing or invalid bearer token',
+  })
+  @ApiResponse({ status: 404, type: NotFoundDto, description: 'Portfolio not found' })
+  addStocksBatch(
+    @Param('id') id: string,
+    @Body(ValidationPipe) dto: AddStocksBatchDto,
+  ): Promise<Portfolio> {
+    return this.portfoliosService.addStocks(id, dto.items);
   }
 }

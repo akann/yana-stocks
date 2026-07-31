@@ -231,6 +231,66 @@ describe('PortfoliosController (integration)', () => {
     });
   });
 
+  describe('POST /portfolios/:id/stocks/batch', () => {
+    it('adds multiple holdings in one call, averaging cost basis across items, and records one trade per item', async () => {
+      const doc = await portfolioModel.create({
+        userId: USER_ID,
+        name: 'Batch Portfolio',
+        stocks: [],
+      });
+      const portfolioId = doc._id.toString();
+
+      const body = (
+        await request(server)
+          .post(`/portfolios/${portfolioId}/stocks/batch`)
+          .set('Authorization', AUTH)
+          .send({
+            items: [
+              { symbol: 'AAPL', shares: 10, price: 150 },
+              { symbol: 'AAPL', shares: 10, price: 170 },
+              { symbol: 'MSFT', shares: 5, price: 400 },
+            ],
+          })
+          .expect(201)
+      ).body as PortfolioResponse;
+
+      const aapl = body.stocks.find((s) => s.symbol === 'AAPL');
+      const msft = body.stocks.find((s) => s.symbol === 'MSFT');
+      expect(aapl!.shares).toBe(20);
+      expect(aapl!.avgCostBasis).toBe(160); // (10*150 + 10*170) / 20
+      expect(msft!.shares).toBe(5);
+
+      const trades = await tradeModel.find({ portfolioId }).lean<Trade[]>().exec();
+      expect(trades).toHaveLength(3);
+    });
+
+    it('returns 400 for an empty items array', async () => {
+      const doc = await portfolioModel.create({
+        userId: USER_ID,
+        name: 'Batch Portfolio',
+        stocks: [],
+      });
+      await request(server)
+        .post(`/portfolios/${doc._id.toString()}/stocks/batch`)
+        .set('Authorization', AUTH)
+        .send({ items: [] })
+        .expect(400);
+    });
+
+    it('returns 404 when the portfolio belongs to another user', async () => {
+      const doc = await portfolioModel.create({
+        userId: OTHER_USER_ID,
+        name: 'Not Mine',
+        stocks: [],
+      });
+      await request(server)
+        .post(`/portfolios/${doc._id.toString()}/stocks/batch`)
+        .set('Authorization', AUTH)
+        .send({ items: [{ symbol: 'TSLA', shares: 5, price: 200 }] })
+        .expect(404);
+    });
+  });
+
   describe('PUT /portfolios/:id', () => {
     it('renames the portfolio', async () => {
       const doc = await portfolioModel.create({ userId: USER_ID, name: 'Old Name', stocks: [] });

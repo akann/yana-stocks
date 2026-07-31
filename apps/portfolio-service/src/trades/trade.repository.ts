@@ -40,4 +40,9 @@ export class TradeRepository {
   async record(input: RecordTradeInput): Promise<void> {
     await this.model.create({ ...input, userId: this.userId });
   }
+
+  async recordMany(inputs: RecordTradeInput[]): Promise<void> {
+    if (!inputs.length) return;
+    await this.model.insertMany(inputs.map((input) => ({ ...input, userId: this.userId })));
+  }
 }

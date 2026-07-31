@@ -22,7 +22,7 @@ describe('PortfoliosService', () => {
       'findAll' | 'findById' | 'create' | 'updateName' | 'delete' | 'findByIdForMutation'
     >
   >;
-  let tradeRepo: jest.Mocked<Pick<TradeRepository, 'record'>>;
+  let tradeRepo: jest.Mocked<Pick<TradeRepository, 'record' | 'recordMany'>>;
 
   beforeEach(async () => {
     portfolioRepo = {
@@ -47,6 +47,7 @@ describe('PortfoliosService', () => {
 
     tradeRepo = {
       record: jest.fn().mockResolvedValue(undefined),
+      recordMany: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -158,9 +159,9 @@ describe('PortfoliosService', () => {
       await service.addStock('portfolio-1', { symbol: 'AAPL', shares: 10, price: 150 });
 
       expect(portfolioRepo.findByIdForMutation).toHaveBeenCalledWith('portfolio-1');
-      expect(tradeRepo.record).toHaveBeenCalledWith(
+      expect(tradeRepo.recordMany).toHaveBeenCalledWith([
         expect.objectContaining({ symbol: 'AAPL', type: 'buy', shares: 10, price: 150 }),
-      );
+      ]);
     });
 
     it('averages cost basis when the symbol already exists in the portfolio', async () => {
@@ -225,6 +226,64 @@ describe('PortfoliosService', () => {
         service.addStock('portfolio-1', { symbol: 'AAPL', shares: 5, price: 150 }),
       ).rejects.toThrow(NotFoundException);
       expect(portfolioRepo.findByIdForMutation).toHaveBeenCalledWith('portfolio-1');
+    });
+  });
+
+  describe('addStocks (batch)', () => {
+    it('applies every item against one document save and records one trade per item', async () => {
+      const stocks: Array<{
+        symbol: string;
+        shares: number;
+        avgCostBasis: number;
+        latestPrice?: number;
+      }> = [];
+      const save = jest
+        .fn()
+        .mockResolvedValue({ toObject: () => ({ ...mockPortfolioDoc, stocks }) });
+      portfolioRepo.findByIdForMutation.mockResolvedValue({
+        ...mockPortfolioDoc,
+        stocks,
+        save,
+      } as unknown as Awaited<ReturnType<PortfolioRepository['findByIdForMutation']>>);
+
+      await service.addStocks('portfolio-1', [
+        { symbol: 'AAPL', shares: 10, price: 150 },
+        { symbol: 'MSFT', shares: 5, price: 400 },
+      ]);
+
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(tradeRepo.recordMany).toHaveBeenCalledTimes(1);
+      expect(tradeRepo.recordMany).toHaveBeenCalledWith([
+        expect.objectContaining({ symbol: 'AAPL', shares: 10, price: 150 }),
+        expect.objectContaining({ symbol: 'MSFT', shares: 5, price: 400 }),
+      ]);
+    });
+
+    it('averages cost basis across items for the same symbol within one batch', async () => {
+      const stocks: Array<{ symbol: string; shares: number; avgCostBasis: number }> = [];
+      portfolioRepo.findByIdForMutation.mockResolvedValue({
+        ...mockPortfolioDoc,
+        stocks,
+        save: jest.fn().mockResolvedValue({ toObject: () => ({ ...mockPortfolioDoc, stocks }) }),
+      } as unknown as Awaited<ReturnType<PortfolioRepository['findByIdForMutation']>>);
+
+      await service.addStocks('portfolio-1', [
+        { symbol: 'AAPL', shares: 10, price: 100 },
+        { symbol: 'AAPL', shares: 10, price: 120 },
+      ]);
+
+      expect(stocks).toHaveLength(1);
+      expect(stocks[0]?.shares).toBe(20);
+      expect(stocks[0]?.avgCostBasis).toBe(110);
+    });
+
+    it('throws NotFoundException when portfolio belongs to another user', async () => {
+      portfolioRepo.findByIdForMutation.mockResolvedValue(null);
+
+      await expect(
+        service.addStocks('portfolio-1', [{ symbol: 'AAPL', shares: 5, price: 150 }]),
+      ).rejects.toThrow(NotFoundException);
+      expect(tradeRepo.recordMany).not.toHaveBeenCalled();
     });
   });
 });

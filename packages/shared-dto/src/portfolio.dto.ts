@@ -1,5 +1,17 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsPositive, IsString, MaxLength, Min, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  ArrayNotEmpty,
+  IsArray,
+  IsNumber,
+  IsPositive,
+  IsString,
+  MaxLength,
+  Min,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
 
 export class CreatePortfolioDto {
   @ApiProperty({ example: 'My ISA Portfolio' })
@@ -25,4 +37,14 @@ export class AddStockDto {
   @IsNumber()
   @Min(0.01)
   price!: number;
+}
+
+export class AddStocksBatchDto {
+  @ApiProperty({ type: [AddStockDto], description: 'Buy trades to record, 1-50 per request' })
+  @IsArray()
+  @ArrayNotEmpty()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => AddStockDto)
+  items!: AddStockDto[];
 }

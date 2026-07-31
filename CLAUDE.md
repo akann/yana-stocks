@@ -274,6 +274,17 @@ yana-stocks/
   - `GET/POST /portfolios`
   - `GET/PUT/DELETE /portfolios/:id`
   - `POST /portfolios/:id/stocks`
+  - `POST /portfolios/:id/stocks/batch` — add up to 50 holdings in one call
+    (2026-07-31, `AddStocksBatchDto` in `@yana-stocks/shared-dto`). Shares
+    `addStock`'s underlying logic — `PortfoliosService.addStock` now just calls
+    `addStocks(id, [dto])`, and `addStocks` does one `findByIdForMutation`, N
+    in-memory mutations, one `doc.save()`, and one
+    `TradeRepository.recordMany()` (bulk insert). **Deliberately not
+    transactional** — `docker-compose.yml`'s `mongo:8` runs standalone (no
+    `--replSet`), and the pre-existing single-item `addStock` was already
+    non-transactional (save then a separate trade insert, no rollback if the
+    second write fails) — batch staying consistent with that is more honest than
+    making batch atomic while single-item isn't.
   - `GET/POST /watchlists`
   - `GET /trades`
 
@@ -343,6 +354,36 @@ yana-stocks/
   `sentiment-analyzer` reads directly); a bare `/stocks/:symbol` visit with no
   add gets instant predictions but not instant sentiment/news, since
   `sentiment-analyzer` has no way to discover a merely-viewed symbol at all.
+
+  **Async request-reply pattern — assessed, deliberately not built
+  (2026-07-31):** an API-design-pattern review asked whether long-running work
+  like `ensureTracking`/ml-predictor's `track_symbol` should return `202` +
+  `Location: /jobs/:id` for polling. Checked and found unnecessary: every call
+  site already fires this `void`-style with no caller waiting, and the
+  frontend's `GET /stocks/:symbol` query already polls every 10s
+  (`refetchInterval: 10_000`), so a missing prediction self-heals with no
+  client-visible "processing" state today. Building a job store now would solve
+  a problem nothing currently has — revisit only if a genuinely slow,
+  directly-user-awaited operation is added later.
+
+- **Idempotency-Key support (2026-07-31):** `PortfolioProxyController`'s
+  mutating routes (`addStock`, `addStocksBatch`, `addWatchlistSymbol`,
+  `createWatchlist`) accept an optional `Idempotency-Key` header via
+  `@Idempotent()` (`src/common/idempotent.decorator.ts` +
+  `idempotency.interceptor.ts`) — opt-in, so a request with no header behaves
+  exactly as before. Implemented here rather than in `portfolio-service` because
+  `portfolio-service` has no Redis at all (confirmed, Mongo-only) while this app
+  already has `RedisService` for other caching. Key format:
+  `papi:idem:<jwt sub>:<method>:<path>:<key>`; stores a sha256 hash of the
+  request body so the same key reused with a **different** body gets a `422`
+  rather than silently replaying a stale response for a different payload; an
+  in-flight duplicate gets `409`; a genuine replay returns the original cached
+  `{status, body}` verbatim with an `Idempotent-Replay: true` header, without
+  re-running the handler (so `ensureTracking` isn't re-fired on a retry).
+  Required `forward()` to change from writing the response and returning `void`
+  to also returning `{ status, body }` — Nest ignores a `@Res()` handler's
+  return value for the actual HTTP response, but the interceptor chain still
+  sees it.
 
   **Why HTTP, not Kafka:** `portfolio-service` previously had a Kafka producer
   (`stocks.portfolio.events`) for portfolio/watchlist changes, deleted entirely
@@ -716,8 +757,18 @@ Kong JWT plugin (key_claim_name: iss):
 
 ## Kong Routes (k8s-apps repo)
 
+**Rate limiting (2026-07-31):** every route below now also carries a
+`rate-limiting` plugin — `rate-limiting-public` (60/min) on public routes,
+`rate-limiting` (300/min) on JWT-protected ones, both IP-scoped (no per-end-user
+`KongConsumer` registry exists — the one `KongConsumer` here is `auth-service`
+itself, for JWT issuance). `policy: redis` against the shared cluster Redis
+(Kong is DB-less, ruling out the `cluster` policy; `local` would count
+per-Kong-replica independently, silently scaling the effective limit with
+replica count). See `k8s-apps`'
+`apps/yana-stocks/kong/kongplugin-rate-limiting*.yaml`.
+
 ```shell
-# Public auth routes (cors plugin only)
+# Public auth routes (rate-limiting-public + cors)
 /api/auth/register                  → auth-service:3000    (Exact)
 /api/auth/verify                    → auth-service:3000    (Exact)
 /api/auth/login                     → auth-service:3000    (Exact)
@@ -726,23 +777,23 @@ Kong JWT plugin (key_claim_name: iss):
 /api/auth/password/reset-request    → auth-service:3000    (Exact)
 /api/auth/password/reset            → auth-service:3000    (Exact)
 
-# JWT-protected auth routes
-/api/auth/me        → auth-service:3000    (Exact, jwt-auth+cors)
-/api/auth/password  → auth-service:3000    (Exact, jwt-auth+cors — change password)
-/api/auth/account   → auth-service:3000    (Exact, jwt-auth+cors — delete account)
+# JWT-protected auth routes (jwt-auth+rate-limiting+cors)
+/api/auth/me        → auth-service:3000    (Exact — jwt-auth+rate-limiting+cors)
+/api/auth/password  → auth-service:3000    (Exact — change password)
+/api/auth/account   → auth-service:3000    (Exact — delete account)
 
 # JWT-protected profile routes
-/api/profile/*      → profile-service:3000 (Prefix, jwt-auth+cors)
+/api/profile/*      → profile-service:3000 (Prefix, jwt-auth+rate-limiting+cors)
 
 # Public API routes
-/api/market/*       → portfolio-api:3000   (Prefix, cors only — shown on unauthenticated homepage)
+/api/market/*       → portfolio-api:3000   (Prefix, rate-limiting-public+cors — shown on unauthenticated homepage)
 
 # JWT-protected API routes
-/api/stocks/*       → portfolio-api:3000   (Prefix, jwt-auth+cors)
-/api/signals/*      → portfolio-api:3000   (Prefix, jwt-auth+cors)
-/api/portfolio/*    → portfolio-api:3000   (Prefix, jwt-auth+cors — portfolio-api proxies to portfolio-service)
-/api/news/*         → portfolio-api:3000   (Prefix, jwt-auth+cors)
-/api/predict/*      → ml-predictor:8000    (Prefix, jwt-auth+cors)
+/api/stocks/*       → portfolio-api:3000   (Prefix, jwt-auth+rate-limiting+cors)
+/api/signals/*      → portfolio-api:3000   (Prefix, jwt-auth+rate-limiting+cors)
+/api/portfolio/*    → portfolio-api:3000   (Prefix, jwt-auth+rate-limiting+cors — portfolio-api proxies to portfolio-service)
+/api/news/*         → portfolio-api:3000   (Prefix, jwt-auth+rate-limiting+cors)
+/api/predict/*      → ml-predictor:8000    (Prefix, jwt-auth+rate-limiting+cors)
 
 # Frontend (nginx, not Kong)
 /*                  → frontend:3000

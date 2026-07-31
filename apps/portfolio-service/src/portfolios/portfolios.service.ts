@@ -47,9 +47,45 @@ export class PortfoliosService {
   }
 
   async addStock(id: string, dto: AddStockDto): Promise<PortfolioType> {
+    return this.addStocks(id, [dto]);
+  }
+
+  /**
+   * Shared by addStock and the batch endpoint — one findByIdForMutation, N
+   * in-memory mutations, one save, one trade insert per item. No
+   * transaction/session: mongo:8 in docker-compose runs standalone (no
+   * --replSet), and single-item addStock was already non-transactional
+   * (save then a separate trade insert, no rollback on the second write
+   * failing) — batch staying consistent with that today is more honest than
+   * making batch atomic while single-item isn't.
+   */
+  async addStocks(id: string, items: AddStockDto[]): Promise<PortfolioType> {
     const doc = await this.repo.findByIdForMutation(id);
     if (!doc) throw new NotFoundException('Portfolio not found');
 
+    for (const dto of items) {
+      this.applyBuy(doc, dto);
+    }
+
+    const saved = await doc.save();
+
+    const executedAt = new Date();
+    await this.tradeRepo.recordMany(
+      items.map((dto) => ({
+        portfolioId: id,
+        symbol: dto.symbol,
+        type: 'buy',
+        shares: dto.shares,
+        price: dto.price,
+        totalAmount: dto.shares * dto.price,
+        executedAt,
+      })),
+    );
+
+    return this.toResponse(saved.toObject<Portfolio>());
+  }
+
+  private applyBuy(doc: PortfolioDocument, dto: AddStockDto): void {
     const existing = doc.stocks.find((s) => s.symbol === dto.symbol);
     if (existing) {
       const newShares = existing.shares + dto.shares;
@@ -66,20 +102,6 @@ export class PortfoliosService {
         latestPrice: dto.price,
       });
     }
-
-    const saved = await doc.save();
-
-    await this.tradeRepo.record({
-      portfolioId: id,
-      symbol: dto.symbol,
-      type: 'buy',
-      shares: dto.shares,
-      price: dto.price,
-      totalAmount: dto.shares * dto.price,
-      executedAt: new Date(),
-    });
-
-    return this.toResponse(saved.toObject<Portfolio>());
   }
 
   private toResponse(
