@@ -4,6 +4,7 @@ import { APP_FILTER } from '@nestjs/core';
 import { MongooseModule } from '@nestjs/mongoose';
 import { SentryModule, SentryGlobalFilter } from '@sentry/nestjs/setup';
 import configuration from './config/configuration';
+import { CommonModule } from './common/common.module';
 import { HealthController } from './health.controller';
 import { MetricsController } from './metrics.controller';
 import { PricesModule } from './prices/prices.module';
@@ -18,6 +19,7 @@ import { PricesModule } from './prices/prices.module';
         uri: config.getOrThrow<string>('mongodb.uri'),
       }),
     }),
+    CommonModule,
     PricesModule,
   ],
   controllers: [HealthController, MetricsController],

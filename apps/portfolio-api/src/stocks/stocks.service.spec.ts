@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { of, throwError } from 'rxjs';
 import type { AxiosResponse } from 'axios';
 import type { OHLCV } from '@yana-stocks/shared-types';
+import { ExternalApiBreakersService } from '../common/external-api-breakers.service';
 import { RedisService } from '../redis/redis.service';
 import type { AssetEntry, PriceCacheEntry, ScreenerResult } from './price-cache.types';
 import { StocksService } from './stocks.service';
@@ -116,6 +117,9 @@ describe('StocksService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StocksService,
+        // Real (not mocked) — several tests below exercise actual
+        // open/closed circuit-breaker behavior, not just pass-through.
+        ExternalApiBreakersService,
         {
           provide: RedisService,
           useValue: {
@@ -578,6 +582,24 @@ describe('StocksService', () => {
       expect(redis.set).toHaveBeenCalledWith('papi:assets:us', expect.any(String), 60);
     });
 
+    it('falls back to MOCK_ASSETS when Massive returns an unexpected response shape', async () => {
+      // Simulates Polygon renaming/restructuring `results` — same fallback
+      // path (and short TTL) as a network failure, just caught by the shape
+      // check instead of a rejected promise.
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('MY_MASSIVE_KEY');
+
+      httpService.get.mockReturnValueOnce(
+        of({ data: { results: 'not-an-array' } } as unknown as AxiosResponse),
+      );
+
+      const result = await service.getAssets('', 1, 10, 'us');
+
+      expect(result.total).toBeGreaterThan(0);
+      expect(result.data[0]?.assetClass).toBe('us_equity');
+      expect(redis.set).toHaveBeenCalledWith('papi:assets:us', expect.any(String), 60);
+    });
+
     it('filters by symbol prefix (case-insensitive)', async () => {
       redis.get.mockResolvedValue(JSON.stringify(mockEquityAssets));
 
@@ -728,6 +750,56 @@ describe('StocksService', () => {
       expect(result.indices).toHaveLength(2);
       expect(result.sectors).toHaveLength(11);
       expect(result.news).toHaveLength(1);
+    });
+
+    it('drops news articles with an unexpected field type instead of throwing', async () => {
+      // A renamed/retyped FMP field (e.g. `title` becoming a number) must be
+      // caught here, not silently propagate as `undefined`/NaN downstream —
+      // this is the concrete "format change" case the reviewer asked about.
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('KEY');
+      httpService.get.mockImplementation(
+        (url: string, config?: { params?: Record<string, unknown> }) => {
+          const sym = config?.params?.['symbol'] as string | undefined;
+          if (url.includes('/stable/quote')) {
+            if (sym === '^GSPC') return of({ data: [fmpIndices[0]] } as AxiosResponse);
+            return of({ data: [] } as AxiosResponse);
+          }
+          if (url.includes('/news/stock')) {
+            return of({
+              data: [{ title: 12345, url: 'https://example.com/bad', site: 'Reuters' }, fmpNews[0]],
+            } as unknown as AxiosResponse);
+          }
+          if (url.includes('polygon.io')) {
+            return of({ data: { ticker: { todaysChangePerc: 1.5 } } } as AxiosResponse);
+          }
+          return throwError(() => new Error('unexpected url'));
+        },
+      );
+
+      const result = await service.getOverview();
+
+      expect(result.news).toHaveLength(1);
+      expect(result.news[0]?.title).toBe('Markets rally on Fed optimism');
+    });
+
+    it('returns no news when FMP responds with a non-array shape', async () => {
+      redis.get.mockResolvedValue(null);
+      (configService.get as jest.Mock).mockReturnValue('KEY');
+      httpService.get.mockImplementation((url: string) => {
+        if (url.includes('/stable/quote')) return of({ data: [] } as AxiosResponse);
+        if (url.includes('/news/stock')) {
+          return of({ data: { error: 'unexpected envelope' } } as unknown as AxiosResponse);
+        }
+        if (url.includes('polygon.io')) {
+          return of({ data: { ticker: { todaysChangePerc: 1.5 } } } as AxiosResponse);
+        }
+        return throwError(() => new Error('unexpected url'));
+      });
+
+      const result = await service.getOverview();
+
+      expect(result.news).toHaveLength(0);
     });
   });
 

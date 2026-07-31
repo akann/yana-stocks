@@ -10,6 +10,7 @@ import { MetricsController } from './metrics.controller';
 import { PortfolioProxyController } from './portfolio/portfolio-proxy.controller';
 import { PredictProxyController } from './predict/predict-proxy.controller';
 import { ProfileProxyController } from './profile/profile-proxy.controller';
+import { CommonModule } from './common/common.module';
 import { KafkaModule } from './kafka/kafka.module';
 import { RedisModule } from './redis/redis.module';
 import { AnalystModule } from './analyst/analyst.module';
@@ -22,6 +23,7 @@ import { StocksModule } from './stocks/stocks.module';
     SentryModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
     HttpModule.register({ timeout: 10_000 }),
+    CommonModule,
     RedisModule,
     KafkaModule,
     StocksModule,

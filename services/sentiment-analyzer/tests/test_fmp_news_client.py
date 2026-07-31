@@ -100,6 +100,50 @@ def test_fetch_skips_non_list_response(mock_client_class: MagicMock) -> None:
     assert articles == []
 
 
+@patch("sentiment_analyzer.fmp_news_client.httpx.Client")
+def test_fetch_skips_article_with_unexpected_field_type(mock_client_class: MagicMock) -> None:
+    # A renamed/retyped FMP field (e.g. `title` becoming a number) must be
+    # caught here, not silently propagate as "" downstream — the concrete
+    # "format change" case a reviewer asked about.
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+    malformed = {**FMP_ARTICLE, "title": 12345}
+    mock_client.get.return_value = _make_response([malformed, FMP_ARTICLE])
+
+    client = FmpNewsClient(api_key="key")
+    since = datetime(2024, 1, 14, tzinfo=UTC)
+    articles = client.fetch_articles(["AAPL"], since)
+
+    assert len(articles) == 1
+    assert articles[0]["headline"] == "Apple beats earnings"
+
+
+@patch("sentiment_analyzer.fmp_news_client.httpx.Client")
+def test_circuit_opens_after_repeated_failures(mock_client_class: MagicMock) -> None:
+    import httpx
+
+    mock_client = MagicMock()
+    mock_client_class.return_value = mock_client
+    mock_client.get.side_effect = httpx.HTTPError("timeout")
+
+    client = FmpNewsClient(api_key="key")
+    since = datetime(2024, 1, 14, tzinfo=UTC)
+
+    # fail_max=5 on a fresh breaker — five failing calls trip it open.
+    for _ in range(5):
+        with pytest.raises(NewsApiError):
+            client.fetch_articles(["AAPL"], since)
+
+    calls_while_closed = mock_client.get.call_count
+    assert calls_while_closed > 0
+
+    # Once open, further calls must fail fast without hitting the network
+    # again — this is the actual resilience behavior, not just a metric.
+    with pytest.raises(NewsApiError):
+        client.fetch_articles(["AAPL"], since)
+    assert mock_client.get.call_count == calls_while_closed
+
+
 def test_parse_published_at_fmp_format() -> None:
     dt = FmpNewsClient.parse_published_at("2024-01-15 10:30:00")
     assert dt.year == 2024

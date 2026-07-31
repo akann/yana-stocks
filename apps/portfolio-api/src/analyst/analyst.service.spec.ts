@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { of, throwError } from 'rxjs';
 import type { AxiosResponse } from 'axios';
+import { ExternalApiBreakersService } from '../common/external-api-breakers.service';
 import { RedisService } from '../redis/redis.service';
 import { AnalystService } from './analyst.service';
 import type { AnalystRating } from './analyst.types';
@@ -31,6 +32,7 @@ describe('AnalystService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AnalystService,
+        ExternalApiBreakersService,
         {
           provide: RedisService,
           useValue: {

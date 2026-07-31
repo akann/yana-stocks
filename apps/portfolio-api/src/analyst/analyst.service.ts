@@ -2,6 +2,7 @@ import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
+import { ExternalApiBreakersService } from '../common/external-api-breakers.service';
 import { RedisService } from '../redis/redis.service';
 import type { AnalystRating } from './analyst.types';
 
@@ -54,6 +55,7 @@ export class AnalystService {
     private readonly redis: RedisService,
     private readonly httpService: HttpService,
     private readonly config: ConfigService,
+    private readonly breakers: ExternalApiBreakersService,
   ) {}
 
   async getRatings(symbol: string): Promise<AnalystRating> {
@@ -68,14 +70,18 @@ export class AnalystService {
     }
 
     const [recResult, targetResult] = await Promise.allSettled([
-      firstValueFrom(
-        this.httpService.get<FmpRecommendation[]>(
-          `${FMP_STABLE}/grades-consensus?symbol=${symbol}&apikey=${apiKey}`,
+      this.breakers.fire('fmp', () =>
+        firstValueFrom(
+          this.httpService.get<FmpRecommendation[]>(
+            `${FMP_STABLE}/grades-consensus?symbol=${symbol}&apikey=${apiKey}`,
+          ),
         ),
       ),
-      firstValueFrom(
-        this.httpService.get<FmpPriceTarget | FmpPriceTarget[]>(
-          `${FMP_STABLE}/price-target-consensus?symbol=${symbol}&apikey=${apiKey}`,
+      this.breakers.fire('fmp', () =>
+        firstValueFrom(
+          this.httpService.get<FmpPriceTarget | FmpPriceTarget[]>(
+            `${FMP_STABLE}/price-target-consensus?symbol=${symbol}&apikey=${apiKey}`,
+          ),
         ),
       ),
     ]);

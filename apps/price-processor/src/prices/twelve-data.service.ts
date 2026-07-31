@@ -4,6 +4,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 import { Model } from 'mongoose';
+import { ExternalApiBreakersService } from '../common/external-api-breakers.service';
 import { RedisService } from '../redis/redis.service';
 import type { QuoteEntry } from './prices.service';
 import { PriceBar } from './schemas/price-bar.schema';
@@ -43,6 +44,7 @@ export class TwelveDataService {
   constructor(
     @InjectModel(PriceBar.name) private readonly priceBarsModel: Model<PriceBar>,
     private readonly redis: RedisService,
+    private readonly breakers: ExternalApiBreakersService,
     config: ConfigService,
   ) {
     this.apiKey = config.get<string>('twelveData.apiKey') ?? '';
@@ -64,9 +66,11 @@ export class TwelveDataService {
     }
 
     try {
-      const resp = await this.http.get<TwelveDataQuote>('/quote', {
-        params: { symbol: this.tdSymbol(symbol), exchange: 'LSE', apikey: this.apiKey },
-      });
+      const resp = await this.breakers.fire('twelvedata', () =>
+        this.http.get<TwelveDataQuote>('/quote', {
+          params: { symbol: this.tdSymbol(symbol), exchange: 'LSE', apikey: this.apiKey },
+        }),
+      );
       const d = resp.data;
       if (d.status === 'error' || !d.close) {
         this.logger.warn('Twelve Data quote error for %s: %s', symbol, d.message ?? 'no close');
@@ -114,15 +118,17 @@ export class TwelveDataService {
     const outputsize = interval === '1d' ? 730 : Math.min(limit, 390);
 
     try {
-      const resp = await this.http.get<TwelveDataTimeSeries>('/time_series', {
-        params: {
-          symbol: this.tdSymbol(symbol),
-          exchange: 'LSE',
-          interval: tdInterval,
-          outputsize,
-          apikey: this.apiKey,
-        },
-      });
+      const resp = await this.breakers.fire('twelvedata', () =>
+        this.http.get<TwelveDataTimeSeries>('/time_series', {
+          params: {
+            symbol: this.tdSymbol(symbol),
+            exchange: 'LSE',
+            interval: tdInterval,
+            outputsize,
+            apikey: this.apiKey,
+          },
+        }),
+      );
       const d = resp.data;
       if (d.status === 'error' || !d.values?.length) {
         this.logger.warn('Twelve Data history error for %s: %s', symbol, d.message ?? 'no values');

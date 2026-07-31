@@ -1,8 +1,24 @@
 import type { NextFunction, Request, Response } from 'express';
-import { Counter, Histogram, Registry, collectDefaultMetrics } from 'prom-client';
+import { Counter, Gauge, Histogram, Registry, collectDefaultMetrics } from 'prom-client';
 
 export const register = new Registry();
 collectDefaultMetrics({ register });
+
+/** Emitted by each provider's CircuitBreaker (see external-api-breakers.service.ts). */
+export const externalApiRequestsTotal = new Counter({
+  name: 'external_api_requests_total',
+  help: 'Total calls to a third-party API, by outcome',
+  labelNames: ['provider', 'outcome'],
+  registers: [register],
+});
+
+/** 0 = closed, 0.5 = half-open, 1 = open. */
+export const externalApiCircuitState = new Gauge({
+  name: 'external_api_circuit_state',
+  help: "Current circuit-breaker state for a third-party API's provider",
+  labelNames: ['provider'],
+  registers: [register],
+});
 
 export const httpRequestDuration = new Histogram({
   name: 'http_request_duration_seconds',

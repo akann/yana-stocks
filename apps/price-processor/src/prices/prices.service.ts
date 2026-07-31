@@ -9,11 +9,27 @@ import type {
 } from '@yana-stocks/shared-types';
 import { KAFKA_TOPICS } from '@yana-stocks/kafka-client';
 import type { AxiosInstance } from 'axios';
+import { plainToInstance } from 'class-transformer';
+import { IsArray, IsOptional, validateSync } from 'class-validator';
 import { Model } from 'mongoose';
+import { ExternalApiBreakersService } from '../common/external-api-breakers.service';
+import { externalApiRequestsTotal } from '../metrics';
 import { RedisService } from '../redis/redis.service';
 import { KafkaProducerService } from './kafka-producer.service';
 import { PriceBar } from './schemas/price-bar.schema';
 import { TwelveDataService } from './twelve-data.service';
+
+/**
+ * Shape check on Polygon's aggregates response envelope (not each bar's
+ * fields — the existing `bar.o ?? 0`-style defaults already degrade those
+ * gracefully). Catches e.g. `results` being renamed, which would otherwise
+ * silently resolve to an empty history via `?? []` with no error.
+ */
+class PolygonAggregatesResponseDto {
+  @IsOptional()
+  @IsArray()
+  results?: unknown[];
+}
 
 export const POLYGON_HTTP = 'POLYGON_HTTP';
 
@@ -72,6 +88,7 @@ export class PricesService {
     private readonly kafkaProducer: KafkaProducerService,
     @Inject(POLYGON_HTTP) private readonly http: AxiosInstance,
     private readonly twelveData: TwelveDataService,
+    private readonly breakers: ExternalApiBreakersService,
     config: ConfigService,
   ) {
     this.apiKey = config.get<string>('massive.apiKey') ?? '';
@@ -177,9 +194,11 @@ export class PricesService {
     if (cached) return JSON.parse(cached) as QuoteEntry;
 
     try {
-      const resp = await this.http.get<PolygonSnapshotResp>(
-        `/v2/snapshot/locale/us/markets/stocks/tickers/${symbol}`,
-        { params: { apiKey: this.apiKey } },
+      const resp = await this.breakers.fire('massive', () =>
+        this.http.get<PolygonSnapshotResp>(
+          `/v2/snapshot/locale/us/markets/stocks/tickers/${symbol}`,
+          { params: { apiKey: this.apiKey } },
+        ),
       );
       const ticker = resp.data.ticker;
       const prevClose = ticker?.prevDay?.c;
@@ -233,10 +252,20 @@ export class PricesService {
     const fromStr = from.toISOString().slice(0, 10);
 
     try {
-      const resp = await this.http.get<PolygonAggregatesResp>(
-        `/v2/aggs/ticker/${symbol}/range/1/${timespan}/${fromStr}/${toStr}`,
-        { params: { adjusted: true, limit: 50000, apiKey: this.apiKey } },
+      const resp = await this.breakers.fire('massive', () =>
+        this.http.get<PolygonAggregatesResp>(
+          `/v2/aggs/ticker/${symbol}/range/1/${timespan}/${fromStr}/${toStr}`,
+          { params: { adjusted: true, limit: 50000, apiKey: this.apiKey } },
+        ),
       );
+
+      const shapeErrors = validateSync(plainToInstance(PolygonAggregatesResponseDto, resp.data));
+      if (shapeErrors.length > 0) {
+        externalApiRequestsTotal.inc({ provider: 'massive', outcome: 'invalid_shape' });
+        throw new Error(
+          `Unexpected Polygon aggregates response shape: ${shapeErrors.map((e) => e.property).join(', ')}`,
+        );
+      }
 
       const results = resp.data.results ?? [];
       if (results.length === 0) {

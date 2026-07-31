@@ -2,7 +2,50 @@ import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { OHLCV, PredictionSignal, SentimentSignal } from '@yana-stocks/shared-types';
+import { plainToInstance } from 'class-transformer';
+import { IsArray, IsOptional, IsString, validateSync } from 'class-validator';
 import { firstValueFrom } from 'rxjs';
+import { ExternalApiBreakersService } from '../common/external-api-breakers.service';
+import { externalApiRequestsTotal } from '../metrics';
+
+/**
+ * Runtime shape check for FMP news articles — every field is optional, same as
+ * FmpNewsItem, but a *present* field with the wrong type (FMP renaming/retyping
+ * a field) fails validation instead of silently resolving to undefined/NaN
+ * downstream. See fetchAssetsFromMassive's shape check below for the same idea
+ * applied to Polygon's response envelope.
+ */
+class FmpNewsArticleDto {
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @IsOptional()
+  @IsString()
+  url?: string;
+
+  @IsOptional()
+  @IsString()
+  publishedDate?: string;
+
+  @IsOptional()
+  @IsString()
+  site?: string;
+
+  @IsOptional()
+  @IsString()
+  text?: string;
+}
+
+class PolygonTickersResponseDto {
+  @IsOptional()
+  @IsArray()
+  results?: unknown[];
+
+  @IsOptional()
+  @IsString()
+  next_url?: string;
+}
 
 interface FmpIndexQuote {
   symbol?: string;
@@ -231,9 +274,39 @@ export class StocksService {
     private readonly redis: RedisService,
     private readonly httpService: HttpService,
     private readonly config: ConfigService,
+    private readonly breakers: ExternalApiBreakersService,
   ) {
     this.priceProcessorUrl = config.getOrThrow<string>('priceProcessorUrl');
     this.mlPredictorUrl = config.getOrThrow<string>('mlPredictorUrl');
+  }
+
+  /**
+   * Validates a raw FMP news article, skipping (not throwing on) any item
+   * whose shape doesn't match — one bad article shouldn't drop the rest of
+   * the batch. Records `invalid_shape` so a sustained format change (as
+   * opposed to occasional junk data) is visible/alertable.
+   */
+  private validateFmpNewsItems(data: unknown): FmpNewsItem[] {
+    if (!Array.isArray(data)) {
+      externalApiRequestsTotal.inc({ provider: 'fmp', outcome: 'invalid_shape' });
+      this.logger.warn('FMP news response was not an array — treating as empty');
+      return [];
+    }
+
+    const valid: FmpNewsItem[] = [];
+    for (const raw of data) {
+      const dto = plainToInstance(FmpNewsArticleDto, raw);
+      const errors = validateSync(dto);
+      if (errors.length > 0) {
+        externalApiRequestsTotal.inc({ provider: 'fmp', outcome: 'invalid_shape' });
+        this.logger.warn(
+          `Skipping FMP news article with unexpected shape: ${errors.map((e) => e.property).join(', ')}`,
+        );
+        continue;
+      }
+      valid.push(dto);
+    }
+    return valid;
   }
 
   /**
@@ -518,30 +591,38 @@ export class StocksService {
       apiKey
         ? Promise.allSettled(
             INDEX_SYMBOLS.map((sym) =>
-              firstValueFrom(
-                this.httpService.get<FmpIndexQuote[]>(`${FMP_STABLE}/quote`, {
-                  params: { symbol: sym, apikey: apiKey },
-                  timeout: 5000,
-                }),
+              this.breakers.fire('fmp', () =>
+                firstValueFrom(
+                  this.httpService.get<FmpIndexQuote[]>(`${FMP_STABLE}/quote`, {
+                    params: { symbol: sym, apikey: apiKey },
+                    timeout: 5000,
+                  }),
+                ),
               ),
             ),
           )
         : Promise.resolve([] as PromiseSettledResult<{ data: FmpIndexQuote[] }>[]),
       apiKey
-        ? firstValueFrom(
-            this.httpService.get<FmpNewsItem[]>(`${FMP_STABLE}/news/stock`, {
-              params: { limit: 8, apikey: apiKey },
-              timeout: 5000,
-            }),
-          ).catch(() => ({ data: [] as FmpNewsItem[] }))
+        ? this.breakers
+            .fire('fmp', () =>
+              firstValueFrom(
+                this.httpService.get<FmpNewsItem[]>(`${FMP_STABLE}/news/stock`, {
+                  params: { limit: 8, apikey: apiKey },
+                  timeout: 5000,
+                }),
+              ),
+            )
+            .catch(() => ({ data: [] as FmpNewsItem[] }))
         : Promise.resolve({ data: [] as FmpNewsItem[] }),
       polygonApiKey
         ? Promise.allSettled(
             etfSymbols.map((sym) =>
-              firstValueFrom(
-                this.httpService.get<{ ticker?: { todaysChangePerc?: number } }>(
-                  `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${sym}`,
-                  { params: { apiKey: polygonApiKey }, timeout: 5000 },
+              this.breakers.fire('massive', () =>
+                firstValueFrom(
+                  this.httpService.get<{ ticker?: { todaysChangePerc?: number } }>(
+                    `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${sym}`,
+                    { params: { apiKey: polygonApiKey }, timeout: 5000 },
+                  ),
                 ),
               ),
             ),
@@ -570,7 +651,7 @@ export class StocksService {
       return [{ sector: sectorName, changesPercentage: changePerc }];
     });
 
-    const news: MarketNewsItem[] = (newsResult.data ?? []).map((n) => ({
+    const news: MarketNewsItem[] = this.validateFmpNewsItems(newsResult.data).map((n) => ({
       title: n.title ?? '',
       url: n.url ?? '',
       publishedAt: n.publishedDate ?? '',
@@ -594,12 +675,16 @@ export class StocksService {
     if (!apiKey) return { dates: [], rows: [] };
 
     const FMP_STABLE = 'https://financialmodelingprep.com/stable';
-    const resp = await firstValueFrom(
-      this.httpService.get<FmpHistoricalSectorEntry[]>(
-        `${FMP_STABLE}/historical-sectors-performance`,
-        { params: { limit: 12, apikey: apiKey }, timeout: 8000 },
-      ),
-    ).catch(() => ({ data: [] as FmpHistoricalSectorEntry[] }));
+    const resp = await this.breakers
+      .fire('fmp', () =>
+        firstValueFrom(
+          this.httpService.get<FmpHistoricalSectorEntry[]>(
+            `${FMP_STABLE}/historical-sectors-performance`,
+            { params: { limit: 12, apikey: apiKey }, timeout: 8000 },
+          ),
+        ),
+      )
+      .catch(() => ({ data: [] as FmpHistoricalSectorEntry[] }));
 
     // FMP returns newest-first; reverse to chronological order for the heatmap
     const entries = [...(resp.data ?? [])].reverse();
@@ -650,10 +735,12 @@ export class StocksService {
 
     const snapshots = await Promise.allSettled(
       SECTOR_ETFS.map(({ etf }) =>
-        firstValueFrom(
-          this.httpService.get<{ ticker?: { todaysChangePerc?: number } }>(
-            `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${etf}`,
-            { params: { apiKey: polygonApiKey }, timeout: 5000 },
+        this.breakers.fire('massive', () =>
+          firstValueFrom(
+            this.httpService.get<{ ticker?: { todaysChangePerc?: number } }>(
+              `https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers/${etf}`,
+              { params: { apiKey: polygonApiKey }, timeout: 5000 },
+            ),
           ),
         ),
       ),
@@ -700,17 +787,22 @@ export class StocksService {
 
     const results = await Promise.allSettled(
       allStocks.map(({ tdSymbol }) =>
-        firstValueFrom(
-          this.httpService.get<TwelveDataSeriesResponse>('https://api.twelvedata.com/time_series', {
-            params: {
-              symbol: tdSymbol,
-              exchange: 'LSE',
-              interval: '1day',
-              outputsize: NUM_DATES + 1,
-              apikey: tdApiKey,
-            },
-            timeout: 10_000,
-          }),
+        this.breakers.fire('twelvedata', () =>
+          firstValueFrom(
+            this.httpService.get<TwelveDataSeriesResponse>(
+              'https://api.twelvedata.com/time_series',
+              {
+                params: {
+                  symbol: tdSymbol,
+                  exchange: 'LSE',
+                  interval: '1day',
+                  outputsize: NUM_DATES + 1,
+                  apikey: tdApiKey,
+                },
+                timeout: 10_000,
+              },
+            ),
+          ),
         ),
       ),
     );
@@ -857,12 +949,14 @@ export class StocksService {
 
     const fetched = await Promise.allSettled(
       SCREENER_SYMBOLS.map((sym) =>
-        firstValueFrom(
-          this.httpService.get<FmpProfile[]>(
-            `${FMP_STABLE}/profile?symbol=${sym}&apikey=${apiKey}`,
-            {
-              timeout: 5000,
-            },
+        this.breakers.fire('fmp', () =>
+          firstValueFrom(
+            this.httpService.get<FmpProfile[]>(
+              `${FMP_STABLE}/profile?symbol=${sym}&apikey=${apiKey}`,
+              {
+                timeout: 5000,
+              },
+            ),
           ),
         ),
       ),
@@ -904,11 +998,13 @@ export class StocksService {
     try {
       const results = await Promise.allSettled(
         DEFAULT_SYMBOLS.map((sym) =>
-          firstValueFrom(
-            this.httpService.get<FmpQuote[]>('https://financialmodelingprep.com/stable/quote', {
-              params: { symbol: sym, apikey: apiKey },
-              timeout: 5000,
-            }),
+          this.breakers.fire('fmp', () =>
+            firstValueFrom(
+              this.httpService.get<FmpQuote[]>('https://financialmodelingprep.com/stable/quote', {
+                params: { symbol: sym, apikey: apiKey },
+                timeout: 5000,
+              }),
+            ),
           ),
         ),
       );
@@ -964,9 +1060,27 @@ export class StocksService {
 
       while (url) {
         const pageUrl: string = url;
-        const resp = await firstValueFrom(
-          this.httpService.get<PolygonTickersResponse>(pageUrl, { params: params ?? { apiKey } }),
+        const resp = await this.breakers.fire('massive', () =>
+          firstValueFrom(
+            this.httpService.get<PolygonTickersResponse>(pageUrl, { params: params ?? { apiKey } }),
+          ),
         );
+
+        // Shape check on the response envelope itself (not each ticker's
+        // fields — the existing type-guard filter below already handles
+        // that) — catches e.g. `results` being renamed, which would
+        // otherwise silently resolve to an empty page via `?? []` with no
+        // error, one page at a time, until the whole universe quietly came
+        // back empty. Thrown here so it's caught by the same outer catch
+        // (and same MOCK_ASSETS/short-TTL fallback) as a network failure.
+        const shapeErrors = validateSync(plainToInstance(PolygonTickersResponseDto, resp.data));
+        if (shapeErrors.length > 0) {
+          externalApiRequestsTotal.inc({ provider: 'massive', outcome: 'invalid_shape' });
+          throw new Error(
+            `Unexpected Polygon tickers response shape: ${shapeErrors.map((e) => e.property).join(', ')}`,
+          );
+        }
+
         collected.push(...(resp.data.results ?? []));
 
         // next_url carries the pagination cursor but NOT the apiKey — it must

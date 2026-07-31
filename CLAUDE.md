@@ -117,6 +117,20 @@ yana-stocks/
 - **Pattern:** KEDA ScaledObject (scale 1→3 on `stocks.prices.raw` lag,
   threshold 100; min 1 — serves HTTP history/quote requests outside trading
   hours)
+- **External-API reliability (2026-07-31):** every Massive/Polygon and Twelve
+  Data call (`prices.service.ts`, `twelve-data.service.ts`) is wrapped in a
+  per-provider `opossum` circuit breaker
+  (`src/common/external-api-breakers.service.ts`) instead of called directly — a
+  `massive` breaker and a `twelvedata` breaker, each fed by every call site for
+  that provider. Breaker events emit
+  `external_api_requests_total{provider,outcome}` /
+  `external_api_circuit_state{provider}` (same names as portfolio-api's, so one
+  PrometheusRule covers both — see `k8s-apps`' `UPDATES.md` 2026-07-31 for the
+  new alert). Polygon's aggregates response envelope is also shape-validated
+  (`class-validator`/`class-transformer`, already this repo's DTO convention)
+  before use — a renamed/retyped `results` field throws into the _same_
+  catch/fallback path a network error already takes, rather than silently
+  resolving to an empty history via `?? []`.
 
 ### 3. sentiment-analyzer (Python)
 
@@ -138,7 +152,15 @@ yana-stocks/
   10 — this project is on FMP's **Starter** plan, ~300 req/min with no daily
   cap, not the free tier's 250/day the original number was sized for; 50
   comfortably covers the whole ~30-ticker baseline every cycle) each cycle so a
-  much larger tracked universe still can't burst past the per-minute limit;
+  much larger tracked universe still can't burst past the per-minute limit; its
+  one call site (`fmp_news_client.py`) is wrapped in a `pybreaker`
+  `CircuitBreaker` (2026-07-31) whose success/failure/state-change events emit
+  the same-named `external_api_requests_total`/`external_api_circuit_state`
+  metrics as the Node services (see price-processor's entry above), and each raw
+  article is validated against a small `FmpArticle` Pydantic model before use —
+  a field FMP silently renames or retypes is now caught and counted as
+  `invalid_shape` instead of resolving to `""` unnoticed, closing the gap that
+  let the 2026-07-23 FMP-deprecation incident below go undetected for a while;
   user-held/watched symbols always get a fresh fetch every cycle.
 
 ### 4. ml-predictor (Python)
@@ -262,6 +284,25 @@ yana-stocks/
 - **Pattern:** KEDA ScaledObject (scale 1→3, triggers on
   `stocks.prices.processed` + `stocks.signals.sentiment` +
   `stocks.signals.prediction` lag; min 1 — serves HTTP traffic)
+- **External-API reliability (2026-07-31):** every FMP/Massive/Twelve Data call
+  in `stocks.service.ts`/`analyst.service.ts` is routed through
+  `src/common/external-api-breakers.service.ts` (one `opossum` breaker per
+  provider — `fmp`/`massive`/`twelvedata` — not per call site), instead of
+  hitting `HttpService` directly. Prompted by a code-review question on how
+  external outages are handled — investigation found solid timeouts/fallback
+  caching already, but zero failure metric anywhere and no response-shape
+  validation, confirmed against the real FMP-deprecation incident below that
+  went undetected for a while. Breaker events emit
+  `external_api_requests_total{provider,outcome}`/
+  `external_api_circuit_state{provider}` in `metrics.ts`
+  (0=closed/0.5=half-open/1=open); `k8s-apps`' `ExternalApiCircuitOpen`
+  PrometheusRule alerts on the gauge (see its `UPDATES.md`, 2026-07-31). FMP
+  news and the Polygon asset-pagination response (the two spots with real
+  incident history) are also shape-validated via
+  `class-validator`/`class-transformer` — a renamed/retyped field is caught and
+  counted as `invalid_shape`, falling through to the exact same fallback path a
+  network error already takes rather than silently resolving to
+  `undefined`/`NaN`.
 - **Endpoints:**
   - `GET /stocks/:symbol` — price + sentiment + prediction (JWT required)
   - `GET /stocks/:symbol/history` — OHLCV history (JWT required)

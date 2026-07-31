@@ -3,6 +3,7 @@ import { getModelToken } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
 import type { ProcessedPriceMessage, RawPriceMessage } from '@yana-stocks/shared-types';
 import { KAFKA_TOPICS } from '@yana-stocks/kafka-client';
+import { ExternalApiBreakersService } from '../common/external-api-breakers.service';
 import { RedisService } from '../redis/redis.service';
 import { KafkaProducerService } from './kafka-producer.service';
 import { POLYGON_HTTP, PricesService } from './prices.service';
@@ -47,6 +48,8 @@ const massiveAggSuccess = {
   ],
 };
 const massiveAggEmpty = { ticker: 'SHOP', results: [] };
+// Simulates Polygon renaming/restructuring `results` on the aggregates envelope.
+const massiveAggInvalidShape = { ticker: 'SHOP', results: 'not-an-array' };
 
 const massiveSnapSuccess = {
   ticker: {
@@ -93,6 +96,9 @@ async function buildModule(): Promise<Fixture> {
   const module: TestingModule = await Test.createTestingModule({
     providers: [
       PricesService,
+      // Real (not mocked) — a new test below exercises the breaker actually
+      // failing fast, not just pass-through.
+      ExternalApiBreakersService,
       { provide: getModelToken(PriceBar.name), useValue: model },
       {
         provide: RedisService,
@@ -267,6 +273,21 @@ describe('PricesService', () => {
 
       await service.getHistory('SHOP', { limit: 60, interval: '1m' });
 
+      expect(redisSetex).not.toHaveBeenCalledWith('hist:no-data:SHOP:1m', expect.anything(), '1');
+    });
+
+    it('falls back to the DB (same as a network error) when Massive returns an unexpected response shape', async () => {
+      // A renamed/retyped `results` field must be caught here, not silently
+      // resolve to an empty history via `?? []` with no error — the concrete
+      // "format change" case a reviewer asked about. Same fallback path as a
+      // thrown network error: no new no-data flag, no bulkWrite, no crash.
+      const { service, model, redisSetex, mockGet } = await buildModule();
+      mockGet.mockResolvedValue({ data: massiveAggInvalidShape });
+
+      const result = await service.getHistory('SHOP', { limit: 60, interval: '1m' });
+
+      expect(result).toEqual([]);
+      expect(model.bulkWrite).not.toHaveBeenCalled();
       expect(redisSetex).not.toHaveBeenCalledWith('hist:no-data:SHOP:1m', expect.anything(), '1');
     });
 
