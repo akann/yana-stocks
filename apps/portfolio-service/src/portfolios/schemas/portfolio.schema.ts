@@ -4,6 +4,9 @@ import { HydratedDocument } from 'mongoose';
 
 @Schema({ _id: false })
 export class PortfolioHolding {
+  // Read directly (no API) via `.distinct('stocks.symbol')` by
+  // sentiment-analyzer and ml-predictor's storage.py — renaming this field
+  // silently breaks their tracked-symbol discovery. Update both if you rename it.
   @ApiProperty({ example: 'AAPL' })
   @Prop({ required: true })
   symbol!: string;

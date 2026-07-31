@@ -14,6 +14,9 @@ export class Watchlist {
   @Prop({ required: true })
   name!: string;
 
+  // Read directly (no API) via `.distinct('symbols')` by sentiment-analyzer
+  // and ml-predictor's storage.py — renaming this field silently breaks their
+  // tracked-symbol discovery. Update both if you rename it.
   @ApiProperty({ type: [String], example: ['AAPL', 'MSFT', 'GOOGL'] })
   @Prop({ type: [String], default: [] })
   symbols!: string[];
