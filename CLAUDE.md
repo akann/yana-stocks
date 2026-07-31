@@ -539,6 +539,34 @@ yana-stocks/
     service's guard). This closed a real gap found while investigating:
     `/stocks/[symbol]` had **no** client-side auth guard at all before this — it
     relied entirely on an API 401 plus `lib/api.ts`'s hard redirect.
+  - **CI gotcha (2026-07-31, same-day as the migration)**: the first real CI run
+    after this landed didn't fail fast — `e2e-tests` crawled for 40+ minutes on
+    the chromium project alone (vs. ~5 min historically) before being manually
+    cancelled. Root cause, confirmed live by `kubectl exec`ing into the
+    self-hosted runner pod mid-run and reading `/proc/<pid>/environ` for the
+    running `next-server` process:
+    `AUTH_SERVICE_URL`/`PROFILE_SERVICE_URL`/`PORTFOLIO_API_URL` were unset at
+    runtime, even though `.github/workflows/ci.yml`'s "Write frontend
+    .env.local" step writes them. The standalone `server.js`
+    (`output: "standalone"`, needed for the same reason as the Dockerfile) loads
+    env files relative to **its own** directory
+    (`.next/standalone/apps/frontend/`), not the source `apps/frontend/` the
+    file was written to — and "Assemble frontend standalone server" only copies
+    `static/`/`public/` in, never `.env.local`. So `resolveUpstream()` silently
+    fell back to its dev defaults (`auth`→3004, else→3006), neither of which
+    matches this job's real ports (auth-service=3001, portfolio-api=3004,
+    portfolio-service=3003) — every BFF-proxied request outside `auth`/`profile`
+    hit `localhost:3006`, where nothing listens, and `frontend.log` was
+    wall-to-wall `ECONNREFUSED`. Each affected e2e test then burned its full 60s
+    timeout × 3 attempts (1 + 2 CI retries) instead of failing fast, which is
+    what actually produced the multi-hour crawl rather than a fast, obvious
+    failure. Fixed by passing those three vars explicitly on the "Start backend
+    services" step's frontend launch line, the same way
+    `PORT`/`HOSTNAME`/`E2E_TEST_MODE` already are — more robust than trying to
+    get `.env.local` copied into the standalone output. `.env.local` is still
+    written and still needed for the **build** step (it's read there to inline
+    `NEXT_PUBLIC_WS_URL`), so that step stays; only the runtime services need
+    the explicit env on the launch line.
 - **Lighthouse CI** (2026-07-22, upgraded to a real server 2026-07-22):
   `pnpm --filter @yana-stocks/frontend lighthouse`
   (`apps/frontend/lighthouserc.json`, `@lhci/cli`) runs Lighthouse 3x against

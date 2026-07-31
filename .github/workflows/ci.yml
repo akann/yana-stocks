@@ -548,7 +548,21 @@ jobs:
           pnpm --filter @yana-stocks/portfolio-service start > logs/portfolio-service.log 2>&1 &
           pnpm --filter @yana-stocks/portfolio-api     start > logs/portfolio-api.log     2>&1 &
           pnpm --filter @yana-stocks/profile-service   start > logs/profile-service.log   2>&1 &
-          PORT=3000 HOSTNAME=0.0.0.0 E2E_TEST_MODE=true node apps/frontend/.next/standalone/apps/frontend/server.js > logs/frontend.log 2>&1 &
+          # Runtime-only env (AUTH_SERVICE_URL/PROFILE_SERVICE_URL/PORTFOLIO_API_URL)
+          # must be passed explicitly here, not just written to
+          # apps/frontend/.env.local above: the standalone server.js loads env
+          # files relative to its own directory
+          # (.next/standalone/apps/frontend/), which never gets .env.local
+          # copied into it ("Assemble frontend standalone server" only copies
+          # static/ and public/) — without this, resolveUpstream() falls back
+          # to its dev defaults (auth→3004, else→3006), neither of which
+          # matches this job's real ports, and every BFF-proxied request
+          # ECONNREFUSEs.
+          PORT=3000 HOSTNAME=0.0.0.0 E2E_TEST_MODE=true \
+          AUTH_SERVICE_URL=http://localhost:3001 \
+          PROFILE_SERVICE_URL=http://localhost:3007 \
+          PORTFOLIO_API_URL=http://localhost:3004 \
+          node apps/frontend/.next/standalone/apps/frontend/server.js > logs/frontend.log 2>&1 &
 
       - name: Wait for all services to be ready
         run: |
