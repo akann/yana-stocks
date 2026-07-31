@@ -3,8 +3,6 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api';
-
 const INPUT =
   'w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500';
 
@@ -19,7 +17,7 @@ export function ForgotPasswordForm(): React.JSX.Element {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/auth/password/reset-request`, {
+      const res = await fetch('/api/auth/password/reset-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),

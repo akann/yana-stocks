@@ -12,8 +12,8 @@ export function CookieBanner(): React.JSX.Element | null {
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-gray-100 border-t border-gray-300 px-4 py-4">
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <p className="text-sm text-gray-600">
-          We store session tokens in your browser&apos;s sessionStorage to keep you signed in. No
-          tracking or third-party cookies are used.{' '}
+          We use a secure, first-party session cookie to keep you signed in. No tracking or
+          third-party cookies are used.{' '}
         </p>
         <div className="flex items-center gap-2 shrink-0">
           <button

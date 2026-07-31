@@ -4,26 +4,14 @@
 // after hydration. Uses Next's fetch Data Cache with `revalidate` for
 // ISR-style caching shared across requests.
 
-const PORTFOLIO_API_URL = process.env.PORTFOLIO_API_URL ?? 'http://localhost:3006';
-
-function resolveApiOrigin(): string {
-  const publicUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (publicUrl && /^https?:\/\//.test(publicUrl)) {
-    return publicUrl.replace(/\/$/, '');
-  }
-  // Dev fallback: NEXT_PUBLIC_API_URL is unset (browser uses the relative
-  // '/api' proxy path via next.config.mjs rewrites, which only applies to
-  // incoming HTTP requests, not outgoing server-side fetches). Hit
-  // portfolio-api directly instead, mirroring next.config.mjs's rewrites().
-  return `${PORTFOLIO_API_URL}/api`;
-}
+import { resolveUpstream } from './bff/upstream';
 
 export async function fetchPublicMarketData<T>(
   path: string,
   revalidateSeconds: number,
 ): Promise<T | null> {
   try {
-    const res = await fetch(`${resolveApiOrigin()}${path}`, {
+    const res = await fetch(`${resolveUpstream(['market'])}/api${path}`, {
       next: { revalidate: revalidateSeconds },
     });
     if (!res.ok) return null;

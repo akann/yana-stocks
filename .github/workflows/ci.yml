@@ -459,10 +459,16 @@ jobs:
 
       - name: Write frontend .env.local
         run: |
+          # No NEXT_PUBLIC_API_URL anymore — the browser only ever calls this
+          # app's own origin now; src/app/api/[...path] (the BFF) is what
+          # resolves these server-only URLs (see src/lib/bff/upstream.ts).
+          # API_GATEWAY_URL is deliberately left unset here (no Kong in CI),
+          # so it falls through to this per-service map.
           printf '%s\n' \
-            'NEXT_PUBLIC_API_URL=http://localhost:3004/api' \
             'NEXT_PUBLIC_WS_URL=ws://localhost:3004' \
             'AUTH_SERVICE_URL=http://localhost:3001' \
+            'PROFILE_SERVICE_URL=http://localhost:3007' \
+            'PORTFOLIO_API_URL=http://localhost:3004' \
             > apps/frontend/.env.local
 
       - name: Build all apps
@@ -841,7 +847,6 @@ jobs:
           if [[ "${{ matrix.service.name }}" == "frontend" ]]; then
             {
               echo 'args<<EOF'
-              echo 'NEXT_PUBLIC_API_URL=https://api-gateway.yanatech.co.uk/api'
               echo 'NEXT_PUBLIC_WS_URL=wss://api-gateway.yanatech.co.uk'
               echo 'NEXT_PUBLIC_SENTRY_DSN=https://b7573581c85df1ce24ea66b2dcda43f9@o4511713892499456.ingest.de.sentry.io/4511714258780240'
               echo 'EOF'

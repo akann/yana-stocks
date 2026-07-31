@@ -4,8 +4,6 @@ import React, { Suspense, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api';
-
 function VerifyInner(): React.JSX.Element {
   const params = useSearchParams();
   const token = params.get('token');
@@ -19,7 +17,7 @@ function VerifyInner(): React.JSX.Element {
     if (!token || done.current) return;
     done.current = true;
 
-    fetch(`${API_URL}/auth/verify`, {
+    fetch('/api/auth/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),

@@ -3,10 +3,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api';
-
-const ACCESS_TOKEN_KEY = 'access_token';
-const REFRESH_TOKEN_KEY = 'refresh_token';
+// Always same-origin now — the BFF (this app's own /api/[...path] route
+// handler) is what talks to the real backend server-to-server, attaching
+// Authorization from the httpOnly access_token cookie. The browser never
+// calls api-gateway.yanatech.co.uk directly anymore.
+const API_URL = '/api';
 
 export interface AuthUser {
   userId: string;
@@ -40,7 +41,6 @@ export interface MFASetupData {
 }
 
 interface AuthContextValue {
-  accessToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   mfaRequired: boolean;
@@ -49,7 +49,6 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<{ mfaRequired: boolean }>;
   verifyMFALogin: (code: string) => Promise<void>;
   logout: () => Promise<void>;
-  refresh: () => Promise<void>;
   updateProfile: (dto: UpdateProfileInput) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   deleteAccount: (password: string) => Promise<void>;
@@ -61,13 +60,11 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function authHeaders(token: string): Record<string, string> {
-  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-}
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
-async function fetchIdentity(token: string): Promise<AuthUser | null> {
+async function fetchIdentity(): Promise<AuthUser | null> {
   try {
-    const res = await fetch(`${API_URL}/auth/me`, { headers: authHeaders(token) });
+    const res = await fetch(`${API_URL}/auth/me`, { credentials: 'same-origin' });
     if (!res.ok) return null;
     return (await res.json()) as AuthUser;
   } catch {
@@ -75,9 +72,9 @@ async function fetchIdentity(token: string): Promise<AuthUser | null> {
   }
 }
 
-async function fetchProfile(token: string): Promise<UserProfile | null> {
+async function fetchProfile(): Promise<UserProfile | null> {
   try {
-    const res = await fetch(`${API_URL}/profile/me`, { headers: authHeaders(token) });
+    const res = await fetch(`${API_URL}/profile/me`, { credentials: 'same-origin' });
     if (!res.ok) return null;
     return (await res.json()) as UserProfile;
   } catch {
@@ -85,108 +82,52 @@ async function fetchProfile(token: string): Promise<UserProfile | null> {
   }
 }
 
-async function doRefresh(): Promise<string | null> {
-  const refreshToken = sessionStorage.getItem(REFRESH_TOKEN_KEY);
-  if (!refreshToken) return null;
-  try {
-    const res = await fetch(`${API_URL}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
-    });
-    if (!res.ok) return null;
-    const tokens = (await res.json()) as { accessToken: string; refreshToken: string };
-    sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
-    sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
-    return tokens.accessToken;
-  } catch {
-    return null;
-  }
-}
-
 export function AuthProvider({ children }: { children: ReactNode }): React.JSX.Element {
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [mfaPendingToken, setMfaPendingToken] = useState<string | null>(null);
+  const [mfaRequired, setMfaRequired] = useState(false);
 
   const clearSession = useCallback(() => {
-    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-    setAccessToken(null);
     setUser(null);
     setProfile(null);
+    setMfaRequired(false);
   }, []);
 
-  const loadUserData = useCallback(async (token: string): Promise<void> => {
-    const [identity, prof] = await Promise.all([fetchIdentity(token), fetchProfile(token)]);
+  const loadUserData = useCallback(async (): Promise<void> => {
+    const [identity, prof] = await Promise.all([fetchIdentity(), fetchProfile()]);
     setUser(identity);
     setProfile(prof);
   }, []);
 
-  // Silently refresh the access token on 401 and retry the original request once.
-  const fetchWithAuth = useCallback(
+  // Every mutating/protected call: the BFF already attempted a transparent
+  // refresh server-side, so a 401 reaching here means genuinely logged out —
+  // clear local state (drives isAuthenticated) rather than retrying again.
+  const authedFetch = useCallback(
     async (url: string, init: RequestInit = {}): Promise<Response> => {
-      const makeRequest = (token: string): Promise<Response> =>
-        fetch(url, {
-          ...init,
-          headers: {
-            'Content-Type': 'application/json',
-            ...(init.headers as Record<string, string> | undefined),
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-      const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
-      if (!token) throw new Error('Not authenticated');
-
-      const res = await makeRequest(token);
-      if (res.status !== 401) return res;
-
-      const newToken = await doRefresh();
-      if (!newToken) {
-        clearSession();
-        throw new Error('Session expired');
-      }
-
-      setAccessToken(newToken);
-      return makeRequest(newToken);
+      const res = await fetch(url, { ...init, credentials: 'same-origin' });
+      if (res.status === 401) clearSession();
+      return res;
     },
     [clearSession],
   );
 
   useEffect(() => {
     void (async () => {
-      const token = sessionStorage.getItem(ACCESS_TOKEN_KEY);
-      if (!token) {
-        setIsLoading(false);
-        return;
-      }
-
-      setAccessToken(token);
-      const identity = await fetchIdentity(token);
+      const identity = await fetchIdentity();
       if (identity) {
         setUser(identity);
-        void fetchProfile(token).then(setProfile);
-      } else {
-        // Access token expired on startup — try silent refresh before logging out.
-        const newToken = await doRefresh();
-        if (newToken) {
-          setAccessToken(newToken);
-          await loadUserData(newToken);
-        } else {
-          clearSession();
-        }
+        void fetchProfile().then(setProfile);
       }
       setIsLoading(false);
     })();
-  }, [loadUserData, clearSession]);
+  }, []);
 
   async function login(email: string, password: string): Promise<{ mfaRequired: boolean }> {
     const res = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      headers: JSON_HEADERS,
       body: JSON.stringify({ email, password }),
     });
 
@@ -195,66 +136,42 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       throw new Error(body.error ?? body.message ?? 'Login failed');
     }
 
-    const data = (await res.json()) as
-      | { mfaRequired: true; mfaToken: string }
-      | { accessToken: string; refreshToken: string };
-
-    if ('mfaRequired' in data && data.mfaRequired) {
-      setMfaPendingToken(data.mfaToken);
+    const data = (await res.json()) as { mfaRequired: boolean };
+    if (data.mfaRequired) {
+      setMfaRequired(true);
       return { mfaRequired: true };
     }
 
-    const tokens = data as { accessToken: string; refreshToken: string };
-    sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
-    sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
-    setAccessToken(tokens.accessToken);
-    await loadUserData(tokens.accessToken);
+    await loadUserData();
     return { mfaRequired: false };
   }
 
   async function verifyMFALogin(code: string): Promise<void> {
-    if (!mfaPendingToken) throw new Error('No MFA session');
     const res = await fetch(`${API_URL}/auth/mfa/verify`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mfaToken: mfaPendingToken, code }),
+      credentials: 'same-origin',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ code }),
     });
     if (!res.ok) {
       const body = (await res.json().catch(() => ({}))) as { error?: string };
       throw new Error(body.error ?? 'Invalid code');
     }
-    const tokens = (await res.json()) as { accessToken: string; refreshToken: string };
-    setMfaPendingToken(null);
-    sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
-    sessionStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
-    setAccessToken(tokens.accessToken);
-    await loadUserData(tokens.accessToken);
+    setMfaRequired(false);
+    await loadUserData();
   }
 
   async function logout(): Promise<void> {
-    const refreshToken = sessionStorage.getItem(REFRESH_TOKEN_KEY);
-    if (refreshToken) {
-      await fetch(`${API_URL}/auth/logout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-      }).catch(() => undefined);
-    }
+    await fetch(`${API_URL}/auth/logout`, { method: 'POST', credentials: 'same-origin' }).catch(
+      () => undefined,
+    );
     clearSession();
   }
 
-  async function refresh(): Promise<void> {
-    const newToken = await doRefresh();
-    if (!newToken) {
-      clearSession();
-      throw new Error('Session expired');
-    }
-    setAccessToken(newToken);
-  }
-
   async function updateProfile(dto: UpdateProfileInput): Promise<void> {
-    const res = await fetchWithAuth(`${API_URL}/profile/me`, {
+    const res = await authedFetch(`${API_URL}/profile/me`, {
       method: 'PUT',
+      headers: JSON_HEADERS,
       body: JSON.stringify(dto),
     });
     if (!res.ok) throw new Error('Failed to update profile');
@@ -262,8 +179,9 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   }
 
   async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
-    const res = await fetchWithAuth(`${API_URL}/auth/password`, {
+    const res = await authedFetch(`${API_URL}/auth/password`, {
       method: 'PUT',
+      headers: JSON_HEADERS,
       body: JSON.stringify({ currentPassword, newPassword }),
     });
     if (!res.ok) {
@@ -273,21 +191,22 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   }
 
   async function getMFAStatus(): Promise<boolean> {
-    const res = await fetchWithAuth(`${API_URL}/auth/mfa`);
+    const res = await authedFetch(`${API_URL}/auth/mfa`);
     if (!res.ok) throw new Error('Failed to get MFA status');
     const body = (await res.json()) as { enabled: boolean };
     return body.enabled;
   }
 
   async function setupMFA(): Promise<MFASetupData> {
-    const res = await fetchWithAuth(`${API_URL}/auth/mfa/setup`, { method: 'POST' });
+    const res = await authedFetch(`${API_URL}/auth/mfa/setup`, { method: 'POST' });
     if (!res.ok) throw new Error('Failed to generate MFA secret');
     return (await res.json()) as MFASetupData;
   }
 
   async function enableMFA(code: string): Promise<void> {
-    const res = await fetchWithAuth(`${API_URL}/auth/mfa/enable`, {
+    const res = await authedFetch(`${API_URL}/auth/mfa/enable`, {
       method: 'POST',
+      headers: JSON_HEADERS,
       body: JSON.stringify({ code }),
     });
     if (!res.ok) {
@@ -297,13 +216,14 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   }
 
   async function disableMFA(): Promise<void> {
-    const res = await fetchWithAuth(`${API_URL}/auth/mfa`, { method: 'DELETE' });
+    const res = await authedFetch(`${API_URL}/auth/mfa`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Failed to disable MFA');
   }
 
   async function deleteAccount(password: string): Promise<void> {
-    const res = await fetchWithAuth(`${API_URL}/auth/account`, {
+    const res = await authedFetch(`${API_URL}/auth/account`, {
       method: 'DELETE',
+      headers: JSON_HEADERS,
       body: JSON.stringify({ password }),
     });
     if (!res.ok) {
@@ -316,16 +236,14 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
   return (
     <AuthContext.Provider
       value={{
-        accessToken,
         isAuthenticated: !!user,
         isLoading,
-        mfaRequired: !!mfaPendingToken,
+        mfaRequired,
         user,
         profile,
         login,
         verifyMFALogin,
         logout,
-        refresh,
         updateProfile,
         changePassword,
         deleteAccount,

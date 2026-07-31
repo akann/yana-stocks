@@ -4,8 +4,6 @@ import React, { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '/api';
-
 const INPUT =
   'w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500';
 
@@ -62,7 +60,7 @@ function ResetPasswordInner(): React.JSX.Element {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/auth/password/reset`, {
+      const res = await fetch('/api/auth/password/reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, newPassword: password }),

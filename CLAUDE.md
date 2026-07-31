@@ -408,8 +408,10 @@ yana-stocks/
   - `/profile` — account settings: Profile / Change password / Delete account
     tabs (auth required)
 - **URL:** `https://stocks.yanatech.co.uk`
-- **Dev proxy:** `next.config.mjs` rewrites `/api/*` to local services (see
-  frontend env vars)
+- **API access:** the browser only ever calls this app's own origin —
+  `src/app/api/[...path]/route.ts` (a BFF) resolves and forwards to the real
+  backend, attaching `Authorization` from the httpOnly `access_token` cookie
+  server-side (see the 2026-07-31 auth-cookie-migration entry below).
 - **Navbar:** `src/components/Navbar.tsx` — `sticky top-0 z-50` (stays fixed on
   scroll). Contains `SymbolSearch` component: debounced (250ms) autocomplete
   input that queries `GET /market/assets?market=all`, shows 8 results in a
@@ -437,25 +439,26 @@ yana-stocks/
   `export const dynamic = 'force-dynamic'` in `src/app/layout.tsx` (cascades to
   all routes) since `Providers`/`Navbar`/`CookieBanner` are all client
   components rendered in the root layout, so every route needs JS to hydrate.
-  Two allowances this app needed that `akan`/`yanatech` didn't: `img-src`
+  One allowance this app needed that `akan`/`yanatech` didn't: `img-src`
   includes `https:` (not just `'self' data:'`) because `profile-service`'s
   `avatar` field is a free-form user-supplied external URL with no host
-  allowlist; `connect-src`'s API origin is **computed from `NEXT_PUBLIC_API_URL`
-  at request time**
-  (`new URL(process.env.NEXT_PUBLIC_API_URL ?? '<prod default>').origin`), **not
-  hardcoded** — production crosses to `https://api-gateway.yanatech.co.uk`, but
-  the `e2e-tests` CI job builds the frontend with
-  `NEXT_PUBLIC_API_URL=http://localhost:3004/api` (no Kong/api-gateway in CI,
-  points straight at `auth-service`), and a hardcoded prod-only value silently
-  CSP-blocked every auth fetch there on first attempt — every login e2e test
-  failed (`toBeVisible`/`waitForURL` timeouts, same symptom as a real hydration
-  break, but the actual cause was `connect-src` not `script-src`).
-  `connect-src`'s Sentry entry is `*.ingest.de.sentry.io` (EU region, matching
-  `NEXT_PUBLIC_SENTRY_DSN`). Unlike `akan`/`yanatech` (which had a CSP that
-  silently broke hydration), this app had **no CSP at all** before this fix —
-  added proactively, not because something broke. See
+  allowlist. Unlike `akan`/`yanatech` (which had a CSP that silently broke
+  hydration), this app had **no CSP at all** before this fix — added
+  proactively, not because something broke. See
   `[[project_nextjs_csp_nonce_gotchas]]` memory for the full incident history
-  across all four apps, including this `connect-src` regression.
+  across all four apps. **`connect-src` simplified 2026-07-31:** now just
+  `'self' https://*.ingest.de.sentry.io` (Sentry's EU-region ingest host,
+  matching `NEXT_PUBLIC_SENTRY_DSN`) — no more per-environment
+  `NEXT_PUBLIC_API_URL` computation. Before the auth-cookie migration below, the
+  browser called `api-gateway.yanatech.co.uk` directly in prod but a local port
+  in CI with no gateway in front, so `connect-src` had to derive the right
+  origin at request time from `NEXT_PUBLIC_API_URL` — getting that wrong once (a
+  hardcoded prod-only value) silently CSP-blocked every auth fetch in CI and
+  failed every login e2e test (`toBeVisible`/`waitForURL` timeouts, same symptom
+  as a real hydration break, but the actual cause was `connect-src` not
+  `script-src`). Now that the browser only ever calls this app's own origin,
+  that whole class of environment-dependent CSP bug is structurally gone, not
+  just fixed.
 - **Real SSR + ISR-style data caching for the homepage** (2026-07-22):
   `force-dynamic` on every route (above) only disables _static generation_ — it
   doesn't stop server-side data fetching. `app/page.tsx` is now an async Server
@@ -473,17 +476,69 @@ yana-stocks/
   raw response. Never reuse the client-side `src/lib/ query-client.ts` singleton
   for this — it's one instance for the whole Node.js server process, so
   prefetching into it would leak one user's data into another's response.
-  `server-api.ts` resolves an absolute API origin itself (`NEXT_PUBLIC_API_URL`
-  in prod; falls back to hitting `PORTFOLIO_API_URL` directly in dev) because
-  server-side `fetch` — unlike the browser — doesn't have an implicit origin to
-  resolve `next.config.mjs`'s relative `/api/*` rewrites against.
-  `MarketBrowser`/`StockScreener` (the tabbed section below the fold, only one
-  visible at a time) are now `next/dynamic` imports to keep their JS out of the
-  homepage's main bundle. **Deliberately not done**: server-side auth redirects
-  for `/dashboard`/`/portfolio`/`/watchlist` — `AuthContext.tsx` keeps tokens
-  only in `sessionStorage`, which no Server Component or `proxy.ts` can read, so
-  this would need a real migration to httpOnly cookies first, not a rendering
-  change; still client-side `useEffect` + `router.replace('/login')`.
+  `server-api.ts` resolves an absolute API origin itself via
+  `src/lib/bff/upstream.ts`'s `resolveUpstream()` (same helper the BFF proxy
+  uses — `API_GATEWAY_URL` in prod, per-service dev URLs otherwise) because
+  server-side `fetch` — unlike the browser — has no implicit origin to resolve a
+  relative `/api/*` path against. `MarketBrowser`/`StockScreener` (the tabbed
+  section below the fold, only one visible at a time) are now `next/dynamic`
+  imports to keep their JS out of the homepage's main bundle. Server-side auth
+  redirects for `/dashboard`/`/portfolio`/`/watchlist`/`/stocks/*`/`/profile`
+  **are now done** (2026-07-31, see below) — `proxy.ts` gates these on the
+  `access_token` cookie's presence before the page even renders; the client-side
+  `useEffect` + `router.replace('/login')` guards remain as defense-in-depth but
+  rarely fire now.
+- **Auth tokens moved from sessionStorage to httpOnly cookies (2026-07-31):**
+  fixes an XSS-exposed storage layer (`sessionStorage` is JS-readable) without
+  needing any change to `auth-service`, Kong, or any other backend service — all
+  of them independently trust `Authorization: Bearer <token>` read straight off
+  the request, and Kong's `jwt` plugin doesn't re-attach a cookie-extracted
+  token as a header for upstream services even if it could read one from a
+  cookie (unconfirmed either way against the live schema). Instead, this app
+  became a thin **BFF**: the browser now only ever calls its own origin, and
+  `src/app/api/[...path]/route.ts` is the _only_ thing that ever sees the
+  httpOnly cookie — it reads it server-side and attaches `Authorization: Bearer`
+  on a server-to-server call to Kong (`API_GATEWAY_URL` in prod) or the local
+  service URLs in dev (`src/lib/bff/upstream.ts`, replacing `next.config.mjs`'s
+  old dev-only `rewrites()`, which is now deleted entirely).
+  - **Cookies:** `access_token` (`Path=/`, 15min) and `refresh_token`
+    (`Path=/api` — not `/api/auth`, since the proxy's own refresh-retry at e.g.
+    `/api/stocks/...` needs it too), both httpOnly, `Secure` in production,
+    `SameSite=Lax`, host-only (no `Domain` attribute — scoped to
+    `stocks.yanatech.co.uk` only, deliberately not shared with other
+    `*.yanatech.co.uk` subdomains in this cluster). `src/lib/bff/cookies.ts`.
+  - **Server-side 401-refresh-retry:** on a 401, the catch-all proxy reads
+    `refresh_token`, calls auth-service's `/refresh`, retries the original
+    request once with the new access token — all invisible to the client.
+    `src/lib/bff/refresh.ts` dedupes concurrent refreshes for the _same_ refresh
+    token (it's single-use/rotated server-side — without this, several
+    concurrent 401s would each try to rotate it, and all but the first would
+    hard-fail a valid session) via an in-process `Map` keyed by token hash, plus
+    a ~10s "recently rotated" cache so a request holding an already-consumed
+    token still resolves correctly. Per-replica — fine today (frontend is a
+    fixed-replica Deployment); would need `sessionAffinity: ClientIP` if that
+    ever changes, or the fallback is just a spurious re-login, not a correctness
+    bug.
+  - **CSRF:** zero protection existed anywhere in the stack before this — and
+    httpOnly cookies auto-attach (a bearer token in JS never did). The proxy
+    rejects (403) any non-GET/HEAD request whose `Origin` header is present and
+    doesn't match its own origin, alongside `SameSite=Lax`.
+  - **`AuthContext.tsx`/`lib/api.ts`:** both lost their token-handling entirely
+    — no more `sessionStorage`, no more client-side retry-on-401 (the BFF
+    already tried). This also deleted a real bug: `lib/api.ts` had its own
+    **second, independent** token-refresh implementation
+    (`isRefreshing`/`failedQueue`), completely unaware of `AuthContext.tsx`'s
+    equivalent — both are gone now, replaced by the one server-side
+    implementation above. `isAuthenticated` is now derived by calling
+    `GET /api/auth/me` on mount (200 vs 401) rather than checking for a
+    JS-readable token, since there isn't one anymore.
+  - **`proxy.ts` auth gate:** presence-check only (no JWT verification, no
+    `JWT_SECRET` in the frontend) — redirects to `/login` if `access_token` is
+    absent on a protected route. Pure UX optimization (no flash of protected
+    content); real enforcement is unchanged (Kong's signature check + each
+    service's guard). This closed a real gap found while investigating:
+    `/stocks/[symbol]` had **no** client-side auth guard at all before this — it
+    relied entirely on an API 401 plus `lib/api.ts`'s hard redirect.
 - **Lighthouse CI** (2026-07-22, upgraded to a real server 2026-07-22):
   `pnpm --filter @yana-stocks/frontend lighthouse`
   (`apps/frontend/lighthouserc.json`, `@lhci/cli`) runs Lighthouse 3x against

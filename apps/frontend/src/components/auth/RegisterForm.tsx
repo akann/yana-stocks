@@ -17,8 +17,7 @@ export function RegisterForm(): React.JSX.Element {
     setError('');
     setLoading(true);
     try {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api';
-      await axios.post(`${apiBase}/auth/register`, { email, name: name || undefined, password });
+      await axios.post('/api/auth/register', { email, name: name || undefined, password });
       setDone(true);
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 409) {
