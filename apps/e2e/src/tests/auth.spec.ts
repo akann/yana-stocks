@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures/base.fixture';
 import {
   MOCK_USER,
   MOCK_PROFILE,
+  BASE_URL,
   fulfill,
   setupAuthSession,
   mockMovers,
@@ -47,9 +48,20 @@ test.describe('Login page', () => {
   });
 
   test('redirects to /dashboard on successful login', async ({ page }) => {
-    await page.route(/\/api\/auth\/login$/, (route) =>
-      fulfill(route, { accessToken: 'tok', refreshToken: 'ref' }),
-    );
+    // Mocking the network response alone isn't enough post-migration: the real
+    // /api/auth/login route sets the httpOnly access_token cookie that
+    // proxy.ts's route guard checks for on /dashboard. page.route() intercepts
+    // the request before it ever reaches that real handler, so the mock must
+    // also seed the cookie itself (and match the real response shape,
+    // { mfaRequired }, not the pre-migration { accessToken, refreshToken }).
+    const cookieDomain = new URL(BASE_URL).hostname;
+    await page.route(/\/api\/auth\/login$/, async (route) => {
+      await page.context().addCookies([
+        { name: 'access_token', value: 'mock-access-token', domain: cookieDomain, path: '/' },
+        { name: 'refresh_token', value: 'mock-refresh-token', domain: cookieDomain, path: '/api' },
+      ]);
+      return fulfill(route, { mfaRequired: false });
+    });
     await page.route(/\/api\/auth\/me$/, (route) => fulfill(route, MOCK_USER));
     await page.route(/\/api\/profile\/me$/, (route) => fulfill(route, MOCK_PROFILE));
     await mockPortfoliosEndpoint(page);

@@ -5,6 +5,7 @@ import {
   mockAssets,
   mockMarketOverview,
   mockSectorRotation,
+  setupAuthSession,
   MOCK_UK_ASSETS_PAGE,
 } from '../fixtures/api-mocks';
 
@@ -131,6 +132,9 @@ test.describe('MarketBrowser', () => {
     page,
   }) => {
     await setup(page);
+    // /stocks/HSBA.L is a protected route (proxy.ts) — needs a session cookie
+    // or the navigation bounces to /login instead.
+    await setupAuthSession(page);
     // Mock the UK stock page endpoints so navigation succeeds.
     await page.route(/\/api\/stocks\/HSBA\.L$/, (route) =>
       fulfill(route, { symbol: 'HSBA.L', price: 640.5, change: 2.3, changePercent: 0.36 }),

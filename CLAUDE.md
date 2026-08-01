@@ -567,6 +567,42 @@ yana-stocks/
     written and still needed for the **build** step (it's read there to inline
     `NEXT_PUBLIC_WS_URL`), so that step stays; only the runtime services need
     the explicit env on the launch line.
+  - **e2e fixture gotcha, same day, found once the CI wiring above was fixed**:
+    with real backend connectivity restored, `e2e-tests` still failed — 112 of
+    189 tests, everything touching a now-protected route
+    (`/dashboard`/`/portfolio`/`/watchlist`/`/stocks/*`/`/profile`). Root cause:
+    the migration rewrote route-gating to check the real httpOnly `access_token`
+    cookie (`proxy.ts`, `AuthContext.tsx`), but the e2e mock fixtures were never
+    updated — `apps/e2e/src/fixtures/api-mocks.ts`'s `setupAuthSession()` and
+    `apps/e2e/src/fixtures/base.fixture.ts`'s `seedAuth()` (used by
+    `setupStockMocks()`) both still seeded `sessionStorage`, which nothing in
+    the app reads anymore. Same root cause also broke the login-redirect test
+    directly: it mocked `POST /api/auth/login` via `page.route()`, which
+    intercepts the request before it ever reaches the real route handler that
+    calls `setAuthCookies()` — so the redirect to `/dashboard` bounced straight
+    back to `/login`. Fixed by switching both helpers to
+    `page.context().addCookies(...)` (matching `cookies.ts`'s real names/paths:
+    `access_token` at `/`, `refresh_token` at `/api`) and making the login-route
+    mock set those cookies itself plus return the real `{ mfaRequired }` shape
+    instead of the pre-migration `{ accessToken, refreshToken }` body. One test
+    in `market.spec.ts`
+    (`clicking a UK stock link navigates to /stocks/HSBA.L...`) had never called
+    any of these helpers at all and needed `setupAuthSession()` added outright.
+    **Cookie gotcha within the fix itself**: Playwright's `addCookies()` rejects
+    `url` + `path` together ("Cookie should have either url or path") — caught
+    by actually running the suite locally
+    (`pnpm --filter @yana-stocks/frontend dev` +
+    `playwright test <spec> --project=chromium` against it) before pushing a
+    second time, not by reasoning alone; fixed by using `domain` (the `BASE_URL`
+    hostname) + `path` instead. That same local run also surfaced that the
+    homepage's real server-side data prefetch (see the SSR/ISR note above) needs
+    `E2E_TEST_MODE=true` set on the dev server to skip — without it,
+    `page.route()` client-side mocks don't cover the SSR-rendered initial HTML
+    at all, producing flaky-looking mismatches unrelated to any real bug. 51/52
+    previously-broken chromium tests passed after the fix; the one remaining
+    failure (`MarketBrowser › search with no match shows empty state message`)
+    reproduces identically on the pre-fix commit too — pre-existing
+    debounce-timing flakiness, not a regression.
 - **Lighthouse CI** (2026-07-22, upgraded to a real server 2026-07-22):
   `pnpm --filter @yana-stocks/frontend lighthouse`
   (`apps/frontend/lighthouserc.json`, `@lhci/cli`) runs Lighthouse 3x against

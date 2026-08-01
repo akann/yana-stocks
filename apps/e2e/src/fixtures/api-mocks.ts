@@ -28,12 +28,21 @@ export function fulfill(route: Route, body: unknown, status = 200): Promise<void
   });
 }
 
-/** Seeds sessionStorage and mocks /auth/me + /profile/me for an authenticated session. */
+export const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
+const COOKIE_DOMAIN = new URL(BASE_URL).hostname;
+
+/**
+ * Seeds real access_token/refresh_token cookies (names/paths match
+ * src/lib/bff/cookies.ts) and mocks /auth/me + /profile/me for an
+ * authenticated session. proxy.ts's route guard and AuthContext's identity
+ * check both read the httpOnly cookie itself since the 2026-07-31
+ * auth-cookie migration, not any client-side storage.
+ */
 export async function setupAuthSession(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    sessionStorage.setItem('access_token', 'mock-access-token');
-    sessionStorage.setItem('refresh_token', 'mock-refresh-token');
-  });
+  await page.context().addCookies([
+    { name: 'access_token', value: 'mock-access-token', domain: COOKIE_DOMAIN, path: '/' },
+    { name: 'refresh_token', value: 'mock-refresh-token', domain: COOKIE_DOMAIN, path: '/api' },
+  ]);
   await page.route(/\/api\/auth\/me$/, (route) => fulfill(route, MOCK_USER));
   await page.route(/\/api\/profile\/me$/, (route) => fulfill(route, MOCK_PROFILE));
 }
