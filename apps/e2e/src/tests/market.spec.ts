@@ -33,8 +33,12 @@ test.describe('Market dashboard — Navbar SymbolSearch (desktop only)', () => {
 
     // SymbolSearch: pressing Enter with no dropdown selection navigates to
     // query.trim().toUpperCase() — no need to wait for the autocomplete dropdown.
+    // pressSequentially, not fill() — see the note on the equivalent MarketBrowser
+    // search test below for why fill() is unreliable for this app's controlled
+    // inputs on the mobile-safari (WebKit) project.
     const input = page.getByPlaceholder('Search symbol…');
-    await input.fill('nvda');
+    await input.click();
+    await input.pressSequentially('nvda');
     await input.press('Enter');
     await page.waitForURL(/\/stocks\/NVDA/, { timeout: 10_000 });
 
@@ -197,7 +201,18 @@ test.describe('MarketBrowser', () => {
     });
     await page.goto('/');
 
-    await page.getByPlaceholder('Search symbol or name…').fill('ZZZZ');
+    // .fill() sets the DOM value directly and (on this input, only on the
+    // mobile-safari/WebKit project) never dispatches a real `input` event —
+    // confirmed by attaching a plain addEventListener('input', ...) directly
+    // to the element: it never fires, so React's onChange (and therefore
+    // setSearch) never runs and the box silently reverts to empty on the next
+    // render. pressSequentially() simulates real keystrokes instead, which
+    // WebKit reliably turns into native input events same as a real user
+    // typing — this is a test/automation-layer gap, not an app bug, so the
+    // fix belongs here rather than in MarketBrowser.tsx.
+    const input = page.getByPlaceholder('Search symbol or name…');
+    await input.click();
+    await input.pressSequentially('ZZZZ');
     // TanStack Query's placeholderData keeps showing old results while the new fetch
     // is in flight. Wait for network to settle so React has committed the empty state.
     await page.waitForLoadState('networkidle');

@@ -601,8 +601,33 @@ yana-stocks/
     at all, producing flaky-looking mismatches unrelated to any real bug. 51/52
     previously-broken chromium tests passed after the fix; the one remaining
     failure (`MarketBrowser › search with no match shows empty state message`)
-    reproduces identically on the pre-fix commit too — pre-existing
-    debounce-timing flakiness, not a regression.
+    reproduces identically on the pre-fix commit too — pre-existing flakiness,
+    not a regression, root-caused and fixed 2026-08-01 below.
+- **`.fill()` silently no-ops on controlled inputs, mobile-safari project only
+  (root-caused and fixed 2026-08-01):** the
+  `search with no match shows empty state message` test above (and a second,
+  same-shape one,
+  `Navbar symbol search uppercases and navigates to /stocks/:SYMBOL on Enter`)
+  intermittently failed in CI on `mobile-safari` — previously assumed to be
+  "pre-existing debounce-timing flakiness" (see above), which turned out to be
+  wrong. Actually root-caused via a real local reproduction (a standalone
+  `next build`/`next start` run, matching CI, not `next dev` — dev mode adds its
+  own unrelated React Strict Mode double-mount noise that has to be ruled out
+  first) plus direct instrumentation: a plain
+  `element.addEventListener('input', ...)` attached straight to the DOM node
+  confirmed that Playwright's `.fill('ZZZZ')`, on the `mobile-safari` (WebKit)
+  project only, sets the input's DOM `.value` directly but never dispatches a
+  real `input` event for these two specific inputs — so React's `onChange` (and
+  therefore `setSearch`/`setQuery`) never fires, the query for the typed value
+  never goes out, and the controlled input's value silently reverts to empty on
+  the next unrelated re-render. Confirmed as a test/automation-layer gap, not an
+  app bug: `MarketBrowser.tsx`/`SymbolSearch.tsx` are both ordinary controlled
+  inputs, and switching the test from `.fill()` to `.click()` +
+  `.pressSequentially()` (real per-keystroke key events, which WebKit reliably
+  turns into genuine `input` events) fixed both tests deterministically —
+  verified 12+ repeats clean on both `chromium` and `mobile-safari`, in both
+  `next dev` and a real standalone prod build. No
+  `MarketBrowser.tsx`/`SymbolSearch.tsx` changes were needed or made.
 - **Lighthouse CI** (2026-07-22, upgraded to a real server 2026-07-22):
   `pnpm --filter @yana-stocks/frontend lighthouse`
   (`apps/frontend/lighthouserc.json`, `@lhci/cli`) runs Lighthouse 3x against
