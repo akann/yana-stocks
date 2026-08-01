@@ -14,7 +14,24 @@ export const runtime = 'nodejs';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD']);
 // Hop-by-hop or leg-specific — must not be copied onto the server-to-server fetch.
-const STRIP_REQUEST_HEADERS = new Set(['cookie', 'host', 'connection', 'content-length']);
+// x-forwarded-host/-port describe THIS origin (stocks.yanatech.co.uk) as seen by
+// ingress-nginx on the inbound request — forwarding them onto the outbound call
+// to Kong (API_GATEWAY_URL) is wrong, since that's a brand-new request to a
+// different origin, not a continuation of the inbound one. Kong trusts
+// X-Forwarded-Host for its own route matching (it sits behind another proxy),
+// so leaking the original Host here made Kong route on "stocks.yanatech.co.uk"
+// — which has no Kong route at all, only an nginx ingress straight to this
+// frontend — instead of api-gateway.yanatech.co.uk, breaking every proxied
+// call with "no Route matched" 404s. x-forwarded-for/-proto are kept: Kong's
+// IP-scoped rate-limiting plugin needs the real client IP, not this pod's.
+const STRIP_REQUEST_HEADERS = new Set([
+  'cookie',
+  'host',
+  'connection',
+  'content-length',
+  'x-forwarded-host',
+  'x-forwarded-port',
+]);
 // Already-decoded (undici) or leg-specific — must not be copied onto our own response.
 const STRIP_RESPONSE_HEADERS = new Set([
   'content-encoding',

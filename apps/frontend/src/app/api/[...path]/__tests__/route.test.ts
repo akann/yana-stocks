@@ -67,6 +67,27 @@ describe('[...path] catch-all proxy', () => {
     expect(sentHeaders.get('authorization')).toBe('Bearer AT123');
   });
 
+  // Regression: Kong trusts X-Forwarded-Host for its own route matching (it
+  // sits behind ingress-nginx). Forwarding the inbound request's own
+  // X-Forwarded-Host (this origin, stocks.yanatech.co.uk) onto the outbound
+  // call to Kong made Kong route on the wrong host — which has no Kong route
+  // at all — breaking every proxied call with a 404 "no Route matched" in
+  // production (2026-08-01).
+  it('does not forward X-Forwarded-Host/-Port from the inbound request to the upstream fetch', async () => {
+    mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
+    await call(
+      'GET',
+      req('GET', 'http://localhost:3000/api/market/movers', {
+        headers: { 'x-forwarded-host': 'stocks.yanatech.co.uk', 'x-forwarded-port': '443' },
+      }),
+      ['market', 'movers'],
+    );
+
+    const sentHeaders = mockFetch.mock.calls[0]?.[1]?.headers as Headers;
+    expect(sentHeaders.get('x-forwarded-host')).toBeNull();
+    expect(sentHeaders.get('x-forwarded-port')).toBeNull();
+  });
+
   it('sends no Authorization header when there is no access_token cookie', async () => {
     mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
     await call('GET', req('GET', 'http://localhost:3000/api/market/overview'), [
