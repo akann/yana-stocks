@@ -4,7 +4,7 @@ import contextlib
 from datetime import datetime
 
 import pymongo
-from pymongo import MongoClient
+from pymongo import MongoClient, errors
 from pymongo.collection import Collection
 from pymongo.database import Database
 
@@ -44,7 +44,7 @@ class ArticleStorage:
         return self._articles.count_documents({"url": url}, limit=1) == 0
 
     def save(self, doc: dict[str, object]) -> None:
-        with contextlib.suppress(pymongo.errors.DuplicateKeyError):
+        with contextlib.suppress(errors.DuplicateKeyError):
             self._articles.insert_one(doc)
 
     def recent_for_symbol(self, symbol: str, limit: int = 10) -> list[dict[str, object]]:
