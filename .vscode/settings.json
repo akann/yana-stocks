@@ -1,0 +1,3 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/services/sentiment-analyzer/.venv/bin/python"
+}
